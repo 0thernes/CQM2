@@ -1,0 +1,34 @@
+name: Bug report
+description: Report a reproducible bug, numerical conservation drift, shader issue, or hardware accelerator error
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for reporting an issue in **CQM2**. Please include exact seed and hardware/browser details for deterministic reproduction.
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary & Symptoms
+      description: What happened vs. what you expected?
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Deterministic Reproduction Steps
+      description: Include World Seed, Entropy Mode, and URL query parameters if applicable.
+      placeholder: |
+        1. Start CQM2 (`bun run start` or open Pages URL with `?seed=42`)
+        2. Switch to Brain-Lab tab and toggle `backwards`
+        3. Observe ...
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: Hardware, OS & Browser
+      placeholder: "Windows 11, MSI Vector 16 HX AI (RTX 5070 Ti + Intel AI Boost NPU), Chrome 142 / Bun 1.3.14"
+    validations:
+      required: true

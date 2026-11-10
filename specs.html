@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="CQM2 v2.0.0 500-Point Grade-A Specifications, Conservation Tolerances, and R21 Causal Benchmarks." />
+    <title>CQM2 Specifications — Conservation Laws, R21 Benchmarks &amp; Budgets</title>
+    <link rel="icon" type="image/svg+xml" href="favicon.svg" />
+    <link rel="stylesheet" href="assets/tokens.css" />
+  </head>
+  <body>
+    <a href="#spec-main" class="skip-link">Skip to specifications</a>
+    <main id="spec-main" class="doc-container">
+      <nav class="doc-nav" aria-label="Specifications navigation">
+        <a href="index.html" class="btn btn-primary">← Launch 4K Observatory</a>
+        <a href="docs.html" class="btn">Architecture &amp; ERD</a>
+        <a href="glossary.html" class="btn">Glossary</a>
+        <a href="downloads.html" class="btn">Downloads &amp; License</a>
+      </nav>
+
+      <section class="panel-card" style="margin-bottom: 18px;">
+        <h1>CQM2 Quantitative Specifications &amp; Grade-A Verification Gates</h1>
+        <div class="data-table-wrap">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Invariant / Gate</th>
+                <th>Mathematical Specification</th>
+                <th>Target Threshold</th>
+                <th>Verification Mechanism</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>First-Law Metabolic Conservation</td>
+                <td><span class="mono">|Σ_{k=0..14} P_k(t) - E_intake(t)| / max(1, E_intake)</span></td>
+                <td><span class="mono">&lt; 1.0 × 10⁻¹²</span></td>
+                <td>Rust 1.94 Kahan FFI + TS Reference Auditor</td>
+              </tr>
+              <tr>
+                <td>Unitary Quantum Norm Preservation</td>
+                <td><span class="mono">|⟨ψ(t)|ψ(t)⟩¹/² - 1|</span></td>
+                <td><span class="mono">&lt; 1.0 × 10⁻¹²</span></td>
+                <td>SU(2) Givens Braid in <code>ZeroGcQuantumRegister</code></td>
+              </tr>
+              <tr>
+                <td>Hoggar Contextual Hexagon H(2)</td>
+                <td>3-qubit isotropic lines with <span class="mono">|g_μν| &gt; 1/12</span>; trace <span class="mono">Tr(g)</span></td>
+                <td><span class="mono">63 lines, Tr = 14.0</span></td>
+                <td>Zig <code>cqm2_hoggar_qgt_violated_hexagon_count</code></td>
+              </tr>
+              <tr>
+                <td>Schwarzschild Photon Sphere Capture</td>
+                <td>Critical impact parameter <span class="mono">b_crit / M = √27</span></td>
+                <td><span class="mono">5.1961524227 M</span></td>
+                <td>Zig RK4 Binet Geodesic Integrator</td>
+              </tr>
+              <tr>
+                <td>Glossodrom Zooid Error Correction</td>
+                <td>Systematic <span class="mono">RS[15, 11]</span> over <span class="mono">GF(2⁴)</span> (<span class="mono">d_min = 5</span>)</td>
+                <td><span class="mono">100% recovery ≤ 2 errors</span></td>
+                <td>Peterson + Chien + Forney Algebraic Decoder</td>
+              </tr>
+              <tr>
+                <td>R21 Causal Lesion Benchmarks</td>
+                <td><code>VOI</code>, <code>CQM10</code>, <code>C16R</code>, <code>HOT-3</code> intact vs lesion</td>
+                <td><span class="mono">Cohen's d ≥ 0.8, t ≥ 2.75</span></td>
+                <td>24-trial/arm deterministic lesion runner</td>
+              </tr>
+              <tr>
+                <td>WCAG 2.3.1 Photosensitive Safety</td>
+                <td>Temporal luminance / shader pulse frequency</td>
+                <td><span class="mono">≤ 2.2 Hz</span> hard clamp</td>
+                <td><code>sanitizeGodDials</code> + GLSL uniform clamp</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </main>
+  </body>
+</html>

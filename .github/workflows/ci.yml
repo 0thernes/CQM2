@@ -1,0 +1,65 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    - cron: '0 6 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  gate:
+    name: Full Verification Gate (Ubuntu)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+
+      - name: Set up Node.js 24
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version: '1.3.14'
+
+      - name: Install dependencies (frozen lockfile)
+        run: bun install --frozen-lockfile
+
+      - name: TypeScript strict check
+        run: bun run typecheck
+
+      - name: Static lint, secret & hygiene audit
+        run: bun run lint
+
+      - name: Automated test suite & coverage gate
+        run: bun run test
+
+      - name: Production & GitHub Pages build
+        run: bun run build && bun run pages
+
+      - name: Local HTTP server smoke test
+        run: bun run smoke
+
+      - name: GitHub Repo Standard 20-point check
+        run: |
+          if [ -z "$(git tag -l 'v*')" ]; then
+            node scripts/repo-check.mjs . --pre-release
+          else
+            node scripts/repo-check.mjs .
+          fi

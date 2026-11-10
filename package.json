@@ -1,0 +1,44 @@
+{
+  "name": "cqm2",
+  "version": "2.0.0",
+  "description": "Cosmogonic Quantum Mechalogodrom 2 (CQM2) — Local-first NPU+GPU+CPU accelerated 4K artificial life, embodied synthetic cognition, quantum contextuality, and procedural morphogenesis workstation.",
+  "license": "SEE LICENSE IN LICENSE",
+  "author": "0thernes LLC <0_0@0thernes.art> (https://0thernes.art)",
+  "homepage": "https://0thernes.github.io/CQM2/",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/0thernes/CQM2.git"
+  },
+  "type": "module",
+  "private": false,
+  "engines": {
+    "bun": ">=1.3.0",
+    "node": ">=24.0.0"
+  },
+  "scripts": {
+    "dev": "bun run scripts/dev.ts",
+    "start": "bun run src/server/main.ts",
+    "build": "bun run scripts/build.ts",
+    "build:zig": "bun run scripts/build-zig.ts",
+    "build:native": "bun run scripts/build-native.ts",
+    "pages": "bun run scripts/build-pages.ts",
+    "typecheck": "bun ./node_modules/typescript/bin/tsc --noEmit",
+    "lint": "bun run scripts/lint.ts",
+    "test": "bun run scripts/run-tests.ts",
+    "test:unit": "bun test",
+    "repo:check": "node scripts/repo-check.mjs .",
+    "repo:check:remote": "node scripts/repo-check.mjs . --remote",
+    "sbom": "bun run scripts/sbom.ts",
+    "release:bundle": "bun run scripts/release-bundle.ts",
+    "smoke": "bun run scripts/smoke.ts",
+    "check": "bun run typecheck && bun run lint && bun run test && bun run build && bun run pages"
+  },
+  "dependencies": {
+    "three": "0.185.1"
+  },
+  "devDependencies": {
+    "@types/bun": "1.3.14",
+    "@types/three": "0.185.1",
+    "typescript": "5.9.3"
+  }
+}

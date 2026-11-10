@@ -1,0 +1,41 @@
+# Environment & Secrets (NEVER commit)
+.env
+.env.*
+!.env.example
+!.env.sample
+!.env.template
+
+# Dependencies & Caches
+node_modules/
+.bun/
+.uv/
+.venv/
+__pycache__/
+*.pyc
+
+# Build & Generated Distribution Outputs
+dist/
+site/
+coverage/
+release-artifacts/
+data/
+*.sqlite
+*.sqlite-wal
+*.sqlite-shm
+
+# Native Build Intermediates (prebuilt portable WASM is tracked; host DLLs/EXEs are built locally via bun run build:native)
+native/bin/
+native/obj/
+zig/.zig-cache/
+zig/zig-out/
+rust/target/
+go/bin/
+
+# OS & Editor Litter
+.DS_Store
+Thumbs.db
+desktop.ini
+*.log
+*.tmp
+.vscode/*
+!.vscode/settings.json

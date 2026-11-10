@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="CQM2 v2.0.0 Architecture, Entity Relationship Diagram (ERD/ERM/ERP), and Polyglot Hardware Documentation." />
+    <title>CQM2 Documentation — Architecture, ERD &amp; Tri-Engine Silicon</title>
+    <link rel="icon" type="image/svg+xml" href="favicon.svg" />
+    <link rel="stylesheet" href="assets/tokens.css" />
+  </head>
+  <body>
+    <a href="#doc-main" class="skip-link">Skip to documentation</a>
+    <main id="doc-main" class="doc-container">
+      <nav class="doc-nav" aria-label="Documentation navigation">
+        <a href="index.html" class="btn btn-primary">← Launch 4K Observatory</a>
+        <a href="specs.html" class="btn">500-Point Specs</a>
+        <a href="glossary.html" class="btn">Glossary</a>
+        <a href="downloads.html" class="btn">Downloads &amp; License</a>
+      </nav>
+
+      <section class="panel-card" style="margin-bottom: 18px;">
+        <h1>Cosmogonic Quantum Mechalogodrom 2 — Architecture &amp; Entity-Relational Design</h1>
+        <p class="mono">Version 2.0.0 · 0thernes LLC · Non-Commercial Research &amp; Play License</p>
+        <p>
+          CQM2 is a ground-up local-first and universal-browser full-stack refactor of the Cosmogonic Quantum Mechalogodrom.
+          It eliminates heap-allocated per-entity scene objects, proposal-only accelerator stubs, and monolithic state files
+          in favor of a <strong>10-table normalized Structure-of-Arrays (SoA) &amp; 3NF SQLite WAL Entity Relational Programming (ERP)</strong> core.
+        </p>
+      </section>
+
+      <section class="panel-card" style="margin-bottom: 18px;">
+        <h2>1. Heterogeneous Tri-Engine Silicon Partitioning</h2>
+        <div class="data-table-wrap">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Processor Unit</th>
+                <th>Workstation Silicon Target</th>
+                <th>Native / Browser Runtime</th>
+                <th>Assigned Scientific Workload</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><strong>dGPU</strong></td>
+                <td>NVIDIA GeForce RTX 5070 Ti Laptop GPU</td>
+                <td>CUDA 12.9 <code>cuBLAS</code> DLL / Browser <code>WebGPU</code> + <code>WebGL2</code></td>
+                <td>Batched neural cortex SGEMM+tanh (~5.6 TFLOPS), 4K InstancedMesh, Kerr <code>g^4</code> photon-ring shaders</td>
+              </tr>
+              <tr>
+                <td><strong>NPU</strong></td>
+                <td>Intel(R) AI Boost (2 Slices, Level Zero)</td>
+                <td>Persistent OpenVINO <code>NPU</code> JSON-Lines Daemon</td>
+                <td>Sub-millisecond (~0.6 ms) <code>AsmodeniusRSSMWorldModel</code> latent rollout imagination</td>
+              </tr>
+              <tr>
+                <td><strong>iGPU</strong></td>
+                <td>Intel(R) Graphics</td>
+                <td>Windows <code>DXCore + DirectML</code> / OpenVINO <code>GPU.0</code></td>
+                <td>Auxiliary <code>GlitchlingSensoryUnscrambler</code> associative inference</td>
+              </tr>
+              <tr>
+                <td><strong>CPU + WASM</strong></td>
+                <td>Intel(R) Core(TM) Ultra 9 275HX (24 Cores)</td>
+                <td>Zig 0.17 SIMD128, x86-64 AVX2/FMA3/POPCNT ASM, Rust 1.94, Go 1.26</td>
+                <td>Larkum sLTC, Marr-Albus Cerebellum, Pauli Hoggar census, First-Law Kahan conservation, UDP OSC stream</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="panel-card" style="margin-bottom: 18px;">
+        <h2>2. Normalized 10-Entity Relational Model (ERD / ERM / ERP)</h2>
+        <ul>
+          <li><code>WorldEpoch (epoch_id PK)</code> — Master seed, simulation tick, Merkle root, free-energy reserve.</li>
+          <li><code>BiomeZone (biome_id PK, epoch_id FK)</code> — Nutrient kJ, detritus kJ, O2 saturation, osmolarity, temperature.</li>
+          <li><code>SpeciesLineage (species_id PK, parent_species_id self-FK)</code> — Caste role, Thingmaker Latin binomial, genome hash.</li>
+          <li><code>Organism (entity_id PK, species_id FK, biome_id FK)</code> — Spatial kinematics, mass, telomere integrity, congenital flaw mask.</li>
+          <li><code>MetabolicLedger (entity_id 1:1 PK/FK)</code> — 15 strictly conserved Cahill/Owen kJ pools + Antithetic Integral Controller states.</li>
+          <li><code>NeuralCortexState (entity_id 1:1 PK/FK)</code> — 126 SIMD weights, DA/ACh/NE/5-HT neuromodulators, PCI proxy, Frenet curvature κ, Free-Won't vetoes.</li>
+          <li><code>QuantumSubstrate (substrate_id PK, epoch_id FK, entity_id nullable FK)</code> — Symplectic Pauli qubits, Hoggar H(2)=63 violated lines, Berry curvature.</li>
+          <li><code>SocialBond (bond_id PK, source_entity_id FK, target_entity_id FK)</code> — Kinship, trust, self-healing Glossodrom RS[15,11] Zooid codeword.</li>
+          <li><code>CausalExperiment (experiment_id PK, epoch_id FK)</code> — R21 intact vs lesion means, Cohen's <em>d</em>, Welch's <em>t</em>.</li>
+          <li><code>HardwareDispatchReceipt (receipt_id PK, epoch_id FK)</code> — Per-tick GPU/NPU/Zig/Rust execution latency, GFLOPS, conservation verdict.</li>
+        </ul>
+      </section>
+
+      <section class="panel-card">
+        <h2>3. Scientific Honesty &amp; Safety Contract</h2>
+        <p>
+          Every neural, metacognitive, and perturbation metric in CQM2 (including Casali Perturbational Complexity Index, HOT-3 confidence,
+          and Kuramoto phase synchronization) is strictly typed as <code>ComputationalIndicatorContract</code> with
+          <code>sentienceClaim: 'NOT_SENTIENT'</code> and <code>indicatorOnly: true</code>. Simulated organisms possess zero subjective awareness.
+          Within the 22-pillar Tsotchke integration, <code>OBLITERATUS</code> is permanently quarantined behind a non-executable read-only fence.
+        </p>
+      </section>
+    </main>
+  </body>
+</html>

@@ -1,0 +1,9 @@
+name: "CQM2 CodeQL Config"
+paths:
+  - src
+  - scripts
+paths-ignore:
+  - dist
+  - site
+  - node_modules
+  - docs

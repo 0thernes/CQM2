@@ -1,0 +1,8 @@
+#!/usr/bin/env sh
+# CQM2 Pre-Push Quality, Secret Scan & Tag Immutability Hook (I-203, I-221, T-447)
+set -e
+
+echo "[pre-push] Running strict typecheck, lint/secret scan, and automated tests..."
+bun run typecheck
+bun run lint
+bun run test

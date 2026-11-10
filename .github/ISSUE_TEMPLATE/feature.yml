@@ -1,0 +1,19 @@
+name: Research / Feature suggestion
+description: Propose a mathematical kernel, A-Life experiment, shader enhancement, or benchmark test
+title: "[Feature]: "
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Scientific / Engineering Proposal
+      description: Describe the proposed capability, equation, or UI enhancement and how it couples causally into CQM2 ("nothing cosmetic").
+    validations:
+      required: true
+  - type: textarea
+    id: verification
+    attributes:
+      label: Verification & Falsifiability Criteria
+      description: What closed-form invariant, conservation law, or Cohen's d / Welch's t lesion test would verify it?
+    validations:
+      required: false
