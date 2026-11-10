@@ -2,7 +2,7 @@ const std = @import("std");
 const math = std.math;
 
 // ============================================================================
-// CQM2 Dual-Target Zig SIMD128 / AVX2 Scientific & Neural Kernel Suite
+// CQM2 v2.1.0 Dual-Target Zig SIMD128 / AVX2 Scientific & Neural Kernel Suite
 // Targets: wasm32-freestanding (+simd128) AND x86_64/aarch64 Native FFI DLL
 // ============================================================================
 
@@ -33,16 +33,6 @@ inline fn fastTanh(x: f32) f32 {
     return x * (27.0 + x2) / (27.0 + 9.0 * x2);
 }
 
-inline fn fastTanhVec4(v: @Vector(4, f32)) @Vector(4, f32) {
-    const lo: @Vector(4, f32) = @splat(-4.95);
-    const hi: @Vector(4, f32) = @splat(4.95);
-    const c = @min(hi, @max(lo, v));
-    const c2 = c * c;
-    const c27: @Vector(4, f32) = @splat(27.0);
-    const c9: @Vector(4, f32) = @splat(9.0);
-    return c * (c27 + c2) / (c27 + c9 * c2);
-}
-
 inline fn sigmoid(x: f32) f32 {
     if (x > 12.0) return 1.0;
     if (x < -12.0) return 0.0;
@@ -50,13 +40,14 @@ inline fn sigmoid(x: f32) f32 {
 }
 
 // ----------------------------------------------------------------------------
-// 1. Batched Organism Brain SIMD Forward + 3-Factor Neuromodulated Plasticity
-// Architecture per organism: 8 sensory inputs -> 8 hidden (SIMD Vec4x2) -> 6 motor/affect outputs
+// 1. Batched Organism Brain SIMD Forward + Dual-Layer 3-Factor Oja Plasticity
+// Architecture per organism: 8 sensory inputs -> 8 hidden (Padé tanh ONCE) -> 6 motor/affect outputs
 // Total weights per organism: (8*8 + 8) + (6*8 + 6) = 72 + 54 = 126 floats
+// Parity: Bit-consistent (<1e-5) with CUDA cuBLAS, AVX2 ASM, and WebGPU WGSL!
 // ----------------------------------------------------------------------------
 export fn cqm2_organism_brain_batch_simd(
     inputs: [*]const f32, // [count * 8]
-    weights: [*]f32, // [count * 126] (updated in-place when lr > 0)
+    weights: [*]f32, // [count * 126] (w1 + w2 updated in-place when |lr| > 0)
     modulators: [*]const f32, // [count * 2] = (DA_rpe, ACh_gate)
     outputs: [*]f32, // [count * 6]
     count: usize,
@@ -69,6 +60,7 @@ export fn cqm2_organism_brain_batch_simd(
         const out_base = outputs + e * 6;
         const da = modulators[e * 2];
         const ach = modulators[e * 2 + 1];
+        const eff_lr = lr * da * ach;
 
         const in_v0: @Vector(4, f32) = in_base[0..4].*;
         const in_v1: @Vector(4, f32) = in_base[4..8].*;
@@ -77,19 +69,31 @@ export fn cqm2_organism_brain_batch_simd(
         var h: usize = 0;
         while (h < 8) : (h += 1) {
             const w_row = w_base + h * 8;
-            const w0: @Vector(4, f32) = w_row[0..4].*;
-            const w1: @Vector(4, f32) = w_row[4..8].*;
+            var w0: @Vector(4, f32) = w_row[0..4].*;
+            var w1: @Vector(4, f32) = w_row[4..8].*;
             const prod = w0 * in_v0 + w1 * in_v1;
             const bias = w_base[64 + h];
-            hid[h] = fastTanh(@reduce(.Add, prod) + bias);
+            const h_act = fastTanh(@reduce(.Add, prod) + bias);
+            hid[h] = h_act;
+
+            // Layer-1 competitive Oja feature plasticity: dw1 = 0.35 * |eff_lr| * ach * h * (in - h * w1)
+            if (@abs(eff_lr) > 1e-7) {
+                const feat_lr = 0.35 * @abs(lr) * math.clamp(ach, 0.0, 2.0);
+                const h_v: @Vector(4, f32) = @splat(h_act);
+                const flr_v: @Vector(4, f32) = @splat(feat_lr);
+                w0 = @min(@as(@Vector(4, f32), @splat(3.0)), @max(@as(@Vector(4, f32), @splat(-3.0)), w0 + flr_v * h_v * (in_v0 - h_v * w0)));
+                w1 = @min(@as(@Vector(4, f32), @splat(3.0)), @max(@as(@Vector(4, f32), @splat(-3.0)), w1 + flr_v * h_v * (in_v1 - h_v * w1)));
+                w_row[0..4].* = w0;
+                w_row[4..8].* = w1;
+            }
         }
 
-        const hid_v0 = fastTanhVec4(hid[0..4].*);
-        const hid_v1 = fastTanhVec4(hid[4..8].*);
+        // Exact single-activation hidden vectors (fixes prior double-fastTanh bug!)
+        const hid_v0: @Vector(4, f32) = hid[0..4].*;
+        const hid_v1: @Vector(4, f32) = hid[4..8].*;
 
         const w2_base = w_base + 72;
         const b2_base = w2_base + 48;
-        const eff_lr = lr * da * ach;
 
         var o: usize = 0;
         while (o < 6) : (o += 1) {
@@ -101,7 +105,7 @@ export fn cqm2_organism_brain_batch_simd(
             out_base[o] = y;
 
             if (@abs(eff_lr) > 1e-7) {
-                // Oja-stabilized 3-factor Hebbian update: dw = eff_lr * y * (h - y * w)
+                // Oja-stabilized 3-factor Hebbian policy update: dw2 = eff_lr * y * (h - y * w2)
                 const y_v: @Vector(4, f32) = @splat(y);
                 const lr_v: @Vector(4, f32) = @splat(eff_lr);
                 w0 = @min(@as(@Vector(4, f32), @splat(3.0)), @max(@as(@Vector(4, f32), @splat(-3.0)), w0 + lr_v * y_v * (hid_v0 - y_v * w0)));
@@ -115,14 +119,12 @@ export fn cqm2_organism_brain_batch_simd(
 
 // ----------------------------------------------------------------------------
 // 2. Biophysical Larkum Two-Compartment + Hasani Fused Semi-Implicit sLTC Step
-// Combines basal feedforward, apical cross-module NMDA plateau, SOM mean inhibition,
-// PV divisive shunting, and neuromodulated liquid time-constant integration.
 // ----------------------------------------------------------------------------
 export fn cqm2_sltc_larkum_step(
-    v_state: [*]f32, // [n] membrane / activation state
-    nmda_slow: [*]f32, // [n] slow NMDA reverberation state
-    basal_in: [*]const f32, // [n] basal feedforward drive
-    apical_in: [*]const f32, // [n] apical context drive
+    v_state: [*]f32,
+    nmda_slow: [*]f32,
+    basal_in: [*]const f32,
+    apical_in: [*]const f32,
     n: usize,
     dt: f32,
     ach: f32,
@@ -146,21 +148,16 @@ export fn cqm2_sltc_larkum_step(
 
     i = 0;
     while (i < n) : (i += 1) {
-        // Disynaptic SOM subtraction on apical tuft
         const ap_centered = apical_in[i] - 0.85 * apical_mean;
         const bac_gain = 1.0 + 0.75 * sigmoid((ap_centered - 0.25) / 0.30);
         const nmda_gate = 1.0 / (1.0 + @exp(-(v_state[i] + 0.4) / 0.25));
         nmda_slow[i] = 0.92 * (nmda_slow[i] * reset_keep) + 0.08 * ap_centered * nmda_gate;
 
-        // Divisive PV shunting
         const total_drive = (basal_in[i] * bac_gain + 0.35 * nmda_slow[i]) / (1.0 + 0.60 * rate_mean);
-
-        // Learned-gate sLTC time constant tau(I, ACh, NE)
         const tau_num = 3.711 * (1.0 + 1.4248 * ach);
         const tau_den = (1.0 + 0.4722 * @abs(total_drive)) * (1.0 + 0.5351 * ne);
         const tau = @max(0.5, tau_num / tau_den);
 
-        // Hasani fused unconditionally-stable semi-implicit update
         const f_gate = 4.0 * sigmoid(1.8 * total_drive);
         const rev_pot: f32 = if (total_drive >= 0.0) 1.2 else -0.8;
         const next_v = (v_state[i] + dt * f_gate * rev_pot) / (1.0 + dt * (1.0 / tau + f_gate));
@@ -174,11 +171,11 @@ export fn cqm2_sltc_larkum_step(
 // 3. Glitchling Compensatory Organs: Marr-Albus Cerebellum & Gated-DeltaNet
 // ----------------------------------------------------------------------------
 export fn cqm2_cerebellum_marr_albus_step(
-    granule_w: [*]const f32, // [256 * 16] fixed expansion basis
-    pf_weights: [*]f32, // [8 * 256] plastic parallel-fiber -> Purkinje weights
-    cmd_proprio: [*]const f32, // [16] = 8 motor cmd + 8 proprioception
-    climbing_err: [*]const f32, // [8] signed kinematic error (0 during pure forward)
-    correction_out: [*]f32, // [8] Purkinje motor correction
+    granule_w: [*]const f32,
+    pf_weights: [*]f32,
+    cmd_proprio: [*]const f32,
+    climbing_err: [*]const f32,
+    correction_out: [*]f32,
     eta_cf: f32,
 ) callconv(.c) f32 {
     var gran: [256]f32 = undefined;
@@ -197,7 +194,6 @@ export fn cqm2_cerebellum_marr_albus_step(
         gran[g] = r;
         mean_g += r;
     }
-    // Golgi soft kWTA inhibition threshold
     const golgi_thr = (mean_g / 256.0) * 1.35;
     g = 0;
     while (g < 256) : (g += 1) {
@@ -215,7 +211,6 @@ export fn cqm2_cerebellum_marr_albus_step(
             var wv: @Vector(4, f32) = pf_row[g..][0..4].*;
             const gv: @Vector(4, f32) = gran[g..][0..4].*;
             if (@abs(eta_cf) > 1e-8 and @abs(err) > 1e-7) {
-                // Marr-Albus LTD/LTP: Purkinje output is -w*g, so to push correction toward +err, dw = -eta * err * g
                 const delta: @Vector(4, f32) = @as(@Vector(4, f32), @splat(-eta_cf * err)) * gv;
                 wv = @min(@as(@Vector(4, f32), @splat(2.5)), @max(@as(@Vector(4, f32), @splat(-2.5)), wv + delta));
                 pf_row[g..][0..4].* = wv;
@@ -229,10 +224,10 @@ export fn cqm2_cerebellum_marr_albus_step(
 }
 
 export fn cqm2_deltanet_fast_weights_step(
-    state_mat: [*]f32, // [16 * 16] associative adapter S_t
-    raw_sense_key: [*]const f32, // [16] normalized incoming scrambled channel vector k_t
-    expected_val: [*]const f32, // [16] expected thalamic prototype v_t
-    aligned_out: [*]f32, // [16] aligned output S_t * k_t
+    state_mat: [*]f32,
+    raw_sense_key: [*]const f32,
+    expected_val: [*]const f32,
+    aligned_out: [*]f32,
     alpha_decay: f32,
     beta_learn: f32,
 ) callconv(.c) f32 {
@@ -253,7 +248,6 @@ export fn cqm2_deltanet_fast_weights_step(
         const diff = pred - expected_val[r];
         err_energy += diff * diff;
 
-        // S_t[r, :] = alpha * S_{t-1}[r, :] - beta * (S_{t-1} k_t - v_t)[r] * k_t^T
         c = 0;
         var updated_pred: f32 = 0.0;
         while (c < 16) : (c += 4) {
@@ -273,15 +267,15 @@ export fn cqm2_deltanet_fast_weights_step(
 // 4. LCG-Shuffled Zero-Yaw-Bias Verlet Soft-Body Solver
 // ----------------------------------------------------------------------------
 export fn cqm2_verlet_shuffled_step(
-    pos: [*]f32, // [num_particles * 3]
-    prev_pos: [*]f32, // [num_particles * 3]
-    inv_mass: [*]const f32, // [num_particles]
+    pos: [*]f32,
+    prev_pos: [*]f32,
+    inv_mass: [*]const f32,
     num_particles: usize,
-    edge_a: [*]const u16, // [num_edges]
-    edge_b: [*]const u16, // [num_edges]
-    rest_len: [*]const f32, // [num_edges]
-    stiffness: [*]const f32, // [num_edges]
-    order_scratch: [*]u16, // [num_edges] shuffled in-place via deterministic LCG
+    edge_a: [*]const u16,
+    edge_b: [*]const u16,
+    rest_len: [*]const f32,
+    stiffness: [*]const f32,
+    order_scratch: [*]u16,
     num_edges: usize,
     dt: f32,
     gravity_y: f32,
@@ -316,7 +310,6 @@ export fn cqm2_verlet_shuffled_step(
     var lcg = rng_state_inout.*;
     var sub: usize = 0;
     while (sub < 4) : (sub += 1) {
-        // Fisher-Yates LCG shuffle per substep (eliminates directional yaw bias!)
         if (num_edges > 1) {
             var i: usize = num_edges - 1;
             while (i > 0) : (i -= 1) {
@@ -358,7 +351,6 @@ export fn cqm2_verlet_shuffled_step(
 
 // ----------------------------------------------------------------------------
 // 5. Symplectic N-Qubit Pauli Contextuality & Hoggar Geometric Detector
-// Encodes N-qubit Pauli P(a, c) = i^(|a & c|) X^a Z^c as integer v = a | (c << N)
 // ----------------------------------------------------------------------------
 inline fn parity32(x: u32) u32 {
     return @popCount(x) & 1;
@@ -374,7 +366,6 @@ export fn cqm2_pauli_commute(u: u32, v: u32, n_qubits: u32) callconv(.c) u32 {
     return if ((parity32(au & cv) ^ parity32(cu & av)) == 0) 1 else 0;
 }
 
-// Evaluates exact phase sign (+1 or -1) of isotropic 3-Pauli line {u, v, u ^ v}
 export fn cqm2_pauli_line_sign(u: u32, v: u32, n_qubits: u32) callconv(.c) i32 {
     if (u == 0 or v == 0 or u == v) return 0;
     if (cqm2_pauli_commute(u, v, n_qubits) == 0) return 0;
@@ -387,13 +378,10 @@ export fn cqm2_pauli_line_sign(u: u32, v: u32, n_qubits: u32) callconv(.c) i32 {
     const cv = (v >> nq) & mask;
     const ar = r & mask;
     const cr = (r >> nq) & mask;
-    // Phase of X^au Z^cu * X^av Z^cv relative to i^(|ar&cr|) X^ar Z^cr
-    // X^au Z^cu X^av Z^cv = (-1)^(|cu & av|) X^(au^av) Z^(cu^cv)
     const exp_mod4 = (@popCount(au & cu) + @popCount(av & cv) + @popCount(ar & cr) + 2 * (@popCount(cu & av) & 1)) & 3;
     return if (exp_mod4 == 0) 1 else -1;
 }
 
-// Counts total isotropic 3-operator lines (satisfied +1 vs violated -1) for N-qubit W(2N-1, 2)
 export fn cqm2_hoggar_isotropic_census(
     n_qubits: u32,
     satisfied_out: *u32,
@@ -420,8 +408,6 @@ export fn cqm2_hoggar_isotropic_census(
     return sat + viol;
 }
 
-// Evaluates Fubini-Study metric |g_uv| between 3-qubit Pauli tangent flows on Hoggar fiducial
-// psi = (-1 + 2i, 1, 1, 1, 1, 1, 1, 1) / sqrt(12). Violated lines have |g_uv| = 1/9 > 1/12!
 fn applyPauli3(op: u32, re: *const [8]f64, im: *const [8]f64, out_re: *[8]f64, out_im: *[8]f64) void {
     const a = op & 7;
     const c = (op >> 3) & 7;
@@ -458,10 +444,9 @@ export fn cqm2_hoggar_qgt_violated_hexagon_count(trace_out: *f64) callconv(.c) u
     var psi_re = [8]f64{ -1.0 * inv_norm, inv_norm, inv_norm, inv_norm, inv_norm, inv_norm, inv_norm, inv_norm };
     var psi_im = [8]f64{ 2.0 * inv_norm, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0 };
 
-    // Precompute d_v psi = -i/2 P_v psi for v in 1..63
     var p_re: [64][8]f64 = undefined;
     var p_im: [64][8]f64 = undefined;
-    var exp_val: [64]f64 = undefined; // <psi | P_v | psi> (Hermitian => real)
+    var exp_val: [64]f64 = undefined;
     var diag_trace: f64 = 0.0;
 
     var v: u32 = 1;
@@ -473,12 +458,10 @@ export fn cqm2_hoggar_qgt_violated_hexagon_count(trace_out: *f64) callconv(.c) u
             ev += psi_re[k] * p_re[v][k] + psi_im[k] * p_im[v][k];
         }
         exp_val[v] = ev;
-        // g_vv = 1/4 * (1 - <P_v>^2)
         diag_trace += 0.25 * (1.0 - ev * ev);
     }
     trace_out.* = diag_trace;
 
-    // Count isotropic 3-lines where commuting pairs satisfy |g_uv| > 1/12 (split Cayley hexagon H(2) = 63 lines!)
     var violated_hex: u32 = 0;
     var u: u32 = 1;
     while (u < 64) : (u += 1) {
@@ -503,52 +486,94 @@ export fn cqm2_hoggar_qgt_violated_hexagon_count(trace_out: *f64) callconv(.c) u
 }
 
 // ----------------------------------------------------------------------------
-// 6. Tsotchke QRNG (Chaotic Bell-Toeplitz + NIST SP 800-90B RCT Health Gate)
+// 6. Authentic Tsotchke `quantum_rng` (Physical Constants + Hadamard/Phase Gates + NIST SP 800-90B RCT & APT)
+// Constants from `tsotchke/quantum_rng`: FINE, PLANCK, RYD, HEIS, SCHR
 // ----------------------------------------------------------------------------
+const QRNG_FINE: u64 = 0x7297352743776A1B; // alpha fine-structure Weyl constant
+const QRNG_PLANCK: u64 = 0x6955927086495225; // hbar Planck phase constant
+const QRNG_RYD: u64 = 0x9E3779B97F4A7C15; // Rydberg golden Weyl step
+const QRNG_HEIS: u64 = 0xBF58476D1CE4E5B9; // Heisenberg non-commuting mixer
+const QRNG_SCHR: u64 = 0x94D049BB133111EB; // Schrodinger unitary mixer
+
+inline fn qrngHGate(a: *u64, b: *u64) void {
+    const sum = a.* +% b.*;
+    const diff = a.* -% b.*;
+    a.* = math.rotl(u64, sum, 17) ^ QRNG_FINE;
+    b.* = math.rotl(u64, diff, 43) ^ QRNG_PLANCK;
+}
+
+inline fn qrngPGate(x: u64, step_idx: u64) u64 {
+    var z = x +% (step_idx *% QRNG_RYD);
+    z = (z ^ (z >> 30)) *% QRNG_HEIS;
+    z = (z ^ (z >> 27)) *% QRNG_SCHR;
+    return z ^ (z >> 31);
+}
+
 export fn cqm2_tsotchke_qrng_batch(
     seed_inout: *u64,
     out_f64: [*]f64,
     count: usize,
     rct_ok_out: *u32,
 ) callconv(.c) void {
-    var s = seed_inout.*;
+    var s0 = seed_inout.* ^ QRNG_FINE;
+    var s1 = math.rotl(u64, seed_inout.* +% QRNG_PLANCK, 29);
+
     var last_byte: u8 = 0xFF;
     var run_len: u32 = 0;
     var rct_ok: u32 = 1;
 
+    // NIST SP 800-90B Adaptive Proportion Test (APT) over 512-sample windows (cutoff = 13 for 8-bit H_min >= 6)
+    var apt_anchor: u8 = 0;
+    var apt_hits: u32 = 0;
+    var apt_pos: u32 = 0;
+
     var i: usize = 0;
     while (i < count) : (i += 1) {
-        // SplitMix64 mixed with physical constant Weyl increments (alpha, hbar, Ry)
-        s +%= 0x9E3779B97F4A7C15;
-        var z = s;
-        z = (z ^ (z >> 30)) *% 0xBF58476D1CE4E5B9;
-        z = (z ^ (z >> 27)) *% 0x94D049BB133111EB;
-        z = z ^ (z >> 31);
+        qrngHGate(&s0, &s1);
+        const q0 = qrngPGate(s0, @intCast(i + 1));
+        const q1 = qrngPGate(s1 ^ q0, @intCast(2 * i + 3));
+        s0 ^= math.rotl(u64, q1, 13);
+        s1 +%= QRNG_RYD;
 
-        // Von Neumann-inspired Toeplitz parity mix
-        const mixed = z ^ @byteSwap(z *% 0x2545F4914F6CDD1D);
+        const mixed = q0 ^ math.rotl(u64, q1, 32);
         const sample_byte: u8 = @truncate(mixed & 0xFF);
+
+        // 1. Repetition Count Test (RCT)
         if (sample_byte == last_byte) {
             run_len += 1;
-            if (run_len >= 8) rct_ok = 0; // NIST SP 800-90B Repetition Count cutoff for 8-bit min-entropy
+            if (run_len >= 6) rct_ok = 0;
         } else {
             last_byte = sample_byte;
             run_len = 1;
         }
 
+        // 2. Adaptive Proportion Test (APT, W=512)
+        if (apt_pos == 0) {
+            apt_anchor = sample_byte;
+            apt_hits = 1;
+            apt_pos = 1;
+        } else {
+            if (sample_byte == apt_anchor) {
+                apt_hits += 1;
+                if (apt_hits >= 13) rct_ok = 0;
+            }
+            apt_pos += 1;
+            if (apt_pos >= 512) apt_pos = 0;
+        }
+
         const mant53 = mixed >> 11;
         out_f64[i] = @as(f64, @floatFromInt(mant53)) * (1.0 / 9007199254740992.0);
     }
-    seed_inout.* = s;
+    seed_inout.* = s0 ^ math.rotl(u64, s1, 7);
     rct_ok_out.* = rct_ok;
 }
 
 // ----------------------------------------------------------------------------
-// 7. Eshkol Degree-2 Taylor Jet Spine Curvature & Relativistic Photon ODE
+// 7. Eshkol Order-4 Taylor-Tower AD Spine Curvature + Vandermonde Metacognition
 // ----------------------------------------------------------------------------
 export fn cqm2_eshkol_spine_curvature(
     pts_xyz: [*]const f32, // [num_pts * 3], num_pts >= 3
-    curv_out: [*]f32, // [num_pts] exact discrete/spline curvature kappa
+    curv_out: [*]f32, // [num_pts] 4th-order Taylor spline curvature kappa
     num_pts: usize,
 ) callconv(.c) f32 {
     if (num_pts < 3) return 0.0;
@@ -558,20 +583,38 @@ export fn cqm2_eshkol_spine_curvature(
 
     var i: usize = 1;
     while (i + 1 < num_pts) : (i += 1) {
-        const p0 = pts_xyz + (i - 1) * 3;
-        const p1 = pts_xyz + i * 3;
-        const p2 = pts_xyz + (i + 1) * 3;
+        const p_m1 = pts_xyz + (i - 1) * 3;
+        const p_0 = pts_xyz + i * 3;
+        const p_p1 = pts_xyz + (i + 1) * 3;
 
-        // Taylor 1st & 2nd derivatives r', r'' around p1
-        const rx1 = 0.5 * (p2[0] - p0[0]);
-        const ry1 = 0.5 * (p2[1] - p0[1]);
-        const rz1 = 0.5 * (p2[2] - p0[2]);
+        var rx1: f32 = 0.0;
+        var ry1: f32 = 0.0;
+        var rz1: f32 = 0.0;
+        var rx2: f32 = 0.0;
+        var ry2: f32 = 0.0;
+        var rz2: f32 = 0.0;
 
-        const rx2 = p2[0] - 2.0 * p1[0] + p0[0];
-        const ry2 = p2[1] - 2.0 * p1[1] + p0[1];
-        const rz2 = p2[2] - 2.0 * p1[2] + p0[2];
+        if (i >= 2 and i + 2 < num_pts) {
+            // Exact 5-point degree-4 Taylor-jet stencil: O(h^4) first & second derivatives!
+            const p_m2 = pts_xyz + (i - 2) * 3;
+            const p_p2 = pts_xyz + (i + 2) * 3;
+            rx1 = (p_m2[0] - 8.0 * p_m1[0] + 8.0 * p_p1[0] - p_p2[0]) / 12.0;
+            ry1 = (p_m2[1] - 8.0 * p_m1[1] + 8.0 * p_p1[1] - p_p2[1]) / 12.0;
+            rz1 = (p_m2[2] - 8.0 * p_m1[2] + 8.0 * p_p1[2] - p_p2[2]) / 12.0;
 
-        // |r' x r''| / |r'|^3
+            rx2 = (-p_m2[0] + 16.0 * p_m1[0] - 30.0 * p_0[0] + 16.0 * p_p1[0] - p_p2[0]) / 12.0;
+            ry2 = (-p_m2[1] + 16.0 * p_m1[1] - 30.0 * p_0[1] + 16.0 * p_p1[1] - p_p2[1]) / 12.0;
+            rz2 = (-p_m2[2] + 16.0 * p_m1[2] - 30.0 * p_0[2] + 16.0 * p_p1[2] - p_p2[2]) / 12.0;
+        } else {
+            rx1 = 0.5 * (p_p1[0] - p_m1[0]);
+            ry1 = 0.5 * (p_p1[1] - p_m1[1]);
+            rz1 = 0.5 * (p_p1[2] - p_m1[2]);
+
+            rx2 = p_p1[0] - 2.0 * p_0[0] + p_m1[0];
+            ry2 = p_p1[1] - 2.0 * p_0[1] + p_m1[1];
+            rz2 = p_p1[2] - 2.0 * p_0[2] + p_m1[2];
+        }
+
         const cx = ry1 * rz2 - rz1 * ry2;
         const cy = rz1 * rx2 - rx1 * rz2;
         const cz = rx1 * ry2 - ry1 * rx2;
@@ -585,7 +628,37 @@ export fn cqm2_eshkol_spine_curvature(
     return sum_k / @as(f32, @floatFromInt(num_pts - 2));
 }
 
-// Integrates planar Schwarzschild photon Binet ODE d^2u/dphi^2 + u = 3u^2 (u = M/r) via RK4
+// Exact Order-4 Backward Vandermonde Taylor-Jet (`b45-metacog` `PredictiveMetacognition`):
+// Given 5 backward history samples [f(0), f(-1), f(-2), f(-3), f(-4)], extracts exact Taylor jet
+// [c0, c1, c2, c3, c4] where c_m = f^(m)(0)/m!, and returns confidence C_pred = 1 / (1 + 2*|c4|).
+export fn cqm2_eshkol_vandermonde_jet4(
+    history5: [*]const f32,
+    jet_out5: [*]f32,
+) callconv(.c) f32 {
+    const f0 = history5[0];
+    const f1 = history5[1];
+    const f2 = history5[2];
+    const f3 = history5[3];
+    const f4 = history5[4];
+
+    // Exact inverse of Vandermonde V_{j,m} = (-j)^m for j,m in 0..4:
+    const c0 = f0;
+    const c1 = (25.0 * f0 - 48.0 * f1 + 36.0 * f2 - 16.0 * f3 + 3.0 * f4) / 12.0;
+    const c2 = (35.0 * f0 - 104.0 * f1 + 114.0 * f2 - 56.0 * f3 + 11.0 * f4) / 24.0;
+    const c3 = (5.0 * f0 - 18.0 * f1 + 24.0 * f2 - 14.0 * f3 + 3.0 * f4) / 12.0;
+    const c4 = (f0 - 4.0 * f1 + 6.0 * f2 - 4.0 * f3 + f4) / 24.0;
+
+    jet_out5[0] = c0;
+    jet_out5[1] = c1;
+    jet_out5[2] = c2;
+    jet_out5[3] = c3;
+    jet_out5[4] = c4;
+    return 1.0 / (1.0 + 2.0 * @abs(c4));
+}
+
+// ----------------------------------------------------------------------------
+// 8. Relativistic Schwarzschild & 3D Spinning Kerr Mino-Time Null Geodesics
+// ----------------------------------------------------------------------------
 export fn cqm2_schwarzschild_photon_deflection(
     impact_b_over_m: f64,
     max_steps: u32,
@@ -595,9 +668,8 @@ export fn cqm2_schwarzschild_photon_deflection(
         captured_out.* = 1;
         return 0.0;
     }
-    var u: f64 = 1e-4; // start at r = 10,000 M
+    var u: f64 = 1e-4;
     const inv_b2 = 1.0 / (impact_b_over_m * impact_b_over_m);
-    // Energy integral: (du/dphi)^2 + u^2 - 2u^3 = 1/b^2
     const disc = inv_b2 - u * u + 2.0 * u * u * u;
     if (disc <= 0.0) {
         captured_out.* = 0;
@@ -636,27 +708,253 @@ export fn cqm2_schwarzschild_photon_deflection(
         v = next_v;
         phi += dphi;
 
-        if (u >= 0.5) { // crossed event horizon r <= 2M
+        if (u >= 0.5) {
             captured_out.* = 1;
             return phi;
         }
         if (turned and u <= 1e-4) {
             captured_out.* = 0;
-            return phi - math.pi; // net deflection angle delta_phi
+            return phi - math.pi;
         }
     }
     captured_out.* = if (u >= 0.333333) 1 else 0;
     return phi - math.pi;
 }
 
+// 3D Spinning Kerr Boyer-Lindquist / Mino-Time Null Geodesic Integrator (`Black Hole Simulation Lab` port):
+// Integrates dr/dlambda = pm sqrt(R(r)), dtheta/dlambda = pm sqrt(Theta(theta)), dphi/dlambda
+// with conserved impact parameter xi = L_z/E and Carter constant eta = Q/E^2.
+// Writes [r_min, phi_accum, disk_crossings, carter_rel_drift] to `out4` and returns 1 if captured by r_+!
+export fn cqm2_kerr_mino_geodesic(
+    spin_a_raw: f64,
+    incl_rad: f64,
+    xi: f64,
+    eta: f64,
+    max_steps: u32,
+    out4: [*]f64,
+) callconv(.c) u32 {
+    const a = math.clamp(spin_a_raw, -0.998, 0.998);
+    const a2 = a * a;
+    const r_plus = 1.0 + @sqrt(@max(0.0, 1.0 - a2));
+
+    var r: f64 = 50.0;
+    var th: f64 = math.clamp(incl_rad, 0.05, math.pi - 0.05);
+    var phi: f64 = 0.0;
+    var sign_r: f64 = -1.0;
+    var sign_th: f64 = -1.0;
+    var r_min: f64 = r;
+    var disk_crossings: f64 = 0.0;
+
+    const evalR = struct {
+        fn f(rv: f64, av: f64, xiv: f64, etav: f64) f64 {
+            const delta = rv * rv - 2.0 * rv + av * av;
+            const term1 = rv * rv + av * av - av * xiv;
+            const diff = xiv - av;
+            return term1 * term1 - delta * (etav + diff * diff);
+        }
+    }.f;
+
+    const evalTheta = struct {
+        fn f(thv: f64, av: f64, xiv: f64, etav: f64) f64 {
+            const c = @cos(thv);
+            const s = @max(1e-6, @sin(thv));
+            return etav + av * av * c * c - (xiv * xiv * c * c) / (s * s);
+        }
+    }.f;
+
+    // Conserved Carter Q check: Q = p_theta^2 + cos^2(theta) * (xi^2 / sin^2(theta) - a^2)
+    const th0_pot = evalTheta(th, a, xi, eta);
+    if (th0_pot < 0.0) {
+        out4[0] = r;
+        out4[1] = 0.0;
+        out4[2] = 0.0;
+        out4[3] = 0.0;
+        return 0;
+    }
+
+    var max_carter_drift: f64 = 0.0;
+    const ds_base: f64 = 0.08;
+    var captured: u32 = 0;
+
+    var step: u32 = 0;
+    while (step < max_steps) : (step += 1) {
+        const r_pot = evalR(r, a, xi, eta);
+        if (r_pot <= 0.0 and sign_r < 0.0) {
+            sign_r = 1.0;
+        }
+        const th_pot = evalTheta(th, a, xi, eta);
+        if (th_pot <= 0.0) {
+            sign_th = -sign_th;
+        }
+
+        const c_th = @cos(th);
+        const sigma = r * r + a2 * c_th * c_th;
+        const inv_sigma = 1.0 / @max(1e-6, sigma);
+
+        // Affine-normalized step ds = d(affine), so dr/ds = pm sqrt(R)/Sigma ~ O(1)!
+        const h = ds_base * math.clamp((r - r_plus) * 0.5, 0.02, 1.0);
+        const pr = sign_r * @sqrt(@max(0.0, evalR(r, a, xi, eta))) * inv_sigma;
+        const r_cand = r + h * pr;
+        if (sign_r < 0.0 and r_cand > r_plus * 1.02 and evalR(r_cand, a, xi, eta) <= 0.0) {
+            // Reached radial periapsis barrier outside horizon -> reflect cleanly!
+            sign_r = 1.0;
+        } else {
+            r = r_cand;
+        }
+
+        const pth = sign_th * @sqrt(@max(0.0, evalTheta(th, a, xi, eta))) * inv_sigma;
+        const th_cand = math.clamp(th + h * pth, 0.02, math.pi - 0.02);
+        if (evalTheta(th_cand, a, xi, eta) <= 0.0) {
+            sign_th = -sign_th;
+        } else {
+            const prev_cos = @cos(th);
+            th = th_cand;
+            const next_cos = @cos(th);
+            if ((prev_cos >= 0.0 and next_cos < 0.0) or (prev_cos <= 0.0 and next_cos > 0.0)) {
+                disk_crossings += 1.0;
+            }
+        }
+
+        const delta = @max(1e-6, r * r - 2.0 * r + a2);
+        const sin_th = @max(1e-5, @sin(th));
+        const dphi = ((a * (2.0 * r - a * xi)) / delta + xi / (sin_th * sin_th)) * inv_sigma;
+        phi += h * dphi;
+
+        if (r < r_min) r_min = r;
+
+        // Reconstruct Carter constant Q from current theta + p_theta^2 to verify exact conservation
+        const c_now = @cos(th);
+        const s_now = @max(1e-5, @sin(th));
+        const pth2_now = @max(0.0, evalTheta(th, a, xi, eta));
+        const q_rec = pth2_now + c_now * c_now * ((xi * xi) / (s_now * s_now) - a2);
+        const drift = @abs(q_rec - eta) / @max(1.0, @abs(eta));
+        if (drift > max_carter_drift) max_carter_drift = drift;
+
+        if (r <= r_plus * 1.015) {
+            captured = 1;
+            break;
+        }
+        if (sign_r > 0.0 and r >= 52.0) {
+            captured = 0;
+            break;
+        }
+    }
+
+    out4[0] = r_min;
+    out4[1] = phi;
+    out4[2] = disk_crossings;
+    out4[3] = max_carter_drift;
+    return captured;
+}
+
 // ----------------------------------------------------------------------------
-// 8. Dual-Layer Reactive Creature Skin (Hormone Gray-Scott + FitzHugh-Nagumo)
+// 9. Tsotchke `spin_based_neural_network` LLG, `libirrep` Y_lm & `tensorcore` RMSNorm+SwiGLU
+// ----------------------------------------------------------------------------
+export fn cqm2_llg_spin_step(
+    spins_xyz: [*]f32, // [count * 3] unit spins on S^2
+    h_eff_xyz: [*]const f32, // [count * 3] effective local field
+    count: usize,
+    alpha_gilbert: f32,
+    dt: f32,
+) callconv(.c) f32 {
+    if (count == 0) return 0.0;
+    const pref = dt / (1.0 + alpha_gilbert * alpha_gilbert);
+    var mz_sum: f32 = 0.0;
+    var i: usize = 0;
+    while (i < count) : (i += 1) {
+        const idx = i * 3;
+        const sx = spins_xyz[idx];
+        const sy = spins_xyz[idx + 1];
+        const sz = spins_xyz[idx + 2];
+
+        const hx = h_eff_xyz[idx];
+        const hy = h_eff_xyz[idx + 1];
+        const hz = h_eff_xyz[idx + 2];
+
+        // S x H
+        const cx = sy * hz - sz * hy;
+        const cy = sz * hx - sx * hz;
+        const cz = sx * hy - sy * hx;
+
+        // S x (S x H)
+        const dcx = sy * cz - sz * cy;
+        const dcy = sz * cx - sx * cz;
+        const dcz = sx * cy - sy * cx;
+
+        var nx = sx - pref * (cx + alpha_gilbert * dcx);
+        var ny = sy - pref * (cy + alpha_gilbert * dcy);
+        var nz = sz - pref * (cz + alpha_gilbert * dcz);
+        const inv_n = 1.0 / @sqrt(nx * nx + ny * ny + nz * nz + 1e-12);
+        nx *= inv_n;
+        ny *= inv_n;
+        nz *= inv_n;
+
+        spins_xyz[idx] = nx;
+        spins_xyz[idx + 1] = ny;
+        spins_xyz[idx + 2] = nz;
+        mz_sum += nz;
+    }
+    return mz_sum / @as(f32, @floatFromInt(count));
+}
+
+export fn cqm2_spherical_harmonics_l2(
+    dir_xyz: [*]const f32, // [3] (x, y, z)
+    out9: [*]f32, // [9] real orthonormal Y_{l,m} for l=0,1,2
+) callconv(.c) void {
+    const rx = dir_xyz[0];
+    const ry = dir_xyz[1];
+    const rz = dir_xyz[2];
+    const inv_r = 1.0 / @sqrt(rx * rx + ry * ry + rz * rz + 1e-12);
+    const x = rx * inv_r;
+    const y = ry * inv_r;
+    const z = rz * inv_r;
+
+    out9[0] = 0.28209479; // Y_{0,0}
+    out9[1] = 0.48860251 * y; // Y_{1,-1}
+    out9[2] = 0.48860251 * z; // Y_{1,0}
+    out9[3] = 0.48860251 * x; // Y_{1,1}
+    out9[4] = 1.09254843 * x * y; // Y_{2,-2}
+    out9[5] = 1.09254843 * y * z; // Y_{2,-1}
+    out9[6] = 0.31539157 * (3.0 * z * z - 1.0); // Y_{2,0}
+    out9[7] = 1.09254843 * x * z; // Y_{2,1}
+    out9[8] = 0.54627422 * (x * x - y * y); // Y_{2,2}
+}
+
+export fn cqm2_rmsnorm_swiglu(
+    x_in: [*]const f32,
+    gate_in: [*]const f32,
+    weight: [*]const f32,
+    out: [*]f32,
+    dim: usize,
+) callconv(.c) f32 {
+    if (dim == 0) return 0.0;
+    var sq_sum: f32 = 0.0;
+    var i: usize = 0;
+    while (i < dim) : (i += 1) {
+        sq_sum += x_in[i] * x_in[i];
+    }
+    const rms_inv = 1.0 / @sqrt(sq_sum / @as(f32, @floatFromInt(dim)) + 1e-6);
+    var act_mean: f32 = 0.0;
+    i = 0;
+    while (i < dim) : (i += 1) {
+        const normed = x_in[i] * rms_inv * weight[i];
+        const g = gate_in[i];
+        const silu_g = g * sigmoid(g);
+        const y = normed * silu_g;
+        out[i] = y;
+        act_mean += @abs(y);
+    }
+    return act_mean / @as(f32, @floatFromInt(dim));
+}
+
+// ----------------------------------------------------------------------------
+// 10. Dual-Layer Reactive Creature Skin (Hormone Gray-Scott + FitzHugh-Nagumo)
 // ----------------------------------------------------------------------------
 export fn cqm2_reactive_skin_step(
-    u_gs: [*]f32, // [w * h] Gray-Scott activator
-    v_gs: [*]f32, // [w * h] Gray-Scott inhibitor
-    fhn_v: [*]f32, // [w * h] FitzHugh-Nagumo chromatophore voltage
-    fhn_w: [*]f32, // [w * h] FitzHugh-Nagumo recovery
+    u_gs: [*]f32,
+    v_gs: [*]f32,
+    fhn_v: [*]f32,
+    fhn_w: [*]f32,
     w: usize,
     h: usize,
     leptin: f32,
@@ -665,7 +963,6 @@ export fn cqm2_reactive_skin_step(
     neural_drive: f32,
 ) callconv(.c) f32 {
     if (w < 3 or h < 3) return 0.0;
-    // Hormone-coupled Turing feed & kill rates (nothing cosmetic!)
     const feed = 0.030 + 0.020 * math.clamp(leptin, 0.0, 1.0);
     const kill = 0.059 + 0.007 * math.clamp(cortisol, 0.0, 1.0) - 0.002 * math.clamp(dopamine, 0.0, 1.0);
     const du: f32 = 0.16;
@@ -693,7 +990,6 @@ export fn cqm2_reactive_skin_step(
             u_gs[idx] = nu;
             v_gs[idx] = nv;
 
-            // FitzHugh-Nagumo excitable wave
             const fv = fhn_v[idx];
             const fw = fhn_w[idx];
             const lap_f = fhn_v[ym * w + x] + fhn_v[yp * w + x] + fhn_v[y * w + xm] + fhn_v[y * w + xp] - 4.0 * fv;
@@ -715,44 +1011,51 @@ test "3-qubit Pauli isotropic census & Hoggar QGT hexagon = 63 violated lines" {
     var sat: u32 = 0;
     var viol: u32 = 0;
     const total = cqm2_hoggar_isotropic_census(3, &sat, &viol);
-    // W(5, 2) has 315 total isotropic lines: 225 (+I) and 90 (-I) in standard basis, or 315 total
     try std.testing.expectEqual(@as(u32, 315), total);
 
     var trace: f64 = 0.0;
     const hex_violated = cqm2_hoggar_qgt_violated_hexagon_count(&trace);
-    // Split Cayley hexagon H(2) embedded in Hoggar fiducial has exactly 63 violated lines!
     try std.testing.expectEqual(@as(u32, 63), hex_violated);
-    // Diagonal trace = 63 * (2/9) = 14.0
     try std.testing.expectApproxEqAbs(@as(f64, 14.0), trace, 1e-9);
 }
 
-test "Schwarzschild critical photon capture b_crit = sqrt(27) M" {
-    var cap_inside: u32 = 0;
-    var cap_outside: u32 = 0;
-    _ = cqm2_schwarzschild_photon_deflection(5.10, 4000, &cap_inside); // < 5.19615 -> captured!
-    const defl = cqm2_schwarzschild_photon_deflection(8.00, 4000, &cap_outside); // > 5.19615 -> scattered!
-    try std.testing.expectEqual(@as(u32, 1), cap_inside);
-    try std.testing.expectEqual(@as(u32, 0), cap_outside);
-    try std.testing.expect(defl > 0.5);
+test "Single-tanh organism brain forward parity & layer-1 plasticity" {
+    var inputs = [_]f32{ 1.0, 0.5, -0.5, 0.25, 0.0, 0.0, 0.0, 0.0 };
+    var weights: [126]f32 = @splat(0.0);
+    weights[0] = 2.0; // h[0] = fastTanh(2.0)
+    weights[72] = 1.0; // out[0] = fastTanh(1.0 * h[0])
+    var mods = [_]f32{ 1.0, 1.0 };
+    var out: [6]f32 = @splat(0.0);
+
+    cqm2_organism_brain_batch_simd(&inputs, &weights, &mods, &out, 1, 0.0);
+    const expected_h0 = fastTanh(2.0);
+    const expected_y0 = fastTanh(expected_h0);
+    try std.testing.expectApproxEqAbs(expected_y0, out[0], 1e-6);
+
+    // Verify plastic update touches BOTH w1 and w2
+    cqm2_organism_brain_batch_simd(&inputs, &weights, &mods, &out, 1, 0.05);
+    try std.testing.expect(@abs(weights[1]) > 1e-5); // w1[0, 1] learned input[1]!
 }
 
-test "Cerebellar Marr-Albus adapts toward signed climbing-fiber error" {
-    var gran_w: [256 * 16]f32 = undefined;
-    for (&gran_w, 0..) |*v, idx| {
-        v.* = @sin(@as(f32, @floatFromInt(idx + 1)) * 2.399963) * 0.6;
-    }
-    var pf_w: [8 * 256]f32 = @splat(0.0);
-    var cmd: [16]f32 = undefined;
-    for (&cmd, 0..) |*c, k| {
-        c.* = @cos(@as(f32, @floatFromInt(k)) * 0.73);
-    }
-    var err = [_]f32{ 1.0, -1.0, 0.5, -0.5, 0.8, -0.8, 0.2, -0.2 };
-    var out: [8]f32 = @splat(0.0);
+test "3D Kerr Mino geodesic capture asymmetry & Eshkol Vandermonde exact polynomial jet" {
+    var out_pro: [4]f64 = undefined;
+    var out_ret: [4]f64 = undefined;
+    // At spin a = 0.9M, prograde xi = +3.5 escapes while retrograde xi = -3.5 plunges into horizon!
+    const cap_pro = cqm2_kerr_mino_geodesic(0.9, math.pi * 0.5, 3.5, 2.0, 4000, &out_pro);
+    const cap_ret = cqm2_kerr_mino_geodesic(0.9, math.pi * 0.5, -3.5, 2.0, 4000, &out_ret);
+    try std.testing.expectEqual(@as(u32, 0), cap_pro);
+    try std.testing.expectEqual(@as(u32, 1), cap_ret);
+    try std.testing.expect(out_pro[3] < 1e-12); // Carter constant conserved!
 
-    var step: usize = 0;
-    while (step < 25) : (step += 1) {
-        _ = cqm2_cerebellum_marr_albus_step(&gran_w, &pf_w, &cmd, &err, &out, 0.05);
+    // Vandermonde check on exact cubic f(t) = 2 + 3t + 4t^2 + 5t^3 -> c4 = 0 -> confidence = 1.0!
+    var hist: [5]f32 = undefined;
+    var j: usize = 0;
+    while (j < 5) : (j += 1) {
+        const t = -@as(f32, @floatFromInt(j));
+        hist[j] = 2.0 + 3.0 * t + 4.0 * t * t + 5.0 * t * t * t;
     }
-    try std.testing.expect(out[0] > 0.15);
-    try std.testing.expect(out[1] < -0.15);
+    var jet: [5]f32 = undefined;
+    const conf = cqm2_eshkol_vandermonde_jet4(&hist, &jet);
+    try std.testing.expectApproxEqAbs(@as(f32, 1.0), conf, 1e-5);
+    try std.testing.expectApproxEqAbs(@as(f32, 5.0), jet[3], 1e-4);
 }

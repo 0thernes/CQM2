@@ -127,9 +127,13 @@ export class DeterministicRng {
     return this.state;
   }
 
-  public setState(newState: bigint): void {
+  public getSpareGaussian(): number | null {
+    return this.spareGaussian;
+  }
+
+  public setState(newState: bigint, spareGaussian: number | null = null): void {
     this.state = newState & MASK64;
-    this.spareGaussian = null;
+    this.spareGaussian = spareGaussian;
   }
 
   public nextU64(): bigint {
@@ -216,10 +220,31 @@ export class SubstreamPrngHub {
     return out;
   }
 
+  public snapshotFullStates(): Record<SubstreamName, { stateHex: string; spare: number | null }> {
+    const names: SubstreamName[] = ['world', 'genome', 'flaw', 'quantum', 'ecology', 'xenolingua', 'benchmark', 'ui'];
+    const out = {} as Record<SubstreamName, { stateHex: string; spare: number | null }>;
+    for (const n of names) {
+      const st = this.stream(n);
+      out[n] = {
+        stateHex: '0x' + st.getState().toString(16).padStart(16, '0'),
+        spare: st.getSpareGaussian(),
+      };
+    }
+    return out;
+  }
+
   public restoreStates(snapshot: Partial<Record<SubstreamName, string>>): void {
     for (const [k, hex] of Object.entries(snapshot)) {
       if (typeof hex === 'string') {
         this.stream(k as SubstreamName).setState(BigInt(hex));
+      }
+    }
+  }
+
+  public restoreFullStates(snapshot: Partial<Record<SubstreamName, { stateHex: string; spare: number | null }>>): void {
+    for (const [k, entry] of Object.entries(snapshot)) {
+      if (entry && typeof entry.stateHex === 'string') {
+        this.stream(k as SubstreamName).setState(BigInt(entry.stateHex), entry.spare ?? null);
       }
     }
   }

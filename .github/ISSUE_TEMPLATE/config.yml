@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Security Vulnerability Disclosure (Private)
+    url: https://github.com/0thernes/CQM2/blob/main/.github/SECURITY.md
+    about: Report security vulnerabilities privately per our Security Policy — never in public issues.
+  - name: Architecture, 13-Chapter Bible & Support Guide
+    url: https://0thernes.github.io/CQM2/bible.html
+    about: Consult CQM2 documentation, mathematical contracts, and troubleshooting steps.

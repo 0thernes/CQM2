@@ -3,12 +3,12 @@
  * Replaces CQM1's heap-allocated object soup with 10 normalized, 3NF-aligned Structure-of-Arrays
  * (`SoA`) tables backed by `SharedArrayBuffer` (with transparent `ArrayBuffer` fallback).
  *
- * Normalized Entity Model (10 Core Entities):
+ * Normalized Entity Model (10 Core Entities — 1:1 parity with SQLite `migrations/001_initial_3nf.up.sql`):
  *   1. `WorldEpoch`              (PK: epochId)
  *   2. `BiomeZone`               (PK: biomeId, FK: epochId -> WorldEpoch)
  *   3. `SpeciesLineage`          (PK: speciesId, Self-FK: parentSpeciesId -> SpeciesLineage)
  *   4. `Organism`                (PK: entityId, FK: speciesId -> SpeciesLineage, FK: biomeId -> BiomeZone)
- *   5. `MetabolicLedger`         (PK/FK 1:1: entityId -> Organism; 15 conserved kJ pools)
+ *   5. `MetabolicLedger`         (PK/FK 1:1: entityId -> Organism; 15 conserved kJ pools + O2/CO2/pH/ROS)
  *   6. `NeuralCortexState`       (PK/FK 1:1: entityId -> Organism; 126 SIMD weights + modulators + PCI)
  *   7. `QuantumSubstrate`        (PK: substrateId, Nullable FK: entityId -> Organism)
  *   8. `SocialBond`              (PK: bondId, FK: sourceEntityId, targetEntityId -> Organism)
@@ -18,6 +18,7 @@
 
 export type CasteRole = 'EXPLORER' | 'HARVESTER' | 'GUARDIAN' | 'ARCHITECT' | 'ORACLE';
 export type BiomeKind = 'HYDROTHERMAL_ABYSS' | 'PELAGIC_PHOTON_SHELF' | 'CRYSTAL_REEF' | 'SINGULARITY_RIM';
+export type SleepStageCode = 0 | 1 | 2; // 0=WAKE, 1=NREM, 2=REM
 
 export const METABOLIC_POOL_NAMES = [
   'gutGlucoseKj',
@@ -79,6 +80,18 @@ export interface SpeciesLineageRecord {
   meanFitness: number;
 }
 
+export interface QuantumSubstrateRecord {
+  substrateId: number;
+  epochId: number;
+  entityId: number | null;
+  qubitCount: number;
+  purityTrRho2: number;
+  fubiniStudyTraceG: number;
+  berryCurvatureOmega: number;
+  contextualityWitness: number;
+  updatedAtTick: number;
+}
+
 export interface SocialBondRecord {
   bondId: number;
   sourceEntityId: number;
@@ -119,6 +132,8 @@ export interface JoinedOrganismView {
   speciesId: number;
   latinBinomial: string;
   casteRole: CasteRole;
+  morphotypeId: number;
+  entangledPartnerId: number;
   biomeId: number;
   biomeName: string;
   ageSec: number;
@@ -131,6 +146,12 @@ export interface JoinedOrganismView {
   totalMetabolicKj: number;
   atpBufferKj: number;
   hydration: number;
+  o2Reserve: number;
+  bloodPh: number;
+  rosDamage: number;
+  sleepStage: SleepStageCode;
+  aurumWealth: number;
+  umbraWealth: number;
   dopamineRpe: number;
   pciProxy: number;
   thoughtCurvatureKappa: number;
@@ -139,11 +160,16 @@ export interface JoinedOrganismView {
 export interface ReversibleWorldSnapshot {
   tick: number;
   simTimeSec: number;
+  merkleRootHex: string;
   freeEnergyReserveKj: number;
   activeCount: number;
   alive: Uint8Array;
   speciesId: Uint16Array;
   biomeId: Uint8Array;
+  generation: Uint16Array;
+  flawMask: Uint8Array;
+  morphotypeId: Uint8Array;
+  entangledPartnerId: Int32Array;
   ageSec: Float32Array;
   posX: Float32Array;
   posY: Float32Array;
@@ -151,12 +177,41 @@ export interface ReversibleWorldSnapshot {
   velX: Float32Array;
   velY: Float32Array;
   velZ: Float32Array;
+  headingRad: Float32Array;
+  massKg: Float32Array;
+  telomereIntegrity: Float32Array;
   pools15: Float64Array;
   totalIntakeKj: Float64Array;
+  o2Reserve: Float32Array;
+  co2Level: Float32Array;
+  bloodPh: Float32Array;
+  rosDamage: Float32Array;
+  sleepStage: Uint8Array;
+  aurumWealth: Float32Array;
+  umbraWealth: Float32Array;
   hydration: Float32Array;
+  insulin: Float32Array;
+  glucagon: Float32Array;
+  leptin: Float32Array;
+  ghrelin: Float32Array;
+  cortisol: Float32Array;
+  aicZ1: Float32Array;
+  aicZ2: Float32Array;
+  senseIn8: Float32Array;
   weights126: Float32Array;
-  biomeNutrients: Float64Array;
-  biomeDetritus: Float64Array;
+  modulators2: Float32Array;
+  motorOut6: Float32Array;
+  norepinephrine: Float32Array;
+  serotonin: Float32Array;
+  pciProxy: Float32Array;
+  thoughtCurvatureKappa: Float32Array;
+  freeWontVetoCount: Uint32Array;
+  biomes: BiomeZoneRecord[];
+  species: SpeciesLineageRecord[];
+  quantumSubstrates: QuantumSubstrateRecord[];
+  socialBonds: Array<[number, SocialBondRecord]>;
+  nextBondId: number;
+  auxiliaryPayload?: unknown;
 }
 
 function createBuffer(byteLength: number): ArrayBuffer | SharedArrayBuffer {
@@ -171,30 +226,30 @@ function createBuffer(byteLength: number): ArrayBuffer | SharedArrayBuffer {
   return new ArrayBuffer(aligned);
 }
 
-/**
- * Normalized Structure-of-Arrays (`SoA`) Entity Relational Store with Foreign-Key Integrity
- * and `NOVEL-100 N01` Ring-Buffer Time-Travel Rollback.
- */
+const allocU8 = (n: number): Uint8Array => new Uint8Array(createBuffer(n), 0, n);
+const allocU16 = (n: number): Uint16Array => new Uint16Array(createBuffer(n * 2), 0, n);
+const allocU32 = (n: number): Uint32Array => new Uint32Array(createBuffer(n * 4), 0, n);
+const allocI32 = (n: number): Int32Array => new Int32Array(createBuffer(n * 4), 0, n);
+const allocF32 = (n: number): Float32Array => new Float32Array(createBuffer(n * 4), 0, n);
+const allocF64 = (n: number): Float64Array => new Float64Array(createBuffer(n * 8), 0, n);
+
 export class ErpRelationalStore {
   public readonly maxEntities: number;
   public readonly sharedMemoryActive: boolean;
 
-  // 1. WorldEpoch
   public epoch: WorldEpochRecord;
-
-  // 2. BiomeZone (normalized map with FK -> epochId)
   public readonly biomes = new Map<number, BiomeZoneRecord>();
-
-  // 3. SpeciesLineage (normalized map with self-FK -> parentSpeciesId)
   public readonly species = new Map<number, SpeciesLineageRecord>();
 
-  // 4. Organism SoA Columns (`[0 .. maxEntities - 1]`)
+  // 4. Organism SoA Columns
   public activeCount = 0;
   public readonly alive: Uint8Array;
   public readonly speciesFk: Uint16Array;
   public readonly biomeFk: Uint8Array;
   public readonly generation: Uint16Array;
-  public readonly flawMask: Uint8Array; // bit0=scramble, bit1=leaky, bit2=backwards, bit3=misfire
+  public readonly flawMask: Uint8Array;
+  public readonly morphotypeId: Uint8Array;
+  public readonly entangledPartnerId: Int32Array;
   public readonly ageSec: Float32Array;
   public readonly posX: Float32Array;
   public readonly posY: Float32Array;
@@ -207,23 +262,29 @@ export class ErpRelationalStore {
   public readonly telomereIntegrity: Float32Array;
 
   // 5. MetabolicLedger 1:1 SoA Columns
-  public readonly pools15: Float64Array; // [maxEntities * 15]
-  public readonly totalIntakeKj: Float64Array; // [maxEntities]
+  public readonly pools15: Float64Array;
+  public readonly totalIntakeKj: Float64Array;
   public readonly o2Reserve: Float32Array;
+  public readonly co2Level: Float32Array;
+  public readonly bloodPh: Float32Array;
+  public readonly rosDamage: Float32Array;
+  public readonly sleepStage: Uint8Array;
+  public readonly aurumWealth: Float32Array;
+  public readonly umbraWealth: Float32Array;
   public readonly hydration: Float32Array;
   public readonly insulin: Float32Array;
   public readonly glucagon: Float32Array;
   public readonly leptin: Float32Array;
   public readonly ghrelin: Float32Array;
   public readonly cortisol: Float32Array;
-  public readonly aicZ1: Float32Array; // Briat-Gupta-Khammash Antithetic Integral Controller Z1
-  public readonly aicZ2: Float32Array; // Antithetic Integral Controller Z2
+  public readonly aicZ1: Float32Array;
+  public readonly aicZ2: Float32Array;
 
   // 6. NeuralCortexState 1:1 SoA Columns
-  public readonly senseIn8: Float32Array; // [maxEntities * 8]
-  public readonly weights126: Float32Array; // [maxEntities * 126]
-  public readonly modulators2: Float32Array; // [maxEntities * 2] = (DA_rpe, ACh_gate)
-  public readonly motorOut6: Float32Array; // [maxEntities * 6]
+  public readonly senseIn8: Float32Array;
+  public readonly weights126: Float32Array;
+  public readonly modulators2: Float32Array;
+  public readonly motorOut6: Float32Array;
   public readonly norepinephrine: Float32Array;
   public readonly serotonin: Float32Array;
   public readonly pciProxy: Float32Array;
@@ -231,6 +292,7 @@ export class ErpRelationalStore {
   public readonly freeWontVetoCount: Uint32Array;
 
   // 7-10. Relational Auxiliary Tables
+  public readonly quantumSubstrates = new Map<number, QuantumSubstrateRecord>();
   public readonly socialBonds = new Map<number, SocialBondRecord>();
   public readonly causalExperiments: CausalExperimentRecord[] = [];
   public readonly dispatchReceipts: HardwareDispatchReceiptRecord[] = [];
@@ -238,8 +300,6 @@ export class ErpRelationalStore {
   private nextBondId = 1;
   private nextExperimentId = 1;
   private nextReceiptId = 1;
-
-  // Reversible snapshot ring buffer (`N01`)
   private readonly snapshotCapacity: number;
   private readonly snapshots: ReversibleWorldSnapshot[] = [];
 
@@ -259,59 +319,54 @@ export class ErpRelationalStore {
       freeEnergyReserveKj: 25_000.0,
     };
 
-    this.alive = new Uint8Array(aliveBuf, 0, this.maxEntities);
-    this.speciesFk = new Uint16Array(createBuffer(this.maxEntities * 2), 0, this.maxEntities);
-    this.biomeFk = new Uint8Array(createBuffer(this.maxEntities), 0, this.maxEntities);
-    this.generation = new Uint16Array(createBuffer(this.maxEntities * 2), 0, this.maxEntities);
-    this.flawMask = new Uint8Array(createBuffer(this.maxEntities), 0, this.maxEntities);
-    this.ageSec = new Float32Array(createBuffer(this.maxEntities * 4), 0, this.maxEntities);
-    this.posX = new Float32Array(createBuffer(this.maxEntities * 4), 0, this.maxEntities);
-    this.posY = new Float32Array(createBuffer(this.maxEntities * 4), 0, this.maxEntities);
-    this.posZ = new Float32Array(createBuffer(this.maxEntities * 4), 0, this.maxEntities);
-    this.velX = new Float32Array(createBuffer(this.maxEntities * 4), 0, this.maxEntities);
-    this.velY = new Float32Array(createBuffer(this.maxEntities * 4), 0, this.maxEntities);
-    this.velZ = new Float32Array(createBuffer(this.maxEntities * 4), 0, this.maxEntities);
-    this.headingRad = new Float32Array(createBuffer(this.maxEntities * 4), 0, this.maxEntities);
-    this.massKg = new Float32Array(createBuffer(this.maxEntities * 4), 0, this.maxEntities);
-    this.telomereIntegrity = new Float32Array(createBuffer(this.maxEntities * 4), 0, this.maxEntities);
+    const m = this.maxEntities;
+    this.alive = new Uint8Array(aliveBuf, 0, m);
+    this.speciesFk = allocU16(m);
+    this.biomeFk = allocU8(m);
+    this.generation = allocU16(m);
+    this.flawMask = allocU8(m);
+    this.morphotypeId = allocU8(m);
+    this.entangledPartnerId = allocI32(m);
+    this.entangledPartnerId.fill(-1);
+    this.ageSec = allocF32(m);
+    this.posX = allocF32(m);
+    this.posY = allocF32(m);
+    this.posZ = allocF32(m);
+    this.velX = allocF32(m);
+    this.velY = allocF32(m);
+    this.velZ = allocF32(m);
+    this.headingRad = allocF32(m);
+    this.massKg = allocF32(m);
+    this.telomereIntegrity = allocF32(m);
 
-    this.pools15 = new Float64Array(
-      createBuffer(this.maxEntities * METABOLIC_POOL_COUNT * 8),
-      0,
-      this.maxEntities * METABOLIC_POOL_COUNT,
-    );
-    this.totalIntakeKj = new Float64Array(createBuffer(this.maxEntities * 8), 0, this.maxEntities);
-    this.o2Reserve = new Float32Array(createBuffer(this.maxEntities * 4), 0, this.maxEntities);
-    this.hydration = new Float32Array(createBuffer(this.maxEntities * 4), 0, this.maxEntities);
-    this.insulin = new Float32Array(createBuffer(this.maxEntities * 4), 0, this.maxEntities);
-    this.glucagon = new Float32Array(createBuffer(this.maxEntities * 4), 0, this.maxEntities);
-    this.leptin = new Float32Array(createBuffer(this.maxEntities * 4), 0, this.maxEntities);
-    this.ghrelin = new Float32Array(createBuffer(this.maxEntities * 4), 0, this.maxEntities);
-    this.cortisol = new Float32Array(createBuffer(this.maxEntities * 4), 0, this.maxEntities);
-    this.aicZ1 = new Float32Array(createBuffer(this.maxEntities * 4), 0, this.maxEntities);
-    this.aicZ2 = new Float32Array(createBuffer(this.maxEntities * 4), 0, this.maxEntities);
+    this.pools15 = allocF64(m * METABOLIC_POOL_COUNT);
+    this.totalIntakeKj = allocF64(m);
+    this.o2Reserve = allocF32(m);
+    this.co2Level = allocF32(m);
+    this.bloodPh = allocF32(m);
+    this.bloodPh.fill(7.4);
+    this.rosDamage = allocF32(m);
+    this.sleepStage = allocU8(m);
+    this.aurumWealth = allocF32(m);
+    this.umbraWealth = allocF32(m);
+    this.hydration = allocF32(m);
+    this.insulin = allocF32(m);
+    this.glucagon = allocF32(m);
+    this.leptin = allocF32(m);
+    this.ghrelin = allocF32(m);
+    this.cortisol = allocF32(m);
+    this.aicZ1 = allocF32(m);
+    this.aicZ2 = allocF32(m);
 
-    this.senseIn8 = new Float32Array(
-      createBuffer(this.maxEntities * ORGANISM_SENSE_STRIDE * 4),
-      0,
-      this.maxEntities * ORGANISM_SENSE_STRIDE,
-    );
-    this.weights126 = new Float32Array(
-      createBuffer(this.maxEntities * ORGANISM_WEIGHT_STRIDE * 4),
-      0,
-      this.maxEntities * ORGANISM_WEIGHT_STRIDE,
-    );
-    this.modulators2 = new Float32Array(createBuffer(this.maxEntities * 2 * 4), 0, this.maxEntities * 2);
-    this.motorOut6 = new Float32Array(
-      createBuffer(this.maxEntities * ORGANISM_MOTOR_STRIDE * 4),
-      0,
-      this.maxEntities * ORGANISM_MOTOR_STRIDE,
-    );
-    this.norepinephrine = new Float32Array(createBuffer(this.maxEntities * 4), 0, this.maxEntities);
-    this.serotonin = new Float32Array(createBuffer(this.maxEntities * 4), 0, this.maxEntities);
-    this.pciProxy = new Float32Array(createBuffer(this.maxEntities * 4), 0, this.maxEntities);
-    this.thoughtCurvatureKappa = new Float32Array(createBuffer(this.maxEntities * 4), 0, this.maxEntities);
-    this.freeWontVetoCount = new Uint32Array(createBuffer(this.maxEntities * 4), 0, this.maxEntities);
+    this.senseIn8 = allocF32(m * ORGANISM_SENSE_STRIDE);
+    this.weights126 = allocF32(m * ORGANISM_WEIGHT_STRIDE);
+    this.modulators2 = allocF32(m * 2);
+    this.motorOut6 = allocF32(m * ORGANISM_MOTOR_STRIDE);
+    this.norepinephrine = allocF32(m);
+    this.serotonin = allocF32(m);
+    this.pciProxy = allocF32(m);
+    this.thoughtCurvatureKappa = allocF32(m);
+    this.freeWontVetoCount = allocU32(m);
   }
 
   public registerBiome(record: BiomeZoneRecord): void {
@@ -328,14 +383,25 @@ export class ErpRelationalStore {
     this.species.set(record.speciesId, { ...record });
   }
 
-  /**
-   * Inserts a new organism with strict relational FK checks (`speciesId`, `biomeId`) and exact 15-pool kJ sum.
-   */
+  public upsertQuantumSubstrate(record: QuantumSubstrateRecord): QuantumSubstrateRecord {
+    if (record.epochId !== this.epoch.epochId) {
+      throw new Error(`FK violation: QuantumSubstrate.epochId=${record.epochId} != WorldEpoch.epochId=${this.epoch.epochId}`);
+    }
+    if (record.entityId !== null && (record.entityId < 0 || record.entityId >= this.activeCount)) {
+      throw new Error(`FK violation: QuantumSubstrate.entityId=${record.entityId} out of Organism range`);
+    }
+    const copy = { ...record };
+    this.quantumSubstrates.set(copy.substrateId, copy);
+    return copy;
+  }
+
   public spawnOrganism(params: {
     speciesId: number;
     biomeId: number;
     generation: number;
     flawMask: number;
+    morphotypeId?: number;
+    entangledPartnerId?: number;
     pos: [number, number, number];
     headingRad: number;
     initialPools15: ArrayLike<number>;
@@ -348,7 +414,6 @@ export class ErpRelationalStore {
       throw new Error(`FK violation: Organism.biomeId=${params.biomeId} not found in BiomeZone`);
     }
 
-    // Reuse dead slot or grow activeCount
     let slot = -1;
     for (let i = 0; i < this.activeCount; i++) {
       if (this.alive[i] === 0) {
@@ -368,6 +433,8 @@ export class ErpRelationalStore {
     this.biomeFk[slot] = params.biomeId;
     this.generation[slot] = params.generation;
     this.flawMask[slot] = params.flawMask & 0x0f;
+    this.morphotypeId[slot] = params.morphotypeId ?? ((params.speciesId + 2) & 0x07);
+    this.entangledPartnerId[slot] = params.entangledPartnerId ?? -1;
     this.ageSec[slot] = 0;
     this.posX[slot] = params.pos[0];
     this.posY[slot] = params.pos[1];
@@ -379,7 +446,6 @@ export class ErpRelationalStore {
     this.massKg[slot] = 1.25;
     this.telomereIntegrity[slot] = 1.0;
 
-    // Exact Kahan sum of initial 15 pools -> totalIntakeKj
     const pBase = slot * METABOLIC_POOL_COUNT;
     let sum = 0;
     let comp = 0;
@@ -393,6 +459,12 @@ export class ErpRelationalStore {
     }
     this.totalIntakeKj[slot] = sum;
     this.o2Reserve[slot] = 0.95;
+    this.co2Level[slot] = 0.12;
+    this.bloodPh[slot] = 7.4;
+    this.rosDamage[slot] = 0.02;
+    this.sleepStage[slot] = 0;
+    this.aurumWealth[slot] = 10.0;
+    this.umbraWealth[slot] = 2.0;
     this.hydration[slot] = 0.92;
     this.insulin[slot] = 0.35;
     this.glucagon[slot] = 0.25;
@@ -475,9 +547,6 @@ export class ErpRelationalStore {
     return full;
   }
 
-  /**
-   * Relational INNER JOIN across `Organism`, `SpeciesLineage`, `BiomeZone`, `MetabolicLedger`, and `NeuralCortexState`.
-   */
   public queryJoinedOrganisms(options: { limit?: number; casteRole?: CasteRole; biomeId?: number } = {}): JoinedOrganismView[] {
     const limit = Math.max(1, Math.min(500, options.limit ?? 64));
     const results: JoinedOrganismView[] = [];
@@ -493,11 +562,14 @@ export class ErpRelationalStore {
       if (options.casteRole && sp.casteRole !== options.casteRole) continue;
 
       const pBase = i * METABOLIC_POOL_COUNT;
+      const stageRaw = this.sleepStage[i]! as SleepStageCode;
       results.push({
         entityId: i,
         speciesId: spId,
         latinBinomial: sp.latinBinomial,
         casteRole: sp.casteRole,
+        morphotypeId: this.morphotypeId[i]!,
+        entangledPartnerId: this.entangledPartnerId[i]!,
         biomeId: bmId,
         biomeName: bm.name,
         ageSec: this.ageSec[i]!,
@@ -510,6 +582,12 @@ export class ErpRelationalStore {
         totalMetabolicKj: this.totalIntakeKj[i]!,
         atpBufferKj: this.pools15[pBase + 12]!,
         hydration: this.hydration[i]!,
+        o2Reserve: this.o2Reserve[i]!,
+        bloodPh: this.bloodPh[i]!,
+        rosDamage: this.rosDamage[i]!,
+        sleepStage: stageRaw <= 2 ? stageRaw : 0,
+        aurumWealth: this.aurumWealth[i]!,
+        umbraWealth: this.umbraWealth[i]!,
         dopamineRpe: this.modulators2[i * 2]!,
         pciProxy: this.pciProxy[i]!,
         thoughtCurvatureKappa: this.thoughtCurvatureKappa[i]!,
@@ -518,20 +596,21 @@ export class ErpRelationalStore {
     return results;
   }
 
-  /**
-   * Captures an exact reversible state checkpoint into the ring buffer (`NOVEL-100 N01`).
-   */
-  public captureSnapshot(): ReversibleWorldSnapshot {
+  public captureSnapshot(auxiliaryPayload?: unknown): ReversibleWorldSnapshot {
     const n = this.activeCount;
-    const biomeArr = Array.from(this.biomes.values()).sort((a, b) => a.biomeId - b.biomeId);
     const snap: ReversibleWorldSnapshot = {
       tick: this.epoch.simTick,
       simTimeSec: this.epoch.simTimeSec,
+      merkleRootHex: this.epoch.merkleRootHex,
       freeEnergyReserveKj: this.epoch.freeEnergyReserveKj,
       activeCount: n,
       alive: this.alive.slice(0, n),
       speciesId: this.speciesFk.slice(0, n),
       biomeId: this.biomeFk.slice(0, n),
+      generation: this.generation.slice(0, n),
+      flawMask: this.flawMask.slice(0, n),
+      morphotypeId: this.morphotypeId.slice(0, n),
+      entangledPartnerId: this.entangledPartnerId.slice(0, n),
       ageSec: this.ageSec.slice(0, n),
       posX: this.posX.slice(0, n),
       posY: this.posY.slice(0, n),
@@ -539,12 +618,41 @@ export class ErpRelationalStore {
       velX: this.velX.slice(0, n),
       velY: this.velY.slice(0, n),
       velZ: this.velZ.slice(0, n),
+      headingRad: this.headingRad.slice(0, n),
+      massKg: this.massKg.slice(0, n),
+      telomereIntegrity: this.telomereIntegrity.slice(0, n),
       pools15: this.pools15.slice(0, n * METABOLIC_POOL_COUNT),
       totalIntakeKj: this.totalIntakeKj.slice(0, n),
+      o2Reserve: this.o2Reserve.slice(0, n),
+      co2Level: this.co2Level.slice(0, n),
+      bloodPh: this.bloodPh.slice(0, n),
+      rosDamage: this.rosDamage.slice(0, n),
+      sleepStage: this.sleepStage.slice(0, n),
+      aurumWealth: this.aurumWealth.slice(0, n),
+      umbraWealth: this.umbraWealth.slice(0, n),
       hydration: this.hydration.slice(0, n),
+      insulin: this.insulin.slice(0, n),
+      glucagon: this.glucagon.slice(0, n),
+      leptin: this.leptin.slice(0, n),
+      ghrelin: this.ghrelin.slice(0, n),
+      cortisol: this.cortisol.slice(0, n),
+      aicZ1: this.aicZ1.slice(0, n),
+      aicZ2: this.aicZ2.slice(0, n),
+      senseIn8: this.senseIn8.slice(0, n * ORGANISM_SENSE_STRIDE),
       weights126: this.weights126.slice(0, n * ORGANISM_WEIGHT_STRIDE),
-      biomeNutrients: Float64Array.from(biomeArr.map((b) => b.nutrientPoolKj)),
-      biomeDetritus: Float64Array.from(biomeArr.map((b) => b.detritusPoolKj)),
+      modulators2: this.modulators2.slice(0, n * 2),
+      motorOut6: this.motorOut6.slice(0, n * ORGANISM_MOTOR_STRIDE),
+      norepinephrine: this.norepinephrine.slice(0, n),
+      serotonin: this.serotonin.slice(0, n),
+      pciProxy: this.pciProxy.slice(0, n),
+      thoughtCurvatureKappa: this.thoughtCurvatureKappa.slice(0, n),
+      freeWontVetoCount: this.freeWontVetoCount.slice(0, n),
+      biomes: Array.from(this.biomes.values(), (b) => ({ ...b })),
+      species: Array.from(this.species.values(), (s) => ({ ...s })),
+      quantumSubstrates: Array.from(this.quantumSubstrates.values(), (q) => ({ ...q })),
+      socialBonds: Array.from(this.socialBonds.entries(), ([k, v]) => [k, { ...v }]),
+      nextBondId: this.nextBondId,
+      auxiliaryPayload,
     };
     this.snapshots.push(snap);
     if (this.snapshots.length > this.snapshotCapacity) {
@@ -553,26 +661,29 @@ export class ErpRelationalStore {
     return snap;
   }
 
-  public listSnapshots(): Array<{ tick: number; simTimeSec: number; activeCount: number }> {
+  public listSnapshots(): Array<{ tick: number; simTimeSec: number; activeCount: number; merkleRootHex: string }> {
     return this.snapshots.map((s) => ({
       tick: s.tick,
       simTimeSec: s.simTimeSec,
       activeCount: s.activeCount,
+      merkleRootHex: s.merkleRootHex,
     }));
   }
 
+  public getSnapshot(targetTick?: number): ReversibleWorldSnapshot | null {
+    if (this.snapshots.length === 0) return null;
+    if (targetTick === undefined) return this.snapshots[this.snapshots.length - 1]!;
+    return this.snapshots.find((s) => s.tick === targetTick) ?? null;
+  }
+
   public rollbackToSnapshot(targetTick?: number): boolean {
-    if (this.snapshots.length === 0) return false;
-    let chosen = this.snapshots[this.snapshots.length - 1]!;
-    if (targetTick !== undefined) {
-      const exact = this.snapshots.find((s) => s.tick === targetTick);
-      if (!exact) return false;
-      chosen = exact;
-    }
+    const chosen = this.getSnapshot(targetTick);
+    if (!chosen) return false;
 
     const n = chosen.activeCount;
     this.epoch.simTick = chosen.tick;
     this.epoch.simTimeSec = chosen.simTimeSec;
+    this.epoch.merkleRootHex = chosen.merkleRootHex;
     this.epoch.freeEnergyReserveKj = chosen.freeEnergyReserveKj;
     this.activeCount = n;
 
@@ -580,6 +691,11 @@ export class ErpRelationalStore {
     this.alive.set(chosen.alive, 0);
     this.speciesFk.set(chosen.speciesId, 0);
     this.biomeFk.set(chosen.biomeId, 0);
+    this.generation.set(chosen.generation, 0);
+    this.flawMask.set(chosen.flawMask, 0);
+    this.morphotypeId.set(chosen.morphotypeId, 0);
+    this.entangledPartnerId.fill(-1);
+    this.entangledPartnerId.set(chosen.entangledPartnerId, 0);
     this.ageSec.set(chosen.ageSec, 0);
     this.posX.set(chosen.posX, 0);
     this.posY.set(chosen.posY, 0);
@@ -587,16 +703,46 @@ export class ErpRelationalStore {
     this.velX.set(chosen.velX, 0);
     this.velY.set(chosen.velY, 0);
     this.velZ.set(chosen.velZ, 0);
+    this.headingRad.set(chosen.headingRad, 0);
+    this.massKg.set(chosen.massKg, 0);
+    this.telomereIntegrity.set(chosen.telomereIntegrity, 0);
     this.pools15.set(chosen.pools15, 0);
     this.totalIntakeKj.set(chosen.totalIntakeKj, 0);
+    this.o2Reserve.set(chosen.o2Reserve, 0);
+    this.co2Level.set(chosen.co2Level, 0);
+    this.bloodPh.set(chosen.bloodPh, 0);
+    this.rosDamage.set(chosen.rosDamage, 0);
+    this.sleepStage.set(chosen.sleepStage, 0);
+    this.aurumWealth.set(chosen.aurumWealth, 0);
+    this.umbraWealth.set(chosen.umbraWealth, 0);
     this.hydration.set(chosen.hydration, 0);
+    this.insulin.set(chosen.insulin, 0);
+    this.glucagon.set(chosen.glucagon, 0);
+    this.leptin.set(chosen.leptin, 0);
+    this.ghrelin.set(chosen.ghrelin, 0);
+    this.cortisol.set(chosen.cortisol, 0);
+    this.aicZ1.set(chosen.aicZ1, 0);
+    this.aicZ2.set(chosen.aicZ2, 0);
+    this.senseIn8.set(chosen.senseIn8, 0);
     this.weights126.set(chosen.weights126, 0);
+    this.modulators2.set(chosen.modulators2, 0);
+    this.motorOut6.set(chosen.motorOut6, 0);
+    this.norepinephrine.set(chosen.norepinephrine, 0);
+    this.serotonin.set(chosen.serotonin, 0);
+    this.pciProxy.set(chosen.pciProxy, 0);
+    this.thoughtCurvatureKappa.set(chosen.thoughtCurvatureKappa, 0);
+    this.freeWontVetoCount.set(chosen.freeWontVetoCount, 0);
 
-    const biomeArr = Array.from(this.biomes.values()).sort((a, b) => a.biomeId - b.biomeId);
-    for (let idx = 0; idx < biomeArr.length && idx < chosen.biomeNutrients.length; idx++) {
-      biomeArr[idx]!.nutrientPoolKj = chosen.biomeNutrients[idx]!;
-      biomeArr[idx]!.detritusPoolKj = chosen.biomeDetritus[idx]!;
-    }
+    this.biomes.clear();
+    for (const b of chosen.biomes) this.biomes.set(b.biomeId, { ...b });
+    this.species.clear();
+    for (const s of chosen.species) this.species.set(s.speciesId, { ...s });
+    this.quantumSubstrates.clear();
+    for (const q of chosen.quantumSubstrates) this.quantumSubstrates.set(q.substrateId, { ...q });
+    this.socialBonds.clear();
+    for (const [k, v] of chosen.socialBonds) this.socialBonds.set(k, { ...v });
+    this.nextBondId = chosen.nextBondId;
+
     this.recomputeSpeciesExtantCounts();
     return true;
   }

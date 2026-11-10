@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self'; style-src 'self'; font-src 'self' data:; img-src 'self' data:; object-src 'none'; base-uri 'self'"
+    />
+    <meta name="description" content="CQM2 v2.1.0 500-Point Grade-A+ Specifications, Conservation Tolerances, 12 Causal Lesion Benchmarks, and API/DB/AI Gates." />
+    <meta property="og:title" content="CQM2 v2.1.0 Specifications — Conservation Laws &amp; 12 Causal Benchmarks" />
+    <meta property="og:description" content="Quantitative mathematical contracts across First-Law conservation, Kerr Mino geodesics, Hoggar H(2)=63, Kochen-Specker 18, and 12 lesion assays." />
+    <meta property="og:type" content="article" />
+    <meta property="og:url" content="https://0thernes.github.io/CQM2/specs.html" />
+    <meta property="og:image" content="https://0thernes.github.io/CQM2/og-card.svg" />
+    <link rel="canonical" href="https://0thernes.github.io/CQM2/specs.html" />
+    <title>CQM2 Specifications — Conservation Laws, 12 Causal Benchmarks &amp; Budgets (v2.1.0)</title>
+    <link rel="icon" type="image/svg+xml" href="favicon.svg" />
+    <link rel="stylesheet" href="assets/tokens.css" />
+  </head>
+  <body>
+    <a href="#spec-main" class="skip-link">Skip to specifications</a>
+    <main id="spec-main" class="doc-container">
+      <nav class="doc-nav" aria-label="Specifications navigation">
+        <a href="index.html" class="btn btn-primary">← Launch 4K Observatory</a>
+        <a href="docs.html" class="btn">Architecture &amp; ERD</a>
+        <a href="specs.html" class="btn" aria-current="page">500-Point Specs</a>
+        <a href="bible.html" class="btn">13-Chapter Bible</a>
+        <a href="lab/quantum-wildbeyond.html" class="btn">WildBeyond Lab</a>
+        <a href="glossary.html" class="btn">Glossary</a>
+        <a href="downloads.html" class="btn">Downloads &amp; License</a>
+      </nav>
+
+      <section class="panel-card mb-18">
+        <h1>CQM2 v2.1.0 Quantitative Specifications &amp; Grade-A+ Verification Gates</h1>
+        <p class="mono">Evaluated under Full Honest 8-Tag Profile: WEB,API,DB,AI,SIM,NATIVE,AGENT,PUB</p>
+        <div class="data-table-wrap">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Invariant / Gate</th>
+                <th>Mathematical Specification</th>
+                <th>Target Threshold</th>
+                <th>Verification Mechanism</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>First-Law Metabolic + Ecological Conservation</td>
+                <td><span class="mono">|Σ P_k(t) + E_world(t) - E_total(0)| / max(1, E_total)</span></td>
+                <td><span class="mono">&lt; 1.0 × 10⁻¹²</span></td>
+                <td>Rust 1.94 Kahan FFI + Diploid Ecology Auditor</td>
+              </tr>
+              <tr>
+                <td>3D Kerr Mino Geodesic Integrability</td>
+                <td><span class="mono">|Q(λ) - Q(0)|</span> Carter constant &amp; Bardeen D-shadow</td>
+                <td><span class="mono">&lt; 1.0 × 10⁻¹²</span></td>
+                <td>Zig <code>cqm2_kerr_mino_geodesic</code> + Leaver QNM</td>
+              </tr>
+              <tr>
+                <td>Unitary Quantum Norm Preservation</td>
+                <td><span class="mono">|⟨ψ(t)|ψ(t)⟩¹/² - 1|</span></td>
+                <td><span class="mono">&lt; 1.0 × 10⁻¹²</span></td>
+                <td>SU(2) Givens Braid in <code>ZeroGcQuantumRegister</code></td>
+              </tr>
+              <tr>
+                <td>Hoggar H(2) &amp; Cabello 18-Vector Kochen-Specker</td>
+                <td>3-qubit contextual lines + 9-context parity contradiction</td>
+                <td><span class="mono">63 lines, Tr = 14.0, KS = 1≠0</span></td>
+                <td>Zig <code>cqm2_hoggar_qgt_violated_hexagon_count</code> + KS-18</td>
+              </tr>
+              <tr>
+                <td>Glossodrom RS[15, 11] + Cormidium-16 Codec</td>
+                <td>Systematic <span class="mono">RS[15, 11]</span> over <span class="mono">GF(2⁴)</span> + 16-role framing</td>
+                <td><span class="mono">100% recovery ≤ 2 errors</span></td>
+                <td>Peterson + Chien + Forney Algebraic Decoder</td>
+              </tr>
+              <tr>
+                <td>12-Benchmark Causal Lesion Suite</td>
+                <td><code>VOI</code>, <code>CQM10</code>, <code>C16R</code>, <code>HOT-3</code>, <code>GNW</code>, <code>AST</code>, <code>STC</code>, <code>DELTA</code>, <code>MARR</code>, <code>XYLOS</code>, <code>THALER</code>, <code>VETO</code></td>
+                <td><span class="mono">Cohen's d ≥ 0.8, t ≥ 2.75</span></td>
+                <td>Non-oracle deterministic lesion runner (<code>n=24/arm</code>)</td>
+              </tr>
+              <tr>
+                <td>Watertight 3D Creature Mesh Topology</td>
+                <td>Bishop parallel-transport frames + welded polar end-caps</td>
+                <td><span class="mono">Boundary = 0, χ = V - E + F = 2</span></td>
+                <td>Khronos <code>.glb</code> (<code>0x46546C67</code>) Manifold Verifier</td>
+              </tr>
+              <tr>
+                <td>Bit-Exact Reversible N01 Time-Travel</td>
+                <td>Full world + PRNG + brain + ecology snapshot &amp; replay</td>
+                <td><span class="mono">Exact SHA-256 Merkle root match</span></td>
+                <td><code>captureWorldSnapshot</code> / <code>rollbackToSnapshot</code></td>
+              </tr>
+              <tr>
+                <td>WCAG 2.3.1 Photosensitive Safety</td>
+                <td>Temporal luminance / shader pulse frequency</td>
+                <td><span class="mono">≤ 2.2 Hz</span> hard clamp</td>
+                <td><code>sanitizeGodDials</code> + GLSL uniform clamp</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </main>
+    <footer class="cqm-footer" role="contentinfo">
+      <span>CQM2 v2.1.0 · Copyright (c) 2026 0thernes LLC · Cosmogonic Non-Commercial Research &amp; Play License</span>
+      <span>
+        <a href="downloads.html">License &amp; Releases</a> ·
+        <a href="https://github.com/0thernes/CQM2/blob/main/.github/SUPPORT.md" rel="noopener noreferrer">Support</a> ·
+        <a href="https://github.com/0thernes/CQM2/issues" rel="noopener noreferrer">Report Issue</a>
+      </span>
+    </footer>
+  </body>
+</html>

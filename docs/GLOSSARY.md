@@ -1,24 +1,23 @@
-# CQM2 Scientific, Mathematical & Systems Glossary
+# CQM2 Scientific, Mathematical & Systems Glossary (`v2.1.0`)
 
 | Term | Domain | Definition in CQM2 |
 |---|---|---|
 | **Antithetic Integral Controller (AIC)** | Biophysics | Molecular feedback controller ($\dot{z}_1 = \mu - \eta z_1 z_2$, $\dot{z}_2 = \theta x - \eta z_1 z_2$; Briat, Gupta & Khammash 2016) guaranteeing zero-steady-state-error glycemic homeostasis at $\mu/\theta = 4.0\text{ kJ}$. |
 | **Archon SuperMind** | Swarm Cognition | Caste-level 512-dimensional Fourier Holographic Reduced Representation (`FHRR`) Phasor Hyperdimensional Computing (`HDC`) + 32-slot Modern Continuous Hopfield network ($\beta = 6$). |
-| **Asmodenius v42** | Embodied A-Life | Hero Creature #1 uniting a 14-region recurrent CNS + Enteric Nervous System (`ENS`), Larkum NMDA gating, Hasani `sLTC`, Frazier `VOI`, `HOT-3` confidence, and `N13` Free-Won't veto. |
-| **Berry Curvature ($\Omega_{xy}$)** | Quantum Geometry | Antisymmetric imaginary component $-2\,\mathrm{Im}\,Q_{xy}$ of the Quantum Geometric Tensor evaluated without heap allocations in `ZeroGcQuantumRegister`. |
-| **Casali PCI Proxy** | Neurodynamics | Lempel-Ziv 76 spatiotemporal complexity of the 14-region binary response raster after a localized TMS pulse (`NOT_SENTIENT`, `indicatorOnly: true`). |
-| **Determinantal Point Process (DPP)** | Swarm Ecology | Cholesky $5 \times 5$ Gram determinant $\det(K + \epsilon I)$ measuring behavioral niche volume across the 5 swarm castes. |
-| **Entity Relational Programming (ERP)** | Systems Design | Data-oriented normalized architecture storing 10 relational entities in flat `SharedArrayBuffer` Structure-of-Arrays (`SoA`) columns synced to 3NF SQLite WAL. |
-| **Eshkol Taylor Jet Curvature** | Differential Geometry | Exact discrete 2nd-order jet spine curvature $\kappa = \|\mathbf{r}' \times \mathbf{r}''\| / \|\mathbf{r}'\|^3$ computed in Zig SIMD. |
+| **Asmodenius v42** | Embodied A-Life | Hero Creature #1 uniting a 14-region recurrent CNS + Enteric Nervous System (`ENS`), Larkum NMDA gating, Hasani `sLTC`, Frazier `VOI`, `HOT-3` CalibHead confidence, and `N13` Free-Won't veto. |
+| **BDM Speciation** | Evolutionary Genetics | Bateson-Dobzhansky-Muller post-zygotic genetic incompatibility across 8 diploid loci driving lineage divergence in `src/sim/ecology.ts`. |
+| **BF16-XOR Telemetry Codec** | Systems / Rust | Lossless brain-float-16 XOR delta encoder/decoder in `cqm2_rust_ledger.dll` reducing continuous cortical telemetry bandwidth. |
+| **Big Tree Crystal Sanctuary** | Ecology | Peaceful `r = 14` central sanctuary ring suppressing predation (`aggression = 0`) and ripening 6 conserved bioluminescent fruiting pods. |
+| **Casali PCI Proxy** | Neurodynamics | State-cloned Lempel-Ziv 76 spatiotemporal complexity of the 14-region binary response raster after a localized TMS pulse across Wake, NREM, and Propofol (`NOT_SENTIENT`, `indicatorOnly: true`). |
+| **Cormidium-16 Codec** | Xenolinguistics | 16-role siphonophore zooid functional specialization paired with systematic `GF(16)` Reed-Solomon `RS[15,11]` self-healing codewords. |
+| **Entity Relational Programming (ERP)** | Systems Design | Data-oriented normalized architecture storing 10 relational entities in flat `SharedArrayBuffer` Structure-of-Arrays (`SoA`) columns synced to 3NF SQLite WAL + immutable `audit_events`. |
 | **Frazier Knowledge-Gradient (VOI)** | Active Inference | Closed-form expected utility gain from sampling one noisy environmental cue prior to committing to an irreversible foraging choice (`AINF-H`). |
-| **Frenet-Serret 6D Curvature ($\kappa, \tau$)** | Cognitive Geometry | Generalized trajectory curvature and torsion of Asmodenius's 6D cortical state ring buffer. |
-| **Frey-Morris STC** | Neuroplasticity | Synaptic Tagging & Capture mechanism consolidating tagged early-LTP weights into decay-resistant late-LTP when Dopamine/NE synthesizes Plasticity-Related Proteins (`PRP`). |
+| **Frey-Morris STC** | Neuroplasticity | Synaptic Tagging & Capture consolidating tagged early-LTP weights into decay-resistant late-LTP when Dopamine/NE synthesizes Plasticity-Related Proteins (`PRP`). |
 | **Gated-DeltaNet Fast Weights** | Neuroplasticity | Associative $16 \times 16$ sensory adapter $S_t = \alpha S_{t-1} - \beta(S_{t-1}k_t - v_t)k_t^\top$ that dynamically unscrambles congenital channel permutations (`FLAW_SCRAMBLE`). |
-| **Glossodrom RS[15, 11]** | Xenolinguistics | Systematic Reed-Solomon code over $\mathrm{GF}(2^4)$ ($d_{\min} = 5$) healing up to 2 corrupted 4-bit Zooid symbols via Peterson + Chien + Forney decoding. |
-| **Guanine Thin-Film Iridescence** | Rendering / Optics | Physical dielectric interference (`IOR = 1.83`) coupled to reactive Gray-Scott + FitzHugh-Nagumo chromatophore Turing lattices. |
-| **Hasani Semi-Implicit sLTC** | Biophysical ODE | Unconditionally stable liquid time-constant membrane integrator modulated by Acetylcholine (`ACh`) and Norepinephrine (`NE`). |
-| **Hoggar Hexagon $H(2)$** | Quantum Contextuality | The 63-line split Cayley hexagon inside 3-qubit symplectic space $W(5,2)$ identified where Fubini-Study metric $|g_{\mu\nu}| = 1/9 > 1/12$. |
-| **Kerr $g^4$ Photon Ring** | Relativistic Optics | Multi-order lensed photon ring around a spinning black hole ($a/M \in [0, 0.998]$) with relativistic Doppler intensity beaming $I_{\text{obs}} = g^4 I_{\text{em}}$. |
-| **Larkum Coincidence Gate** | Cortical Biophysics | Two-compartment pyramidal rule multiplying basal feedforward input by disynaptically SOM-inhibited apical NMDA plateau gain. |
+| **Hoggar Hexagon $H(2)$ & KS-18** | Quantum Contextuality | The 63-line split Cayley hexagon inside 3-qubit symplectic space $W(5,2)$ paired with Cabello's 18-vector 9-context Kochen-Specker state-independent parity proof. |
+| **Kerr Mino-Time Geodesics** | Relativistic Physics | Coupled 3D $(r, \theta, \phi)$ photon trajectories integrated in Zig SIMD conserving Carter's 4th constant $Q$ (`drift < 1e-12`), Bardeen D-shadows, and Penrose ergospheres. |
 | **Marr-Albus Cerebellum** | Motor Learning | `16 -> 256 -> 8` Golgi-inhibited granule expansion + climbing-fiber signed error learning that inverts `FLAW_BACKWARDS` motor polarity online. |
-| **Somatic Free-Won't (`N13`)** | Executive Control | Insula + Anterior Cingulate interoceptive veto cancelling impulsive Basal Ganglia `Go` motor readiness potentials when predicted bodily harm exceeds threshold. |
+| **Rosette Wire Verifier** | Verification | Deterministic protocol state-hash receipt chain inspired by `rosette-iot` verifying monotonic tick ordering and zero packet mutation. |
+| **Thaler Creativity Markers** | Attractor Dynamics | 9 quantitative novelty/value attractor metrics verified against 4 systematic falsification ablations (`NOT_SENTIENT`). |
+| **Voynich-Khôra Fibonacci Anyons** | Topological Quantum | Exact $F$- and $R$-matrix braiding unitary representation ($\tau \otimes \tau = 1 \oplus \tau$) encoding Voynich slot grammar strings. |
+| **Xylos v2 (`Creature #002`)** | Hyperbolic A-Life | `{7,3}` Poincaré disk medusa evaluating 14 Butlin computational indicators and non-oracle corollary-discharge reality monitoring (`NOT_SENTIENT`). |

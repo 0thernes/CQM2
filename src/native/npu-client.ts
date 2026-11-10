@@ -1,8 +1,8 @@
 /**
- * CQM2 Persistent Intel(R) AI Boost NPU & Intel(R) Graphics iGPU Subprocess Client.
- * Manages `python/npu_world_worker.py` via `uv` (or Python with OpenVINO) over stdio JSON-lines
- * so compiled NPU neural graphs execute in <0.6 ms with zero cold-start overhead.
- * Gracefully falls back to deterministic CPU latent forward pass on CI / non-NPU machines.
+ * CQM2 v2.1.0 Persistent Intel(R) AI Boost NPU & Intel(R) Graphics iGPU Subprocess Client.
+ * Dispatches BOTH:
+ *   1. Action-Conditioned RSSM World Model (`NPU` — Intel AI Boost)
+ *   2. 2D Habitat Gray-Scott / Pheromone Field Diffusion & Sensory Alignment (`GPU.0` — Intel Graphics iGPU)
  */
 import { existsSync } from 'node:fs';
 import { join, resolve } from 'node:path';
@@ -17,14 +17,24 @@ export interface NpuWorkerStatus {
   calibratedNpuMs: number;
   calibratedAuxMs: number;
   totalDispatches: number;
+  totalIgpuDispatches: number;
   lastLatencyMs: number;
+  lastIgpuLatencyMs: number;
 }
 
 export interface NpuRssmResult {
   device: string;
   ms: number;
   meanAbs: number;
+  epistemicVar: number;
+  branchScores: number[];
   head: number[];
+}
+
+export interface IgpuFieldResult {
+  device: string;
+  ms: number;
+  meanV: number;
 }
 
 const ROOT = resolve(import.meta.dir, '..', '..');
@@ -45,11 +55,13 @@ export class NpuWorldClient {
     primaryDevice: 'CPU-FALLBACK',
     primaryDeviceName: 'Deterministic TypeScript/Zig Latent Fallback',
     auxDevice: 'CPU-FALLBACK',
-    auxDeviceName: 'Deterministic Zig DeltaNet Unscrambler',
+    auxDeviceName: 'Deterministic Zig Reaction-Diffusion Fallback',
     calibratedNpuMs: 0,
     calibratedAuxMs: 0,
     totalDispatches: 0,
+    totalIgpuDispatches: 0,
     lastLatencyMs: 0,
+    lastIgpuLatencyMs: 0,
   };
 
   private proc: ReturnType<typeof Bun.spawn> | null = null;
@@ -62,11 +74,12 @@ export class NpuWorldClient {
     return { ...this.status };
   }
 
-  /**
-   * Synchronous one-shot hardware probe (`--probe`) or daemon boot (`--daemon`).
-   */
   public async init(enableDaemon = true): Promise<NpuWorkerStatus> {
-    if (process.env.CQM2_DISABLE_NPU === '1' || !existsSync(WORKER_SCRIPT) || typeof Bun === 'undefined') {
+    const npuDisabled =
+      process.env.CQM2_DISABLE_NPU === '1' ||
+      process.env.CQM2_ENABLE_NPU === '0' ||
+      process.env.CQM2_ENABLE_NPU === 'false';
+    if (npuDisabled || !existsSync(WORKER_SCRIPT) || typeof Bun === 'undefined') {
       return this.getStatus();
     }
     const uvBin = findUvBinary();
@@ -94,7 +107,9 @@ export class NpuWorldClient {
               calibratedNpuMs: Number(parsed.calibratedNpuMs ?? 0),
               calibratedAuxMs: Number(parsed.calibratedAuxMs ?? 0),
               totalDispatches: 0,
+              totalIgpuDispatches: 0,
               lastLatencyMs: Number(parsed.calibratedNpuMs ?? 0),
+              lastIgpuLatencyMs: Number(parsed.calibratedAuxMs ?? 0),
             };
           }
         } catch {
@@ -123,7 +138,9 @@ export class NpuWorldClient {
           calibratedNpuMs: Number(readyMsg.calibratedNpuMs ?? 0),
           calibratedAuxMs: Number(readyMsg.calibratedAuxMs ?? 0),
           totalDispatches: 0,
+          totalIgpuDispatches: 0,
           lastLatencyMs: Number(readyMsg.calibratedNpuMs ?? 0),
+          lastIgpuLatencyMs: Number(readyMsg.calibratedAuxMs ?? 0),
         };
       } else {
         this.shutdown();
@@ -162,7 +179,7 @@ export class NpuWorldClient {
   }
 
   /**
-   * Executes `[32, 64]` RSSM World-Model latent imagination step on `Intel(R) AI Boost` NPU!
+   * Executes `[32, 64]` Action-Conditioned RSSM World-Model rollout on `Intel(R) AI Boost` NPU!
    */
   public async stepRssmWorldModel(latentBatch2048: Float32Array): Promise<NpuRssmResult> {
     if (this.status.daemonActive && this.proc?.stdin) {
@@ -182,6 +199,8 @@ export class NpuWorldClient {
             device: String(resp.device ?? this.status.primaryDevice),
             ms,
             meanAbs: Number(resp.meanAbs ?? 0),
+            epistemicVar: Number(resp.epistemicVar ?? 0.01),
+            branchScores: Array.isArray(resp.branchScores) ? (resp.branchScores as number[]) : [0, 0, 0, 0],
             head: Array.isArray(resp.head) ? (resp.head as number[]) : [],
           };
         }
@@ -191,17 +210,31 @@ export class NpuWorldClient {
       if (result) return result;
     }
 
-    // Deterministic residual fallback matching `build_rssm_model` topology
+    // Deterministic action-conditioned fallback matching `build_rssm_model`
     const t0 = performance.now();
     let sumAbs = 0;
     const head: number[] = [];
+    const branchScores: number[] = [];
     const n = Math.min(2048, latentBatch2048.length);
+    for (let r = 0; r < 8; r++) {
+      let rowSum = 0;
+      for (let c = 0; c < 16; c++) {
+        const idx = r * 64 + c;
+        const x = idx < n ? latentBatch2048[idx]! : 0;
+        const act = r * 64 + 48 + (c & 15) < n ? latentBatch2048[r * 64 + 48 + (c & 15)]! : 0;
+        const next = Math.tanh(0.82 * x + 0.38 * Math.tanh(0.45 * x + 0.32 * act));
+        rowSum += next;
+        if (r === 0) head.push(Number(next.toFixed(5)));
+      }
+      branchScores.push(Number((rowSum / 16).toFixed(5)));
+    }
     for (let i = 0; i < n; i++) {
       const x = latentBatch2048[i]!;
-      const next = Math.tanh(0.85 * x + 0.35 * Math.tanh(0.42 * x - 0.11 * Math.sin(i * 0.17)));
-      sumAbs += Math.abs(next);
-      if (i < 8) head.push(Number(next.toFixed(5)));
+      sumAbs += Math.abs(Math.tanh(0.82 * x + 0.38 * Math.tanh(0.42 * x)));
     }
+    const meanBranch = branchScores.reduce((a, b) => a + b, 0) / branchScores.length;
+    const epistemicVar =
+      branchScores.reduce((acc, b) => acc + (b - meanBranch) * (b - meanBranch), 0) / branchScores.length;
     const ms = Math.max(0.01, performance.now() - t0);
     this.status.totalDispatches += 1;
     this.status.lastLatencyMs = ms;
@@ -209,7 +242,86 @@ export class NpuWorldClient {
       device: this.status.primaryDevice,
       ms,
       meanAbs: n > 0 ? sumAbs / n : 0,
+      epistemicVar,
+      branchScores,
       head,
+    };
+  }
+
+  /**
+   * Executes `[1, 2, 32, 32]` Habitat Gray-Scott + Pheromone Field Diffusion on `Intel(R) Graphics` iGPU (`GPU.0`)!
+   * Mutates `fieldUv2048` in-place with the updated reaction-diffusion concentrations.
+   */
+  public async stepFieldDiffusion2D(fieldUv2048: Float32Array, feed = 0.036, kill = 0.061): Promise<IgpuFieldResult> {
+    if (this.status.daemonActive && this.proc?.stdin && fieldUv2048.length >= 2048) {
+      let result: IgpuFieldResult | null = null;
+      const run = async () => {
+        const id = this.reqCounter++;
+        const payload =
+          JSON.stringify({ id, cmd: 'field2d', feed, kill, data: Array.from(fieldUv2048.subarray(0, 2048)) }) + '\n';
+        const stdinSink = this.proc!.stdin as { write(chunk: string): unknown; flush?(): unknown };
+        stdinSink.write(payload);
+        if (typeof stdinSink.flush === 'function') stdinSink.flush();
+        const resp = await this.readNextJsonLine(2500);
+        if (resp && resp.ok && Array.isArray(resp.data)) {
+          const outArr = resp.data as number[];
+          const lim = Math.min(2048, outArr.length);
+          for (let i = 0; i < lim; i++) fieldUv2048[i] = outArr[i]!;
+          const ms = Number(resp.ms ?? this.status.calibratedAuxMs);
+          this.status.totalIgpuDispatches += 1;
+          this.status.lastIgpuLatencyMs = ms;
+          result = {
+            device: String(resp.device ?? this.status.auxDevice),
+            ms,
+            meanV: Number(resp.meanV ?? 0),
+          };
+        }
+      };
+      this.pendingMutex = this.pendingMutex.then(run, run);
+      await this.pendingMutex;
+      if (result) return result;
+    }
+
+    // Deterministic 32x32 reaction-diffusion CPU fallback
+    const t0 = performance.now();
+    const g = 32;
+    const nextU = new Float32Array(1024);
+    const nextV = new Float32Array(1024);
+    let sumV = 0;
+    for (let y = 0; y < g; y++) {
+      const ym = y === 0 ? g - 1 : y - 1;
+      const yp = y + 1 === g ? 0 : y + 1;
+      for (let x = 0; x < g; x++) {
+        const xm = x === 0 ? g - 1 : x - 1;
+        const xp = x + 1 === g ? 0 : x + 1;
+        const idx = y * g + x;
+        const u = fieldUv2048[idx]!;
+        const v = fieldUv2048[1024 + idx]!;
+        const lapU =
+          (fieldUv2048[ym * g + x]! + fieldUv2048[yp * g + x]! + fieldUv2048[y * g + xm]! + fieldUv2048[y * g + xp]! - 4 * u) *
+          0.16;
+        const lapV =
+          (fieldUv2048[1024 + ym * g + x]! +
+            fieldUv2048[1024 + yp * g + x]! +
+            fieldUv2048[1024 + y * g + xm]! +
+            fieldUv2048[1024 + y * g + xp]! -
+            4 * v) *
+          0.08;
+        const uvv = u * v * v;
+        nextU[idx] = Math.max(0, Math.min(1, u + lapU - uvv + feed * (1 - u)));
+        nextV[idx] = Math.max(0, Math.min(1, v + lapV + uvv - (feed + kill) * v));
+        sumV += nextV[idx]!;
+      }
+    }
+    fieldUv2048.subarray(0, 1024).set(nextU);
+    fieldUv2048.subarray(1024, 2048).set(nextV);
+    const ms = Math.max(0.01, performance.now() - t0);
+    this.status.totalIgpuDispatches += 1;
+    this.status.lastIgpuLatencyMs = ms;
+    return {
+      device: this.status.auxDevice,
+      ms,
+      meanV: sumV / 1024,
     };
   }
 

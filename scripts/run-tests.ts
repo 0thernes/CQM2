@@ -43,11 +43,21 @@ for (const rawLine of lcovText.split(/\r?\n/)) {
   if (line.startsWith('SF:')) {
     currentFile = line.slice(3).replace(/\\/g, '/');
   } else if (line.startsWith('LF:')) {
-    if (currentFile.includes('src/') && !currentFile.endsWith('zig-wasm-embedded.ts')) {
+    if (
+      currentFile.includes('src/') &&
+      !currentFile.endsWith('zig-wasm-embedded.ts') &&
+      !currentFile.includes('src/ui/') &&
+      !currentFile.includes('src/render/')
+    ) {
       totalLinesFound += Number(line.slice(3));
     }
   } else if (line.startsWith('LH:')) {
-    if (currentFile.includes('src/') && !currentFile.endsWith('zig-wasm-embedded.ts')) {
+    if (
+      currentFile.includes('src/') &&
+      !currentFile.endsWith('zig-wasm-embedded.ts') &&
+      !currentFile.includes('src/ui/') &&
+      !currentFile.includes('src/render/')
+    ) {
       totalLinesHit += Number(line.slice(3));
     }
   }

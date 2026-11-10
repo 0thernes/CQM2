@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self'; style-src 'self'; font-src 'self' data:; img-src 'self' data:; object-src 'none'; base-uri 'self'"
+    />
+    <meta name="description" content="Download CQM2 v2.1.0 Local Quad-Silicon Workstation &amp; Universal Browser Releases, OpenAPI 3.1 Spec, SBOM, Checksums, and Cosmogonic License." />
+    <meta property="og:title" content="CQM2 Downloads &amp; Releases — v2.1.0" />
+    <meta property="og:description" content="Official CQM2 v2.1.0 release archives, CycloneDX SBOM, SHA-256 manifests, and verbatim Cosmogonic License." />
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://0thernes.github.io/CQM2/downloads.html" />
+    <meta property="og:image" content="https://0thernes.github.io/CQM2/og-card.svg" />
+    <link rel="canonical" href="https://0thernes.github.io/CQM2/downloads.html" />
+    <title>CQM2 Downloads &amp; Releases — v2.1.0</title>
+    <link rel="icon" type="image/svg+xml" href="favicon.svg" />
+    <link rel="stylesheet" href="assets/tokens.css" />
+  </head>
+  <body>
+    <a href="#dl-main" class="skip-link">Skip to downloads</a>
+    <main id="dl-main" class="doc-container">
+      <nav class="doc-nav" aria-label="Downloads navigation">
+        <a href="index.html" class="btn btn-primary">← Launch 4K Observatory</a>
+        <a href="docs.html" class="btn">Architecture &amp; ERD</a>
+        <a href="specs.html" class="btn">500-Point Specs</a>
+        <a href="bible.html" class="btn">13-Chapter Bible</a>
+        <a href="lab/quantum-wildbeyond.html" class="btn">WildBeyond Lab</a>
+        <a href="glossary.html" class="btn">Glossary</a>
+        <a href="downloads.html" class="btn" aria-current="page">Downloads &amp; License</a>
+      </nav>
+
+      <section class="panel-card mb-18">
+        <h1>Releases, Downloads &amp; Licensing — CQM2 v2.1.0</h1>
+        <p>
+          All official release archives, CycloneDX 1.5 SBOMs (<code>sbom.cdx.json</code>), and cryptographic SHA-256 manifests
+          (<code>SHA256SUMS.txt</code>) are published immutably on GitHub Releases:
+        </p>
+        <div class="flex-wrap-gap my-14">
+          <a href="https://github.com/0thernes/CQM2/releases/tag/v2.1.0" class="btn btn-primary" rel="noopener noreferrer">
+            Download CQM2 v2.1.0 Release Bundle (Latest)
+          </a>
+          <a href="https://github.com/0thernes/CQM2/releases/tag/v2.0.0" class="btn" rel="noopener noreferrer">
+            Archive: CQM2 v2.0.0 Baseline
+          </a>
+          <a href="https://github.com/0thernes/CQM2" class="btn" rel="noopener noreferrer">
+            View Source Repository (0thernes/CQM2)
+          </a>
+        </div>
+        <h3>Local Quad-Silicon Workstation Quickstart (Windows x64 / Linux / macOS)</h3>
+        <pre class="code-block mono">git clone https://github.com/0thernes/CQM2.git
+cd CQM2
+bun install
+bun run build:native   # Compiles Zig 0.17 AVX2+WASM, CUDA/DirectML/LevelZero C++20/ASM, Rust 1.94, Go 1.26
+bun run check          # Typecheck + Lint + Full Test Suite + Universal Production Build
+bun run start          # Starts Local Quad-Silicon Workstation Server on http://127.0.0.1:4200</pre>
+      </section>
+
+      <section class="panel-card">
+        <h2>License — COSMOGONIC LICENSE (Non-Commercial Research &amp; Play)</h2>
+        <p>
+          Copyright (c) 2026 0thernes (0thernes LLC) &lt;0_0@0thernes.art&gt;. Free for personal exploration, academic and scientific research,
+          classroom teaching, non-monetized streaming, and non-commercial derivative art/mods with attribution and same-license share-alike.
+          Commercial use requires a separate written license from 0thernes LLC. See root <code>LICENSE</code> for the verbatim legal text.
+        </p>
+      </section>
+    </main>
+    <footer class="cqm-footer" role="contentinfo">
+      <span>CQM2 v2.1.0 · Copyright (c) 2026 0thernes LLC · Cosmogonic Non-Commercial Research &amp; Play License</span>
+      <span>
+        <a href="https://github.com/0thernes/CQM2/blob/main/LICENSE" rel="noopener noreferrer">Verbatim LICENSE</a> ·
+        <a href="https://github.com/0thernes/CQM2/blob/main/.github/SUPPORT.md" rel="noopener noreferrer">Support</a> ·
+        <a href="https://github.com/0thernes/CQM2/issues" rel="noopener noreferrer">Report Issue</a>
+      </span>
+    </footer>
+  </body>
+</html>

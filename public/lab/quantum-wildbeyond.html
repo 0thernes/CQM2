@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self'; font-src 'self' data:; img-src 'self' data:; object-src 'none'; base-uri 'self'"
+    />
+    <meta name="description" content="CQM2 v2.1.0 Quantum WildBeyond Interactive Lab — Bardeen Kerr Shadow, Hoggar 63-Hexagon Contextuality, Lorenz Chaos Attractor &amp; CQM-25 Benchmark." />
+    <meta property="og:title" content="CQM2 Quantum WildBeyond Lab — Kerr Shadow, Hoggar H(2) &amp; Chaos" />
+    <meta property="og:description" content="Interactive relativistic photon capture contour, W(5,2) contextual geometry, and strange attractor explorer." />
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://0thernes.github.io/CQM2/lab/quantum-wildbeyond.html" />
+    <meta property="og:image" content="https://0thernes.github.io/CQM2/og-card.svg" />
+    <link rel="canonical" href="https://0thernes.github.io/CQM2/lab/quantum-wildbeyond.html" />
+    <title>CQM2 Quantum WildBeyond Lab — Kerr Shadow, Hoggar H(2) &amp; Chaos (v2.1.0)</title>
+    <link rel="icon" type="image/svg+xml" href="../favicon.svg" />
+    <link rel="stylesheet" href="../assets/tokens.css" />
+  </head>
+  <body>
+    <a href="#lab-main" class="skip-link">Skip to WildBeyond lab</a>
+    <main id="lab-main" class="doc-container">
+      <nav class="doc-nav" aria-label="WildBeyond lab navigation">
+        <a href="../index.html" class="btn btn-primary">← Launch 4K Observatory</a>
+        <a href="../docs.html" class="btn">Architecture &amp; ERD</a>
+        <a href="../specs.html" class="btn">500-Point Specs</a>
+        <a href="../bible.html" class="btn">13-Chapter Bible</a>
+        <a href="quantum-wildbeyond.html" class="btn" aria-current="page">WildBeyond Lab</a>
+        <a href="../glossary.html" class="btn">Glossary</a>
+        <a href="../downloads.html" class="btn">Downloads &amp; License</a>
+      </nav>
+
+      <section class="panel-card mb-18">
+        <h1>Quantum WildBeyond &amp; Relativistic Strange-Attractor Laboratory</h1>
+        <p class="mono">Real-Time Bardeen Kerr D-Shadow · Cabello KS-18 / Hoggar H(2)=63 · Coupled Lorenz-Rössler Manifold</p>
+        <div class="flex-wrap-gap my-14">
+          <label for="wb-spin" class="mono">Kerr Spin (a/M):</label>
+          <input id="wb-spin" type="range" min="0" max="0.998" step="0.005" value="0.92" />
+          <span id="wb-spin-val" class="mono">0.920</span>
+          <button id="wb-bench-btn" type="button" class="btn btn-gold">Run CQM-25 Quantum+Kerr Benchmark</button>
+        </div>
+        <p id="wb-status" class="mono text-muted">Initializing analytical Kerr shadow, Hoggar H(2) web, and Lorenz attractor...</p>
+      </section>
+
+      <div class="wildbeyond-grid">
+        <section class="panel-card">
+          <h2>1. Exact Bardeen Kerr D-Shadow</h2>
+          <canvas id="wb-kerr-canvas" class="wildbeyond-canvas" width="480" height="320" aria-label="Bardeen Kerr black hole shadow plot"></canvas>
+        </section>
+        <section class="panel-card">
+          <h2>2. Hoggar H(2)=63 &amp; KS-18 Web</h2>
+          <canvas id="wb-hoggar-canvas" class="wildbeyond-canvas" width="480" height="320" aria-label="Hoggar 63-line contextual hexagon diagram"></canvas>
+        </section>
+        <section class="panel-card">
+          <h2>3. Coupled Lorenz Chaos Trajectory</h2>
+          <canvas id="wb-chaos-canvas" class="wildbeyond-canvas" width="480" height="320" aria-label="Lorenz chaotic strange attractor projection"></canvas>
+        </section>
+      </div>
+    </main>
+    <footer class="cqm-footer" role="contentinfo">
+      <span>CQM2 v2.1.0 · Copyright (c) 2026 0thernes LLC · Cosmogonic Non-Commercial Research &amp; Play License</span>
+      <span>
+        <a href="../downloads.html">License &amp; Releases</a> ·
+        <a href="https://github.com/0thernes/CQM2/issues" rel="noopener noreferrer">Report Issue</a>
+      </span>
+    </footer>
+    <script type="module" src="../assets/wildbeyond-lab.js"></script>
+  </body>
+</html>

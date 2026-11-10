@@ -1,5 +1,5 @@
 /**
- * CQM2 Isomorphic Zig 0.17 SIMD128 WebAssembly Kernel Bridge.
+ * CQM2 v2.1.0 Isomorphic Zig 0.17 SIMD128 WebAssembly Kernel Bridge.
  * Zero Node/Bun-only imports: runs identically inside any modern Browser (Mobile/Desktop/4K),
  * Bun local server, or Node 24 CI runner with deterministic arena reset per call!
  */
@@ -66,7 +66,25 @@ export interface ZigWasmExports extends WebAssembly.Exports {
   cqm2_hoggar_qgt_violated_hexagon_count(traceOutPtr: number): number;
   cqm2_tsotchke_qrng_batch(seedInOutPtr: number, outF64Ptr: number, count: number, rctOkOutPtr: number): void;
   cqm2_eshkol_spine_curvature(ptsXyzPtr: number, curvOutPtr: number, numPts: number): number;
+  cqm2_eshkol_vandermonde_jet4(history5Ptr: number, jetOut5Ptr: number): number;
   cqm2_schwarzschild_photon_deflection(impactBOverM: number, maxSteps: number, capturedOutPtr: number): number;
+  cqm2_kerr_mino_geodesic(
+    spinA: number,
+    inclRad: number,
+    xi: number,
+    eta: number,
+    maxSteps: number,
+    out4Ptr: number,
+  ): number;
+  cqm2_llg_spin_step(
+    spinsXyzPtr: number,
+    hEffXyzPtr: number,
+    count: number,
+    alphaGilbert: number,
+    dt: number,
+  ): number;
+  cqm2_spherical_harmonics_l2(dirXyzPtr: number, out9Ptr: number): void;
+  cqm2_rmsnorm_swiglu(xInPtr: number, gateInPtr: number, weightPtr: number, outPtr: number, dim: number): number;
   cqm2_reactive_skin_step(
     uGsPtr: number,
     vGsPtr: number,
@@ -125,10 +143,6 @@ export class ZigKernelBridge {
     return ptr;
   }
 
-  /**
-   * Evaluates `count` organisms' 8->8->6 neuromodulated brains in SIMD128!
-   * Updates `weights` in-place when `lr > 0` and writes motor/affect actions into `outputs`.
-   */
   public stepOrganismBrainsSimd(
     inputs: Float32Array,
     weights: Float32Array,
@@ -153,9 +167,6 @@ export class ZigKernelBridge {
     }
   }
 
-  /**
-   * Biophysical Larkum 2-Compartment NMDA + Hasani Fused Semi-Implicit sLTC step.
-   */
   public stepSltcLarkum(
     vState: Float32Array,
     nmdaSlow: Float32Array,
@@ -181,9 +192,6 @@ export class ZigKernelBridge {
     return meanAbs;
   }
 
-  /**
-   * Glitchling Compensatory Organ 1: Marr-Albus Cerebellar 16 -> 256 -> 8 Forward + Climbing-Fiber LTD/LTP.
-   */
   public stepCerebellumMarrAlbus(
     granuleW: Float32Array,
     pfWeights: Float32Array,
@@ -206,9 +214,6 @@ export class ZigKernelBridge {
     return norm;
   }
 
-  /**
-   * Glitchling Compensatory Organ 2: Gated-DeltaNet 16x16 Associative Fast-Weight Sensory Unscrambler.
-   */
   public stepDeltaNetFastWeights(
     stateMat256: Float32Array,
     rawSenseKey16: Float32Array,
@@ -230,9 +235,6 @@ export class ZigKernelBridge {
     return rmse;
   }
 
-  /**
-   * LCG-shuffled zero-yaw-bias Verlet soft-body constraint solver.
-   */
   public stepVerletShuffled(
     pos: Float32Array,
     prevPos: Float32Array,
@@ -332,6 +334,15 @@ export class ZigKernelBridge {
     return meanCurv;
   }
 
+  public eshkolVandermondeJet4(history5: Float32Array, jetOut5: Float32Array): number {
+    this.exports.cqm2_reset_heap();
+    const hPtr = this.allocF32(history5.subarray(0, 5));
+    const jPtr = this.allocF32Zero(5);
+    const confidence = this.exports.cqm2_eshkol_vandermonde_jet4(hPtr, jPtr);
+    jetOut5.subarray(0, 5).set(new Float32Array(this.exports.memory.buffer, jPtr, 5));
+    return confidence;
+  }
+
   public schwarzschildPhotonDeflection(
     impactBOverM: number,
     maxSteps = 4000,
@@ -341,6 +352,60 @@ export class ZigKernelBridge {
     const deflectionRad = this.exports.cqm2_schwarzschild_photon_deflection(impactBOverM, maxSteps, capPtr);
     const captured = new Uint32Array(this.exports.memory.buffer, capPtr, 1)[0] === 1;
     return { deflectionRad, captured };
+  }
+
+  public kerrMinoGeodesic(
+    spinA: number,
+    inclRad: number,
+    xi: number,
+    eta: number,
+    maxSteps = 4000,
+  ): { captured: boolean; rMin: number; phiAccum: number; diskCrossings: number; carterRelDrift: number } {
+    this.exports.cqm2_reset_heap();
+    const outPtr = this.exports.cqm2_alloc(32);
+    const cap = this.exports.cqm2_kerr_mino_geodesic(spinA, inclRad, xi, eta, maxSteps, outPtr);
+    const view = new Float64Array(this.exports.memory.buffer, outPtr, 4);
+    return {
+      captured: cap === 1,
+      rMin: view[0]!,
+      phiAccum: view[1]!,
+      diskCrossings: view[2]!,
+      carterRelDrift: view[3]!,
+    };
+  }
+
+  public stepLlgSpins(spinsXyz: Float32Array, hEffXyz: Float32Array, alphaGilbert = 0.08, dt = 0.05): number {
+    const count = Math.floor(Math.min(spinsXyz.length, hEffXyz.length) / 3);
+    if (count <= 0) return 0;
+    this.exports.cqm2_reset_heap();
+    const sPtr = this.allocF32(spinsXyz.subarray(0, count * 3));
+    const hPtr = this.allocF32(hEffXyz.subarray(0, count * 3));
+    const mzMean = this.exports.cqm2_llg_spin_step(sPtr, hPtr, count, alphaGilbert, dt);
+    spinsXyz.subarray(0, count * 3).set(new Float32Array(this.exports.memory.buffer, sPtr, count * 3));
+    return mzMean;
+  }
+
+  public sphericalHarmonicsL2(x: number, y: number, z: number): Float32Array {
+    this.exports.cqm2_reset_heap();
+    const inPtr = this.allocF32(new Float32Array([x, y, z]));
+    const outPtr = this.allocF32Zero(9);
+    this.exports.cqm2_spherical_harmonics_l2(inPtr, outPtr);
+    const res = new Float32Array(9);
+    res.set(new Float32Array(this.exports.memory.buffer, outPtr, 9));
+    return res;
+  }
+
+  public rmsNormSwiglu(xIn: Float32Array, gateIn: Float32Array, weight: Float32Array, out: Float32Array): number {
+    const dim = Math.min(xIn.length, gateIn.length, weight.length, out.length);
+    if (dim <= 0) return 0;
+    this.exports.cqm2_reset_heap();
+    const xPtr = this.allocF32(xIn.subarray(0, dim));
+    const gPtr = this.allocF32(gateIn.subarray(0, dim));
+    const wPtr = this.allocF32(weight.subarray(0, dim));
+    const oPtr = this.allocF32Zero(dim);
+    const meanAbs = this.exports.cqm2_rmsnorm_swiglu(xPtr, gPtr, wPtr, oPtr, dim);
+    out.subarray(0, dim).set(new Float32Array(this.exports.memory.buffer, oPtr, dim));
+    return meanAbs;
   }
 
   public stepReactiveSkin(

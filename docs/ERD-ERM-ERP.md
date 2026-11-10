@@ -1,6 +1,6 @@
 # Entity Relationship Diagram (`ERD`), Modeling (`ERM`) & Programming (`ERP`)
 
-CQM2 models every cosmological, ecological, physiological, cognitive, quantum, and hardware state variable across **10 normalized third-normal-form (`3NF`) entities**, implemented in-memory as Structure-of-Arrays (`SoA`) columns (`src/erp/relational-store.ts`) and persisted on disk in SQLite `WAL` (`src/server/db.ts`).
+CQM2 (`v2.1.0`) models every cosmological, ecological, physiological, cognitive, quantum, hardware, and audit state variable across **10 normalized third-normal-form (`3NF`) simulation entities** plus an append-only **`audit_events` governance ledger**, implemented in-memory as Structure-of-Arrays (`SoA`) columns (`src/erp/relational-store.ts`) and persisted on disk via reversible SQL migrations (`migrations/001..002`) in SQLite `WAL` (`src/server/db.ts`).
 
 ## 1. Entity Relationship Diagram (`ERD`)
 
@@ -21,6 +21,8 @@ erDiagram
 
   WORLD_EPOCHS {
     int epoch_id PK
+    string public_uid UK
+    int version_rev
     string seed_hex
     int sim_tick
     float sim_time_sec
@@ -29,6 +31,8 @@ erDiagram
   }
   BIOME_ZONES {
     int biome_id PK
+    string public_uid UK
+    int version_rev
     int epoch_id FK
     string name
     string kind
@@ -38,6 +42,8 @@ erDiagram
   }
   SPECIES_LINEAGES {
     int species_id PK
+    string public_uid UK
+    int version_rev
     int parent_species_id FK
     string caste_role
     string latin_binomial
@@ -45,6 +51,8 @@ erDiagram
   }
   ORGANISMS {
     int entity_id PK
+    string public_uid UK
+    int version_rev
     int species_id FK
     int biome_id FK
     int alive
@@ -101,12 +109,21 @@ erDiagram
     float elapsed_ms
     float gflops
   }
+  AUDIT_EVENTS {
+    int event_id PK
+    string public_uid UK
+    string created_at_iso
+    string actor_kind
+    string action_code
+    string payload_sha256
+  }
 ```
 
-## 2. Entity Relational Programming (`ERP`) Invariants
+## 2. Entity Relational Programming (`ERP`) & SQLite WAL Invariants
 
-1. **Referential Integrity**: `spawnOrganism()` and `upsertSocialBond()` verify foreign keys in $O(1)$ before mutating typed-array slots; SQLite enforces `PRAGMA foreign_keys = ON` with `ON DELETE CASCADE` / `ON DELETE RESTRICT`.
-2. **Zero-GC Contiguous Strides**:
-   - `MetabolicLedger.pools15`: `Float64Array(maxEntities * 15)` — stride-15 contiguous layout passed directly by pointer into `cqm2_rust_audit_metabolic_conservation`.
-   - `NeuralCortexState.weights126`: `Float32Array(maxEntities * 126)` — stride-126 contiguous layout passed directly into `cqm2_organism_brain_batch_simd` and WebGPU `WGSL` storage buffers.
-3. **Reversible Time-Travel Ring (`NOVEL-100 N01`)**: `captureSnapshot()` and `rollbackToSnapshot(tick)` save and restore complete multi-table world epochs deterministically.
+1. **Referential Integrity & Opaque External IDs (`I-092`)**: `spawnOrganism()` and `upsertSocialBond()` verify foreign keys in $O(1)$ before mutating typed-array slots; SQLite enforces `PRAGMA foreign_keys = ON`, `CHECK` constraints, `public_uid` opaque tokens, and `version_rev` optimistic concurrency (`409 Conflict` on stale write).
+2. **Reversible SQL Migrations & Verified Backups (`I-089..I-095`)**: `migrations/001_initial_3nf.{up,down}.sql` and `migrations/002_audit_events_ledger.{up,down}.sql` execute inside atomic transactions; `rollbackMigration()` refuses execution unless a verified `VACUUM INTO` snapshot is supplied, and `audit_events` enforces SQLite `BEFORE UPDATE`/`BEFORE DELETE` abort triggers.
+3. **Zero-GC Contiguous Strides & Bit-Exact `N01` Rollback**:
+   - `MetabolicLedger.pools15`: `Float64Array(maxEntities * 15)` passed zero-copy by pointer into `cqm2_rust_audit_metabolic_conservation`.
+   - `NeuralCortexState.weights126`: `Float32Array(maxEntities * 126)` passed directly into `cqm2_cuda_organism_brains_strided`, `cqm2_organism_brain_batch_simd`, and WebGPU `WGSL` storage buffers.
+   - `captureWorldSnapshot()` and `rollbackToSnapshot()` restore complete world state + PRNG substreams bit-exactly (`merkleRootHex` verified identical on replay).

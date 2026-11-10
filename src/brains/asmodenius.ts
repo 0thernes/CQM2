@@ -1,35 +1,21 @@
 /**
- * CQM2 Artificial Life Creature #1: `AsmodeniusV42Brain` (GrokBot / Asmodensius-v40 Lineage -> v42).
+ * CQM2 Artificial Life Creature #1: `AsmodeniusV42Brain` (GrokBot / Asmodensius-v40 Lineage -> v42.1).
  * Implements a 14-region recurrent biophysical nervous system + Enteric Nervous System (`ENS`),
- * closing every R21, `LIFE-100`, and `NOVEL-100` open roadmap gap:
- *   1. Larkum Two-Compartment Basal x Apical NMDA Plateau + Hasani Semi-Implicit `sLTC` (`Zig` SIMD128).
- *   2. `activeInference` (`AINF-H` solved): Frazier Knowledge-Gradient Value-of-Information (`VOI`)
- *      epistemic cue-sampling policy before high-stakes commitment.
- *   3. `HOT-3`: Endogenous second-order Anterior Cingulate / Prefrontal metacognitive confidence readout
- *      for selective opt-out wagering under high sensory noise.
- *   4. `N13` Somatic "Free Won't" Pre-Motor Veto: Insula interoceptive harm predictor vetoes impulsive
- *      Basal Ganglia Go initiation within the readiness window.
- *   5. `N52` `P_SIM` Substrate Anomaly Quarantine: Detects exogenous God-Dial discontinuities and shields
- *      Hippocampal CA3 episodic weights from corrupted updates.
- *   6. 6D Frenet-Serret Cognitive Trajectory Curvature $\kappa(t)$ & Torsion $\tau(t)$.
- *   7. Casali Perturbational Complexity Index (`PCI`) TMS Poke Test (`Functional Flow F` vs `Connectome W`),
- *      strictly wrapped in `ComputationalIndicatorContract` (`NOT_SENTIENT`, `indicatorOnly: true`).
+ * synthesizing every R21, `LIFE-100`, `NOVEL-100`, and `Consciousness-Researchers-Corpus` organ:
+ *   1. Larkum Two-Compartment Basal x Apical NMDA Plateau + Hasani Semi-Implicit `sLTC` (`Zig` SIMD128)
+ *      with **Dale's Law 80/20 `E/PV/SST/VIP` microcircuit** & **Tripartite Astrocyte `Ca²⁺` gliotransmission**.
+ *   2. Surprise-gated Oja dendritic plasticity (`plasticW14x14`).
+ *   3. `activeInference` (`AINF-H`): Frazier Knowledge-Gradient Value-of-Information (`VOI`).
+ *   4. **Non-Oracle `CalibHead` `HOT-3`**: Endogenous Anterior Cingulate / Prefrontal confidence readout
+ *      computed strictly from internal cross-channel dispersion & `E-I` workspace margin (`zero` oracle noise leak!).
+ *   5. **Kalman `AST-1R` Attention Schema**, **Nonlinear `GNW` Global Ignition**, **Causal `CEMI` Ephaptic LFP Feedback**,
+ *      **`AOM` Attention Depletion-Recovery**, **Striatal `D1/D2` Race + Learned `N13` Free-Won't Veto**,
+ *      **4-Mode `PAG` Survival Column**, **`[NPY, CCK_GLP1, CRF, OXT]` Neuropeptides**, and **`SelfModel` (`SELF+SIM`)**.
+ *   6. 6D Frenet-Serret Cognitive Trajectory Curvature $\kappa(t)$ & Torsion $\tau(t)$ + Real `motorCmd6`.
+ *   7. Non-destructive Casali `PCI` TMS Poke Test (`WAKE` vs `NREM_SLOW_WAVE` vs `PROPOFOL_ANESTHESIA`).
  */
-import {
-  type ComputationalIndicatorContract,
-  DeterministicRng,
-  makeIndicator,
-} from '../core/prng';
-import { ErpRelationalStore } from '../erp/relational-store';
+import { type ComputationalIndicatorContract, DeterministicRng, makeIndicator } from '../core/prng';
 import { getZigBridge } from '../native/zig-bridge';
-import {
-  DEFAULT_INITIAL_POOLS_15,
-  ingestConservedMealKj,
-  P_BLD_GLC,
-  stepPopulationMetabolism,
-  transferConservedPoolKj,
-  P_LIV_GLY,
-} from './metabolism';
 
 export const ASMODENIUS_14_REGIONS = [
   'SensoryThalamus',
@@ -49,9 +35,12 @@ export const ASMODENIUS_14_REGIONS = [
 ] as const;
 
 export type AsmodeniusRegionName = (typeof ASMODENIUS_14_REGIONS)[number];
+export type PagSurvivalMode = 'FORAGE' | 'FREEZE' | 'FLIGHT' | 'SOCIAL_GROOM';
+export type TmsArousalMode = 'WAKE' | 'NREM_SLOW_WAVE' | 'PROPOFOL_ANESTHESIA';
 
 export interface TmsPokeReport {
   perturbedRegion: AsmodeniusRegionName;
+  arousalMode: TmsArousalMode;
   pciIndicator: ComputationalIndicatorContract<number>;
   lempelZivDictionarySize: number;
   functionalVsStructuralCorrelation: number;
@@ -63,24 +52,43 @@ export interface AsmodeniusStepTelemetry {
   regionActivations14: number[];
   metacognitiveConfidenceHot3: ComputationalIndicatorContract<number>;
   epistemicValueOfInfo: number;
+  gnwIgnited: boolean;
+  attentionSchemaError: number;
+  attentionResourceAom: number;
+  cemiEphapticPhaseLock: number;
+  pagSurvivalMode: PagSurvivalMode;
+  neuropeptides4: { npy: number; cckGlp1: number; crf: number; oxt: number };
+  selfAgencyScore: number;
   somaticFreeWontVetoTriggered: boolean;
   totalFreeWontVetoes: number;
   substrateAnomalyQuarantined: boolean;
   frenetCurvatureKappa: number;
   frenetTorsionTau: number;
   cpgPhaseRad: number;
+  motorCmd6: [number, number, number, number, number, number];
 }
 
-export interface R21BenchmarkResult {
-  benchmarkName: 'activeInference_VOI' | 'CQM10_gutSatiety' | 'C16R_antitheticHomeostasis' | 'HOT3_metacognitiveWagering';
-  intactMean: number;
-  lesionMean: number;
-  intactStd: number;
-  lesionStd: number;
-  cohensD: number;
-  welchsT: number;
-  passedGradeA: boolean;
-  interpretation: string;
+export interface AsmodeniusStateSnapshot {
+  vState: Float32Array;
+  nmdaSlow: Float32Array;
+  plasticW14x14: Float32Array;
+  functionalF: Float32Array;
+  astroCa14: Float32Array;
+  attnSchema14: Float32Array;
+  cpgPhases24: Float32Array;
+  cpgMasterPhase: number;
+  trajRing6D: Float64Array[];
+  trajCount: number;
+  freeWontVetoCount: number;
+  substrateQuarantineActive: boolean;
+  prevPhysicsSignature: number | null;
+  attentionResourceAom: number;
+  selfPredMotor: number;
+  vetoWeightAv: number;
+}
+
+function clamp(v: number, lo: number, hi: number): number {
+  return v < lo ? lo : v > hi ? hi : v;
 }
 
 function sigmoid(x: number): number {
@@ -94,7 +102,6 @@ function normalPdf(x: number): number {
 }
 
 function normalCdf(x: number): number {
-  // Abramowitz & Stegun 7.1.26 rational approximation (max error < 1.5e-7)
   const sign = x < 0 ? -1 : 1;
   const z = Math.abs(x) / Math.SQRT2;
   const t = 1.0 / (1.0 + 0.3275911 * z);
@@ -104,14 +111,6 @@ function normalCdf(x: number): number {
   return 0.5 * (1.0 + sign * erf);
 }
 
-/**
- * Exact Frazier Knowledge-Gradient Value-of-Information (`VOI`) for binary epistemic foraging:
- * Given current posterior log-odds belief $\mu_0$ with uncertainty variance $\sigma_0^2$, and a sensor cue
- * with observation noise variance $\sigma_{\text{obs}}^2$, a single look shifts posterior mean with predictive
- * standard deviation $\tilde{\sigma} = \sigma_0^2 / \sqrt{\sigma_0^2 + \sigma_{\text{obs}}^2}$.
- * Expected utility gain before subtracting cue cost $c_{\text{cue}}$:
- *   $\mathrm{KG}(\mu_0, \tilde{\sigma}) = \tilde{\sigma}\,\phi(-|\mu_0|/\tilde{\sigma}) - |\mu_0|\,\Phi(-|\mu_0|/\tilde{\sigma})$.
- */
 export function computeKnowledgeGradientVoi(
   priorMeanMargin: number,
   priorVariance: number,
@@ -127,9 +126,6 @@ export function computeKnowledgeGradientVoi(
   return Math.max(0, sigmaTilde * normalPdf(z) + z * sigmaTilde * normalCdf(z));
 }
 
-/**
- * Lempel-Ziv 76 complexity over a binary spatiotemporal raster string.
- */
 export function computeLempelZiv76Complexity(bits: Uint8Array): { rawCount: number; normalizedPci: number } {
   const n = bits.length;
   if (n === 0) return { rawCount: 0, normalizedPci: 0 };
@@ -183,7 +179,7 @@ export function computeLempelZiv76Complexity(bits: Uint8Array): { rawCount: numb
 
 export class AsmodeniusV42Brain {
   public static readonly REGION_COUNT = 14;
-  public static readonly NEURONS_PER_REGION = 8; // 112 coupled cortical/subcortical neurons + 24 CPG oscillators = 136 units!
+  public static readonly NEURONS_PER_REGION = 8; // Units 0..5 = Excitatory (E), Unit 6 = PV/SST Inhibitory, Unit 7 = VIP Disinhibitory!
   public static readonly TOTAL_NEURONS = 14 * 8;
 
   public readonly vState = new Float32Array(AsmodeniusV42Brain.TOTAL_NEURONS);
@@ -191,15 +187,15 @@ export class AsmodeniusV42Brain {
   public readonly basalDrive = new Float32Array(AsmodeniusV42Brain.TOTAL_NEURONS);
   public readonly apicalDrive = new Float32Array(AsmodeniusV42Brain.TOTAL_NEURONS);
 
-  // Structural 14x14 Macro-Connectome `W` & Effective Functional Flow `F`
   public readonly structuralW = new Float32Array(14 * 14);
+  public readonly plasticW14x14 = new Float32Array(14 * 14);
   public readonly functionalF = new Float32Array(14 * 14);
+  public readonly astroCa14 = new Float32Array(14);
+  public readonly attnSchema14 = new Float32Array(14);
 
-  // 24-unit Brainstem/Spinal Central Pattern Generator (`CPG`)
   public readonly cpgPhases24 = new Float32Array(24);
   public cpgMasterPhase = 0;
 
-  // 6D Cognitive Trajectory Ring (last 4 states for Frenet-Serret curvature kappa & torsion tau)
   private readonly trajRing6D: Float64Array[] = [
     new Float64Array(6),
     new Float64Array(6),
@@ -208,10 +204,12 @@ export class AsmodeniusV42Brain {
   ];
   private trajCount = 0;
 
-  // Counters & Safety Shields
   public freeWontVetoCount = 0;
   public substrateQuarantineActive = false;
   private prevPhysicsSignature: number | null = null;
+  public attentionResourceAom = 0.88;
+  private selfPredMotor = 0.0;
+  public vetoWeightAv = 0.72;
 
   public constructor(seed = 20261110n) {
     const rng = new DeterministicRng(seed);
@@ -219,36 +217,34 @@ export class AsmodeniusV42Brain {
     for (let i = 0; i < 24; i++) {
       this.cpgPhases24[i] = (i / 24.0) * 2.0 * Math.PI;
     }
+    this.astroCa14.fill(0.25);
   }
 
   private initCanonicalConnectome(rng: DeterministicRng): void {
-    // Biologically grounded thalamo-cortico-limbic-cerebellar-enteric small-world scaffold
     const edges: Array<[number, number, number]> = [
-      [0, 1, 0.82], // SensoryThalamus -> PrimarySensoryCortex
-      [1, 2, 0.76], // PrimarySensoryCortex -> PrefrontalWorkspace
-      [2, 3, 0.72], // PrefrontalWorkspace -> AnteriorCingulateHOT
-      [3, 2, 0.48], // AnteriorCingulateHOT -> PrefrontalWorkspace (apical top-down!)
-      [2, 4, 0.68], // PrefrontalWorkspace -> HippocampusCA3
-      [4, 2, 0.64], // HippocampusCA3 -> PrefrontalWorkspace (memory retrieval)
-      [2, 5, 0.74], // PrefrontalWorkspace -> BasalGangliaGoNoGo
-      [6, 5, 0.58], // AmygdalaValence -> BasalGangliaGoNoGo
-      [7, 3, 0.79], // InsulaInteroception -> AnteriorCingulateHOT (somatic alarm!)
-      [7, 6, 0.66], // InsulaInteroception -> AmygdalaValence
-      [8, 7, 0.71], // HypothalamusHomeostat -> InsulaInteroception
-      [13, 8, 0.83], // EntericGutPlexus -> HypothalamusHomeostat (vagal GLP-1/POMC!)
-      [5, 10, 0.81], // BasalGangliaGoNoGo -> MotorCortexM1
-      [9, 10, 0.69], // CerebellumPurkinje -> MotorCortexM1
-      [10, 9, 0.62], // MotorCortexM1 -> CerebellumPurkinje (efference copy)
-      [10, 11, 0.85], // MotorCortexM1 -> BrainstemCPG24
-      [12, 2, 0.55], // LocusCoeruleusNE -> PrefrontalWorkspace
-      [12, 1, 0.52], // LocusCoeruleusNE -> PrimarySensoryCortex
-      [3, 12, 0.61], // AnteriorCingulateHOT -> LocusCoeruleusNE (uncertainty arousal)
+      [0, 1, 0.82],
+      [1, 2, 0.76],
+      [2, 3, 0.72],
+      [3, 2, 0.48],
+      [2, 4, 0.68],
+      [4, 2, 0.64],
+      [2, 5, 0.74],
+      [6, 5, 0.58],
+      [7, 3, 0.79],
+      [7, 6, 0.66],
+      [8, 7, 0.71],
+      [13, 8, 0.83],
+      [5, 10, 0.81],
+      [9, 10, 0.69],
+      [10, 9, 0.62],
+      [10, 11, 0.85],
+      [12, 2, 0.55],
+      [12, 1, 0.52],
+      [3, 12, 0.61],
     ];
-
     for (const [src, dst, weight] of edges) {
       this.structuralW[src * 14 + dst] = weight;
     }
-    // Add weak small-world background couplings
     for (let r = 0; r < 14; r++) {
       for (let c = 0; c < 14; c++) {
         if (r !== c && this.structuralW[r * 14 + c] === 0 && rng.nextFloat() < 0.18) {
@@ -258,10 +254,46 @@ export class AsmodeniusV42Brain {
     }
   }
 
-  /**
-   * Advances all 14 CNS/ENS regions, evaluates VOI, HOT-3 confidence, `N13` Free Won't veto,
-   * `N52` substrate anomaly quarantine, and 6D Frenet-Serret curvature.
-   */
+  public snapshotState(): AsmodeniusStateSnapshot {
+    return {
+      vState: this.vState.slice(),
+      nmdaSlow: this.nmdaSlow.slice(),
+      plasticW14x14: this.plasticW14x14.slice(),
+      functionalF: this.functionalF.slice(),
+      astroCa14: this.astroCa14.slice(),
+      attnSchema14: this.attnSchema14.slice(),
+      cpgPhases24: this.cpgPhases24.slice(),
+      cpgMasterPhase: this.cpgMasterPhase,
+      trajRing6D: this.trajRing6D.map((v) => v.slice()),
+      trajCount: this.trajCount,
+      freeWontVetoCount: this.freeWontVetoCount,
+      substrateQuarantineActive: this.substrateQuarantineActive,
+      prevPhysicsSignature: this.prevPhysicsSignature,
+      attentionResourceAom: this.attentionResourceAom,
+      selfPredMotor: this.selfPredMotor,
+      vetoWeightAv: this.vetoWeightAv,
+    };
+  }
+
+  public restoreState(snap: AsmodeniusStateSnapshot): void {
+    this.vState.set(snap.vState);
+    this.nmdaSlow.set(snap.nmdaSlow);
+    this.plasticW14x14.set(snap.plasticW14x14);
+    this.functionalF.set(snap.functionalF);
+    this.astroCa14.set(snap.astroCa14);
+    this.attnSchema14.set(snap.attnSchema14);
+    this.cpgPhases24.set(snap.cpgPhases24);
+    this.cpgMasterPhase = snap.cpgMasterPhase;
+    for (let i = 0; i < 4; i++) this.trajRing6D[i]!.set(snap.trajRing6D[i]!);
+    this.trajCount = snap.trajCount;
+    this.freeWontVetoCount = snap.freeWontVetoCount;
+    this.substrateQuarantineActive = snap.substrateQuarantineActive;
+    this.prevPhysicsSignature = snap.prevPhysicsSignature;
+    this.attentionResourceAom = snap.attentionResourceAom;
+    this.selfPredMotor = snap.selfPredMotor;
+    this.vetoWeightAv = snap.vetoWeightAv;
+  }
+
   public stepBrain(params: {
     sensory8: ArrayLike<number>;
     gutLoadKj: number;
@@ -272,61 +304,112 @@ export class AsmodeniusV42Brain {
     physicsSignature: number;
     ach: number;
     ne: number;
+    cemiCoupling?: number;
+    gnwGain?: number;
+    socialProximity?: number;
     dtSec: number;
   }): AsmodeniusStepTelemetry {
-    const dt = Math.max(1e-3, Math.min(0.25, params.dtSec));
+    const dt = clamp(params.dtSec, 1e-3, 0.25);
+    const cemiGain = clamp(params.cemiCoupling ?? 0.22, 0.0, 1.0);
+    const gnwGain = clamp(params.gnwGain ?? 1.0, 0.0, 2.0);
+    const socialProx = clamp(params.socialProximity ?? 0.3, 0.0, 1.0);
 
-    // 1. N52 Substrate Anomaly Detector (`P_SIM` quarantine on abrupt external God-Dial discontinuity)
+    // 1. N52 Substrate Anomaly Detector (`P_SIM`)
     if (this.prevPhysicsSignature !== null) {
       const jump = Math.abs(params.physicsSignature - this.prevPhysicsSignature);
       this.substrateQuarantineActive = jump > 0.35;
     }
     this.prevPhysicsSignature = params.physicsSignature;
 
-    // Compute current 14-region mean rates
-    const regMean = new Float32Array(14);
-    for (let r = 0; r < 14; r++) {
-      let s = 0;
-      for (let k = 0; k < 8; k++) {
-        s += sigmoid(this.vState[r * 8 + k]!);
-      }
-      regMean[r] = s / 8.0;
-    }
+    // 2. Dale's Law 80/20 Regional Excitatory (`0..5`), PV/SST Inhibitory (`6`), VIP Disinhibitory (`7`) + CEMI LFP
+    const regExcit = new Float32Array(14);
+    const regPvSst = new Float32Array(14);
+    const regVip = new Float32Array(14);
+    let globalLfpSum = 0;
 
-    // 2. Assemble Basal (feedforward sensory + visceral) & Apical (recurrent macro-connectome) drives
+    for (let r = 0; r < 14; r++) {
+      let eSum = 0;
+      for (let k = 0; k < 6; k++) {
+        const rate = sigmoid(this.vState[r * 8 + k]!);
+        eSum += rate;
+        globalLfpSum += this.vState[r * 8 + k]!;
+      }
+      regExcit[r] = eSum / 6.0;
+      regPvSst[r] = sigmoid(this.vState[r * 8 + 6]!);
+      regVip[r] = sigmoid(this.vState[r * 8 + 7]!);
+      // Tripartite astrocyte Ca2+ tracks regional glutamatergic E activity
+      this.astroCa14[r] = clamp(0.92 * this.astroCa14[r]! + 0.08 * regExcit[r]!, 0.05, 1.0);
+    }
+    const meanLfpField = globalLfpSum / (14.0 * 6.0);
+    const cemiEphapticDrive = cemiGain * 0.28 * Math.tanh(meanLfpField);
+
+    // 3. Hypothalamic / Enteric Neuropeptides (`[NPY, CCK_GLP1, CRF, OXT]`)
+    const npy = clamp(sigmoid((4.0 - params.bloodGlucoseKj) * 1.6) * (1.0 - Math.tanh(params.gutLoadKj / 20.0)), 0, 1);
+    const cckGlp1 = clamp(Math.tanh(params.gutLoadKj / 16.0), 0, 1);
+    const crf = clamp(0.75 * params.somaticHazard + 0.25 * params.ne, 0, 1);
+    const oxt = clamp(socialProx * (1.0 - 0.6 * crf), 0, 1);
+
+    // 4. Assemble Basal & Apical Drives with Dale's Law Inhibition, Astrocyte Ca2+, GNW Ignition & CEMI Field
     this.basalDrive.fill(0);
     this.apicalDrive.fill(0);
 
     for (let k = 0; k < 8; k++) {
       const sVal = Number(params.sensory8[k] ?? 0);
-      this.basalDrive[0 * 8 + k] = sVal * 1.35; // SensoryThalamus
-      this.basalDrive[1 * 8 + k] = sVal * 0.95; // PrimarySensoryCortex
-      this.basalDrive[13 * 8 + k] = Math.tanh(params.gutLoadKj / 15.0) * (k % 2 === 0 ? 1.1 : 0.7); // EntericGutPlexus
-      this.basalDrive[8 * 8 + k] = Math.tanh((4.0 - params.bloodGlucoseKj) * 0.8); // HypothalamusHomeostat
-      this.basalDrive[7 * 8 + k] = params.somaticHazard * 1.45; // InsulaInteroception
+      const inhSign = k === 6 ? 0.8 : 1.0;
+      this.basalDrive[0 * 8 + k] = sVal * 1.35 * inhSign + cemiEphapticDrive;
+      this.basalDrive[1 * 8 + k] = sVal * 0.95 * inhSign + cemiEphapticDrive;
+      this.basalDrive[13 * 8 + k] = cckGlp1 * (k % 2 === 0 ? 1.15 : 0.75);
+      this.basalDrive[8 * 8 + k] = (npy - 0.6 * cckGlp1) * 1.25;
+      this.basalDrive[7 * 8 + k] = (params.somaticHazard * 1.45 - 0.35 * oxt) + cemiEphapticDrive;
     }
 
-    // Macro-connectome propagation + Functional Flow Matrix `F[src, dst]`
+    // Nonlinear GNW Ignition (`PrefrontalWorkspace` r=2 <-> `PrimarySensory` r=1 / `ACC` r=3)
+    const workspaceDrive = 0.5 * regExcit[2]! + 0.3 * regExcit[1]! + 0.2 * regExcit[3]!;
+    const gnwIgnited = gnwGain * workspaceDrive * this.attentionResourceAom > 0.36;
+    // AOM attention resource depletes slightly during sustained ignition and recovers at rest
+    this.attentionResourceAom = clamp(
+      this.attentionResourceAom + dt * (gnwIgnited ? -0.06 : 0.09 * (1.0 - this.attentionResourceAom)),
+      0.25,
+      1.0,
+    );
+
+    const surprise = clamp(Math.abs(regExcit[3]! - regExcit[2]!) + 0.3 * params.ne, 0, 1);
     for (let dst = 0; dst < 14; dst++) {
       let apSum = 0;
       for (let src = 0; src < 14; src++) {
-        const w = this.structuralW[src * 14 + dst]!;
-        if (w > 0) {
-          // Quarantine HippocampusCA3 (region 4) plasticity/coupling during substrate teleports (`N52`)
-          const effectiveW = this.substrateQuarantineActive && (src === 4 || dst === 4) ? w * 0.1 : w;
-          const flow = effectiveW * regMean[src]!;
+        const baseW = this.structuralW[src * 14 + dst]!;
+        if (baseW > 0) {
+          const pw = this.plasticW14x14[src * 14 + dst]!;
+          const rawW = clamp(baseW + pw, 0.01, 1.5);
+          const effectiveW = this.substrateQuarantineActive && (src === 4 || dst === 4) ? rawW * 0.1 : rawW;
+          const flow = effectiveW * regExcit[src]!;
           this.functionalF[src * 14 + dst] = 0.85 * this.functionalF[src * 14 + dst]! + 0.15 * flow;
           apSum += flow;
+
+          // Surprise-gated Oja dendritic plasticity (frozen when N52 quarantine is active!)
+          if (!this.substrateQuarantineActive && surprise > 0.08) {
+            const oja = 0.015 * dt * surprise * (regExcit[src]! * regExcit[dst]! - regExcit[dst]! * regExcit[dst]! * pw);
+            this.plasticW14x14[src * 14 + dst] = clamp(pw + oja, -0.35, 0.35);
+          }
         } else {
           this.functionalF[src * 14 + dst] = this.functionalF[src * 14 + dst]! * 0.85;
         }
       }
+
+      // VIP disinhibition opens apical dendrite against SST Martinotti inhibition; Astrocyte Ca2+ boosts NMDA!
+      const sstGate = clamp(1.0 - 0.55 * regPvSst[dst]! + 0.45 * regVip[dst]! + 0.25 * params.ach, 0.2, 1.4);
+      const astroGain = 0.85 + 0.35 * this.astroCa14[dst]!;
+      const gnwBroadcast = gnwIgnited ? 0.28 * gnwGain * regExcit[2]! : 0.0;
+
       for (let k = 0; k < 8; k++) {
-        this.apicalDrive[dst * 8 + k] = apSum + 0.12 * Math.sin((dst + k) * 0.9);
+        const somaticPvInh = k < 6 ? -0.32 * regPvSst[dst]! : 0.0;
+        this.basalDrive[dst * 8 + k] = this.basalDrive[dst * 8 + k]! + somaticPvInh + cemiEphapticDrive;
+        const het = 0.06 * ((k - 3.5) / 3.5);
+        this.apicalDrive[dst * 8 + k] = (apSum + gnwBroadcast) * sstGate * astroGain + het;
       }
     }
 
-    // 3. Step Larkum 2-Compartment NMDA + Hasani Semi-Implicit sLTC in Zig SIMD128!
+    // 5. Step Larkum 2-Compartment NMDA + Hasani Semi-Implicit sLTC in Zig SIMD128!
     const onsetReset = this.substrateQuarantineActive ? 0.65 : 0.04;
     const zig = getZigBridge();
     zig.stepSltcLarkum(
@@ -340,86 +423,134 @@ export class AsmodeniusV42Brain {
       onsetReset,
     );
 
-    // Refresh region activations post-step
     const postReg: number[] = new Array(14);
+    let lfpPhaseAlign = 0;
     for (let r = 0; r < 14; r++) {
       let s = 0;
-      for (let k = 0; k < 8; k++) s += Math.tanh(this.vState[r * 8 + k]!);
+      for (let k = 0; k < 8; k++) {
+        const signDale = k === 6 ? -0.35 : 1.0;
+        s += signDale * Math.tanh(this.vState[r * 8 + k]!);
+      }
       postReg[r] = s / 8.0;
+      if (Math.sign(postReg[r]!) === Math.sign(meanLfpField || 1)) lfpPhaseAlign += 1;
     }
+    const cemiPhaseLock = lfpPhaseAlign / 14.0;
 
-    // 4. Endogenous `HOT-3` Metacognitive Confidence (AnteriorCingulateHOT reads cross-channel coherence & thalamic precision)
-    let senseSignedSum = 0;
+    // 6. Kalman `AST-1R` Predictive Attention Schema over all 14 regional spotlight gains
+    let schemaErrSq = 0;
+    for (let r = 0; r < 14; r++) {
+      const actualGain = Math.abs(postReg[r]!);
+      const innov = actualGain - this.attnSchema14[r]!;
+      schemaErrSq += innov * innov;
+      this.attnSchema14[r] = this.attnSchema14[r]! + 0.34 * innov;
+    }
+    const attnSchemaError = Math.sqrt(schemaErrSq / 14.0);
+
+    // 7. NON-ORACLE `CalibHead` `HOT-3` Metacognitive Confidence!
+    // Computed STRICTLY from internal sensory channel dispersion, cross-channel coherence, and PFC/ACC margin
+    // (ZERO readout of external `params.cueNoiseVariance`!).
+    let senseMean = 0;
     let senseAbsSum = 0;
-    let senseEnergy = 0;
     for (let k = 0; k < 8; k++) {
       const v = Number(params.sensory8[k] ?? 0);
-      senseSignedSum += v;
+      senseMean += v;
       senseAbsSum += Math.abs(v);
-      senseEnergy += v * v;
     }
-    const crossChannelCoherence = senseAbsSum > 1e-5 ? Math.abs(senseSignedSum) / senseAbsSum : 0.0;
-    const signalRms = Math.sqrt(senseEnergy / 8.0);
-    const workspaceMargin = Math.abs(postReg[2]!) * 0.45 + crossChannelCoherence * signalRms * 1.65;
-    const thalamicUncertainty = 0.95 * Math.sqrt(Math.max(0, params.cueNoiseVariance)) + 0.45 * (1.0 - crossChannelCoherence);
-    const snrConfidence = sigmoid((workspaceMargin - thalamicUncertainty) * 3.6);
+    senseMean /= 8.0;
+    let internalDispersionVar = 0;
+    for (let k = 0; k < 8; k++) {
+      const d = Number(params.sensory8[k] ?? 0) - senseMean;
+      internalDispersionVar += d * d;
+    }
+    internalDispersionVar /= 8.0;
+
+    const crossChannelCoherence = senseAbsSum > 1e-5 ? Math.abs(senseMean * 8.0) / senseAbsSum : 0.0;
+    const internalPrecisionMargin =
+      Math.abs(postReg[2]!) * 0.4 +
+      crossChannelCoherence * Math.abs(senseMean) * 1.75 -
+      0.95 * Math.sqrt(internalDispersionVar) -
+      0.5 * (1.0 - crossChannelCoherence);
+    const snrConfidence = sigmoid(internalPrecisionMargin * 3.5);
     const hot3Indicator = makeIndicator(
       snrConfidence,
       'HEURISTIC_INDICATOR',
-      'Fleming & Lau (2014) second-order metacognitive cross-channel coherence & precision readout; NOT phenomenal awareness.',
+      'Fleming & Lau (2014) endogenous non-oracle CalibHead second-order confidence readout; NOT phenomenal awareness.',
     );
 
-    // 5. Frazier Knowledge-Gradient Value-of-Information (`VOI`)
+    // 8. Frazier Knowledge-Gradient Value-of-Information (`VOI`)
     const voi = Math.max(
       0,
-      computeKnowledgeGradientVoi(workspaceMargin * 0.4, 0.65, params.cueNoiseVariance, 8.0) - params.cueCost,
+      computeKnowledgeGradientVoi(Math.abs(senseMean) * crossChannelCoherence * 0.45, 0.65, params.cueNoiseVariance, 8.0) -
+        params.cueCost,
     );
 
-    // 6. `N13` Somatic "Free Won't" Pre-Motor Veto
-    const impulsiveGoDrive = postReg[5]! + 0.5; // BasalGangliaGoNoGo
-    const insulaAlarm = Math.max(params.somaticHazard, postReg[7]!);
+    // 9. Striatal `D1/D2` Go/NoGo Race + Learned `N13` Somatic "Free Won't" Pre-Motor Veto + 4-Mode `PAG`
+    const d1Go = postReg[5]! + 0.55 + 0.25 * npy;
+    const d2NoGo = 0.25 + this.vetoWeightAv * Math.max(params.somaticHazard, postReg[7]!);
     let vetoTriggered = false;
-    if (impulsiveGoDrive > 0.35 && insulaAlarm > 0.62) {
+    if (d1Go > 0.35 && d2NoGo > 0.60) {
       vetoTriggered = true;
       this.freeWontVetoCount += 1;
-      // Suppress MotorCortexM1 (region 10) readiness potential before spinal execution!
+      // Reinforce `wAv` hyperdirect/indirect veto synapse on close-call somatic alarm
+      this.vetoWeightAv = clamp(this.vetoWeightAv + 0.015 * params.somaticHazard, 0.3, 1.5);
       for (let k = 0; k < 8; k++) {
         this.vState[10 * 8 + k] = this.vState[10 * 8 + k]! * 0.15 - 0.35;
       }
       postReg[10] = postReg[10]! * 0.15 - 0.25;
     }
 
-    // 7. Advance 24-unit Brainstem CPG oscillators
-    const cpgFreqHz = vetoTriggered ? 0.25 : 1.4 + 1.2 * Math.max(0, postReg[10]!);
+    let pagMode: PagSurvivalMode = 'FORAGE';
+    if (crf > 0.72 && vetoTriggered) pagMode = 'FREEZE';
+    else if (crf > 0.52) pagMode = 'FLIGHT';
+    else if (oxt > 0.48 && npy < 0.45) pagMode = 'SOCIAL_GROOM';
+
+    // 10. `SelfModel` (`SELF+SIM` counterfactual efference agency tracking) & 24-unit Brainstem CPG
+    const m1Out = postReg[10]!;
+    const selfErr = Math.abs(m1Out - this.selfPredMotor);
+    const selfAgencyScore = clamp(1.0 - selfErr, 0, 1);
+    this.selfPredMotor = 0.7 * this.selfPredMotor + 0.3 * m1Out;
+
+    const cpgFreqHz = pagMode === 'FREEZE' ? 0.2 : 1.4 + 1.2 * Math.max(0, m1Out);
     this.cpgMasterPhase = (this.cpgMasterPhase + 2.0 * Math.PI * cpgFreqHz * dt) % (2.0 * Math.PI);
     for (let i = 0; i < 24; i++) {
       this.cpgPhases24[i] = (this.cpgMasterPhase + (i / 24.0) * 2.0 * Math.PI) % (2.0 * Math.PI);
     }
 
-    // 8. 6D Frenet-Serret Cognitive Trajectory Curvature $\kappa(t)$ & Torsion $\tau(t)$
-    const cur6 = Float64Array.from([
-      postReg[1]!,
-      postReg[2]!,
-      postReg[3]!,
-      postReg[4]!,
-      postReg[7]!,
-      postReg[10]!,
-    ]);
+    // 11. 6D Frenet-Serret Cognitive Trajectory Curvature $\kappa(t)$ & Torsion $\tau(t)$
+    const cur6 = Float64Array.from([postReg[1]!, postReg[2]!, postReg[3]!, postReg[4]!, postReg[7]!, postReg[10]!]);
     this.trajRing6D.shift();
     this.trajRing6D.push(cur6);
     this.trajCount = Math.min(4, this.trajCount + 1);
     const { kappa, tau } = this.computeFrenet6D();
 
+    const flightSign = pagMode === 'FLIGHT' ? -1.0 : pagMode === 'FREEZE' ? 0.05 : 1.0;
+    const motor6: [number, number, number, number, number, number] = [
+      clamp(flightSign * (0.65 * Number(params.sensory8[0] ?? 0) + 0.35 * Math.sin(this.cpgMasterPhase)), -1, 1),
+      clamp(0.35 * Math.cos(this.cpgMasterPhase) * (1.0 - 0.5 * cckGlp1), -1, 1),
+      clamp(flightSign * (0.65 * Number(params.sensory8[1] ?? 0) + 0.35 * m1Out), -1, 1),
+      clamp(snrConfidence * 2.0 - 1.0, -1, 1),
+      clamp(oxt - crf, -1, 1),
+      clamp(voi, -1, 1),
+    ];
+
     return {
       regionActivations14: postReg,
       metacognitiveConfidenceHot3: hot3Indicator,
       epistemicValueOfInfo: voi,
+      gnwIgnited,
+      attentionSchemaError: attnSchemaError,
+      attentionResourceAom: this.attentionResourceAom,
+      cemiEphapticPhaseLock: cemiPhaseLock,
+      pagSurvivalMode: pagMode,
+      neuropeptides4: { npy, cckGlp1, crf, oxt },
+      selfAgencyScore,
       somaticFreeWontVetoTriggered: vetoTriggered,
       totalFreeWontVetoes: this.freeWontVetoCount,
       substrateAnomalyQuarantined: this.substrateQuarantineActive,
       frenetCurvatureKappa: kappa,
       frenetTorsionTau: tau,
       cpgPhaseRad: this.cpgMasterPhase,
+      motorCmd6: motor6,
     };
   }
 
@@ -430,7 +561,6 @@ export class AsmodeniusV42Brain {
     const p2 = this.trajRing6D[2]!;
     const p3 = this.trajRing6D[3]!;
 
-    // First, second, third finite differences in R^6
     let vNormSq = 0;
     let aNormSq = 0;
     let vaDot = 0;
@@ -449,7 +579,6 @@ export class AsmodeniusV42Brain {
     const speed = Math.sqrt(vNormSq);
     if (speed < 1e-5) return { kappa: 0.0, tau: 0.0 };
 
-    // Generalized Frenet curvature in R^n: kappa = sqrt(|v|^2 |a|^2 - (v.a)^2) / |v|^3
     const areaSq = Math.max(0, vNormSq * aNormSq - vaDot * vaDot);
     const kappa = Math.min(25.0, Math.sqrt(areaSq) / (vNormSq * speed + 1e-7));
     const tau = Math.min(25.0, Math.sqrt(jNormSq) / (speed + 0.05));
@@ -457,51 +586,112 @@ export class AsmodeniusV42Brain {
   }
 
   /**
-   * Executes a non-destructive Casali Perturbational Complexity Index (`PCI`) TMS Poke Test
-   * on a cloned copy of the current brain state, recording a `14 regions x 20 steps = 280 bit`
-   * spatiotemporal response matrix and comparing Functional Flow `F` vs Structural Connectome `W`.
+   * Executes a strictly non-destructive Casali Perturbational Complexity Index (`PCI`) TMS Poke Test.
+   * Preserves `vState`, `nmdaSlow`, `basalDrive`, `apicalDrive`, and `functionalF` bit-for-bit,
+   * and evaluates genuine recurrent thalamocortical perturbation cascades (zero synthetic `Math.sin` wave!)
+   * across `'WAKE'`, `'NREM_SLOW_WAVE'`, or `'PROPOFOL_ANESTHESIA'`.
    */
-  public runTmsPokeTest(regionIndex = 2): TmsPokeReport {
+  public runTmsPokeTest(regionIndex = 2, arousalMode: TmsArousalMode = 'WAKE'): TmsPokeReport {
     const regIdx = Math.max(0, Math.min(13, Math.trunc(regionIndex)));
-    const savedV = this.vState.slice();
-    const savedNmda = this.nmdaSlow.slice();
+    const savedBasal = this.basalDrive.slice();
     const savedF = this.functionalF.slice();
 
-    // Inject localized transcranial magnetic pulse into target region
-    for (let k = 0; k < 8; k++) {
-      this.vState[regIdx * 8 + k] = 2.2;
-    }
+    // Casali et al. (2013) sham-subtracted twin evolution:
+    // Both `Sham` (unperturbed) and `Pert` (focal TMS pulse in `regIdx`) evolve under the exact same
+    // neuromodulatory / GABAergic state so global arousal hyperpolarization never masquerades as propagation!
+    const vSham = this.vState.slice();
+    const nmdaSham = this.nmdaSlow.slice();
+    const basalSham = new Float32Array(112);
+    const apicalSham = new Float32Array(112);
 
-    const steps = 20;
+    const vPert = this.vState.slice();
+    const nmdaPert = this.nmdaSlow.slice();
+    const basalPert = new Float32Array(112);
+    const apicalPert = new Float32Array(112);
+
+    // Focal transcranial magnetic depolarization into excitatory pyramidal cells (k = 0..5) of `regIdx`
+    for (let k = 0; k < 6; k++) {
+      vPert[regIdx * 8 + k] = vPert[regIdx * 8 + k]! + 2.85 + 0.15 * (k - 2.5);
+    }
+    vPert[regIdx * 8 + 6] = vPert[regIdx * 8 + 6]! + 0.45;
+    vPert[regIdx * 8 + 7] = vPert[regIdx * 8 + 7]! + 0.45;
+
+    const steps = 24;
     const raster = new Uint8Array(14 * steps);
-    const zeroSense = new Float32Array(8);
     const zig = getZigBridge();
 
-    for (let t = 0; t < steps; t++) {
-      const regMean = new Float32Array(14);
-      for (let r = 0; r < 14; r++) {
-        let s = 0;
-        for (let k = 0; k < 8; k++) s += sigmoid(this.vState[r * 8 + k]!);
-        regMean[r] = s / 8.0;
-        raster[t * 14 + r] = Math.abs(regMean[r]! - 0.5) > 0.09 ? 1 : 0;
-      }
+    const ach = arousalMode === 'WAKE' ? 0.72 : arousalMode === 'NREM_SLOW_WAVE' ? 0.12 : 0.03;
+    const ne = arousalMode === 'WAKE' ? 0.52 : arousalMode === 'NREM_SLOW_WAVE' ? 0.08 : 0.02;
+    const apicalGain = arousalMode === 'WAKE' ? 2.45 : arousalMode === 'NREM_SLOW_WAVE' ? 0.55 : 0.03;
+    const gabaHyperpol = arousalMode === 'PROPOFOL_ANESTHESIA' ? -1.55 : arousalMode === 'NREM_SLOW_WAVE' ? -0.60 : 0.0;
+    const onsetReset = arousalMode === 'PROPOFOL_ANESTHESIA' ? 0.48 : arousalMode === 'NREM_SLOW_WAVE' ? 0.34 : 0.02;
 
-      this.apicalDrive.fill(0);
+    const evalPopulations = (v: Float32Array, excOut: Float32Array, inhOut: Float32Array): void => {
+      for (let r = 0; r < 14; r++) {
+        let excSum = 0;
+        for (let k = 0; k < 6; k++) excSum += sigmoid(v[r * 8 + k]!);
+        excOut[r] = excSum / 6.0;
+        inhOut[r] = 0.5 * (sigmoid(v[r * 8 + 6]!) + sigmoid(v[r * 8 + 7]!));
+      }
+    };
+
+    const stepBranch = (
+      v: Float32Array,
+      nmda: Float32Array,
+      basal: Float32Array,
+      apical: Float32Array,
+      exc: Float32Array,
+      inh: Float32Array,
+    ): void => {
       for (let dst = 0; dst < 14; dst++) {
         let ap = 0;
         for (let src = 0; src < 14; src++) {
-          ap += this.structuralW[src * 14 + dst]! * regMean[src]!;
+          if (src === dst) continue;
+          const w = this.structuralW[src * 14 + dst]! + this.plasticW14x14[src * 14 + dst]!;
+          if (w > 0) {
+            const signEdge = (src * 5 + dst) % 4 === 0 ? -0.9 : 1.35;
+            ap += w * signEdge * (exc[src]! - 0.5);
+          }
         }
-        for (let k = 0; k < 8; k++) {
-          this.apicalDrive[dst * 8 + k] = ap * Math.sin((t + dst + k) * 0.65);
+        for (let k = 0; k < 6; k++) {
+          basal[dst * 8 + k] =
+            savedBasal[dst * 8 + k]! * 0.25 +
+            gabaHyperpol -
+            1.85 * (inh[dst]! - 0.5) +
+            0.45 * ap * apicalGain * (k % 3 === 0 ? 1.2 : 0.8);
+          apical[dst * 8 + k] = apicalGain * ap * (1.0 + 0.12 * (k - 2.5));
+        }
+        for (let k = 6; k < 8; k++) {
+          basal[dst * 8 + k] = gabaHyperpol * 0.3 + 2.6 * (exc[dst]! - 0.5);
+          apical[dst * 8 + k] = 0.35 * apicalGain * ap;
         }
       }
-      zig.stepSltcLarkum(this.vState, this.nmdaSlow, zeroSense.length ? this.basalDrive.fill(0) : this.basalDrive, this.apicalDrive, 0.04, 0.55, 0.35, 0.02);
+      zig.stepSltcLarkum(v, nmda, basal, apical, 0.085, ach, ne, onsetReset);
+    };
+
+    const excSham = new Float32Array(14);
+    const inhSham = new Float32Array(14);
+    const excPert = new Float32Array(14);
+    const inhPert = new Float32Array(14);
+
+    for (let t = 0; t < steps; t++) {
+      evalPopulations(vSham, excSham, inhSham);
+      evalPopulations(vPert, excPert, inhPert);
+
+      for (let r = 0; r < 14; r++) {
+        const lfpSham = excSham[r]! - 0.35 * inhSham[r]!;
+        const lfpPert = excPert[r]! - 0.35 * inhPert[r]!;
+        const diff = lfpPert - lfpSham;
+        const thresh = 0.022 + 0.005 * ((r * 3) % 5);
+        raster[t * 14 + r] = Math.abs(diff) > thresh ? 1 : 0;
+      }
+
+      stepBranch(vSham, nmdaSham, basalSham, apicalSham, excSham, inhSham);
+      stepBranch(vPert, nmdaPert, basalPert, apicalPert, excPert, inhPert);
     }
 
     const lz = computeLempelZiv76Complexity(raster);
 
-    // Pearson correlation between `structuralW` and `functionalF`
     let sumW = 0;
     let sumF = 0;
     const n2 = 196;
@@ -523,13 +713,13 @@ export class AsmodeniusV42Brain {
     }
     const corr = varW > 1e-9 && varF > 1e-9 ? cov / Math.sqrt(varW * varF) : 0;
 
-    // Restore exact pre-poke brain state!
-    this.vState.set(savedV);
-    this.nmdaSlow.set(savedNmda);
+    // `vSham`/`vPert` evolved in isolated twin buffers; `this.vState`, `this.nmdaSlow`, `this.basalDrive`,
+    // `this.apicalDrive`, and `this.functionalF` remain 100% bit-exact untouched!
     this.functionalF.set(savedF);
 
     return {
       perturbedRegion: ASMODENIUS_14_REGIONS[regIdx]!,
+      arousalMode,
       pciIndicator: makeIndicator(
         lz.normalizedPci,
         'HEURISTIC_INDICATOR',
@@ -543,270 +733,9 @@ export class AsmodeniusV42Brain {
   }
 }
 
-// ============================================================================
-// Automated R21 Grade-A Causal Benchmark & Lesion Runner (`Cohen's d` & `Welch's t`)
-// ============================================================================
-function computeStatsPair(intact: number[], lesion: number[]): {
-  intactMean: number;
-  lesionMean: number;
-  intactStd: number;
-  lesionStd: number;
-  cohensD: number;
-  welchsT: number;
-} {
-  const n1 = intact.length;
-  const n2 = lesion.length;
-  const m1 = intact.reduce((a, b) => a + b, 0) / n1;
-  const m2 = lesion.reduce((a, b) => a + b, 0) / n2;
-  const v1 = intact.reduce((a, x) => a + (x - m1) * (x - m1), 0) / Math.max(1, n1 - 1);
-  const v2 = lesion.reduce((a, x) => a + (x - m2) * (x - m2), 0) / Math.max(1, n2 - 1);
-  const s1 = Math.sqrt(v1);
-  const s2 = Math.sqrt(v2);
-  const pooledVar = ((n1 - 1) * v1 + (n2 - 1) * v2) / Math.max(1, n1 + n2 - 2);
-  const pooledStd = Math.sqrt(Math.max(1e-9, pooledVar));
-  const cohensD = (m1 - m2) / pooledStd;
-  const welchsT = (m1 - m2) / Math.sqrt(Math.max(1e-9, v1 / n1 + v2 / n2));
-  return { intactMean: m1, lesionMean: m2, intactStd: s1, lesionStd: s2, cohensD, welchsT };
-}
-
-/**
- * Runs all 4 R21 flagship causal lesion benchmarks across `trialsPerArm` seeded episodes,
- * proving every claimed cognitive/physiological organ does causal, statistically significant work!
- */
-export function runAsmodeniusR21BenchmarkSuite(masterSeed = 20261110n, trialsPerArm = 24): R21BenchmarkResult[] {
-  const rng = new DeterministicRng(masterSeed ^ 0x55aa1234n);
-  const results: R21BenchmarkResult[] = [];
-
-  // 1. `activeInference_VOI`: Epistemic Two-Patch Poison/Nectar Foraging
-  const voiIntact: number[] = [];
-  const voiLesion: number[] = [];
-  for (let t = 0; t < trialsPerArm; t++) {
-    let scoreIntact = 0;
-    let scoreLesion = 0;
-    for (let ep = 0; ep < 15; ep++) {
-      const trueSafePatch = rng.nextFloat() < 0.5 ? 1 : -1;
-      const priorMargin = rng.nextGaussian(0, 0.12); // high initial ambiguity!
-      const cueNoiseVar = 0.08;
-      const cueCost = 0.65;
-
-      // Intact agent evaluates Frazier Knowledge-Gradient VOI
-      const kg = computeKnowledgeGradientVoi(priorMargin, 0.85, cueNoiseVar, 10.0);
-      if (kg > cueCost) {
-        const cueObs = trueSafePatch + rng.nextGaussian(0, Math.sqrt(cueNoiseVar));
-        const choice = cueObs >= 0 ? 1 : -1;
-        scoreIntact += (choice === trueSafePatch ? 8.0 : -10.0) - cueCost;
-      } else {
-        const choice = priorMargin >= 0 ? 1 : -1;
-        scoreIntact += choice === trueSafePatch ? 8.0 : -10.0;
-      }
-
-      // VOI-lesioned agent commits immediately on weak prior without epistemic sensing
-      const lesionChoice = priorMargin >= 0 ? 1 : -1;
-      scoreLesion += lesionChoice === trueSafePatch ? 8.0 : -10.0;
-    }
-    voiIntact.push(scoreIntact);
-    voiLesion.push(scoreLesion);
-  }
-  const st1 = computeStatsPair(voiIntact, voiLesion);
-  results.push({
-    benchmarkName: 'activeInference_VOI',
-    ...st1,
-    passedGradeA: st1.cohensD >= 0.8 && st1.welchsT >= 2.75,
-    interpretation: 'Intact Frazier Knowledge-Gradient VOI samples informative cues before high-stakes foraging.',
-  });
-
-  // 2. `CQM10_gutSatiety`: POMC/GLP-1 Gut Stretch Satiety Stability Score (higher = lower glycemic excursion!)
-  const satIntact: number[] = [];
-  const satLesion: number[] = [];
-  for (let t = 0; t < trialsPerArm; t++) {
-    const storeA = new ErpRelationalStore(16);
-    storeA.registerBiome({
-      biomeId: 1,
-      epochId: 1,
-      name: 'Assay',
-      kind: 'PELAGIC_PHOTON_SHELF',
-      centerX: 0,
-      centerZ: 0,
-      radius: 50,
-      nutrientPoolKj: 5000,
-      detritusPoolKj: 0,
-      o2Saturation: 1,
-      osmolarityMOsM: 300,
-      temperatureK: 293,
-    });
-    storeA.registerSpecies({
-      speciesId: 1,
-      parentSpeciesId: null,
-      originTick: 0,
-      casteRole: 'EXPLORER',
-      latinBinomial: 'Asmodenius lucens',
-      commonGlyph: '◈',
-      genomeHashHex: '0x01',
-      baseHueDeg: 190,
-      extantCount: 0,
-      meanFitness: 1,
-    });
-    const idIntact = storeA.spawnOrganism({
-      speciesId: 1,
-      biomeId: 1,
-      generation: 1,
-      flawMask: 0,
-      pos: [0, 0, 0],
-      headingRad: 0,
-      initialPools15: DEFAULT_INITIAL_POOLS_15,
-      initialWeights126: new Float32Array(126),
-    });
-    const idLesion = storeA.spawnOrganism({
-      speciesId: 1,
-      biomeId: 1,
-      generation: 1,
-      flawMask: 0,
-      pos: [1, 0, 0],
-      headingRad: 0,
-      initialPools15: DEFAULT_INITIAL_POOLS_15,
-      initialWeights126: new Float32Array(126),
-    });
-
-    const mealOffer = 12.0 + rng.nextRange(-1.5, 1.5);
-    for (let step = 0; step < 20; step++) {
-      // Intact uses POMC/GLP-1 gated `ingestConservedMealKj`
-      ingestConservedMealKj(storeA, idIntact, mealOffer);
-      // GLP-1 lesioned bypasses gut stretch gate and dumps directly into gut glucose!
-      storeA.pools15[idLesion * 15] = storeA.pools15[idLesion * 15]! + mealOffer * 0.65;
-      storeA.totalIntakeKj[idLesion] = storeA.totalIntakeKj[idLesion]! + mealOffer * 0.65;
-      stepPopulationMetabolism(storeA, 0.25, { metabolicRateScale: 1.0, oxygenSaturation: 1.0 });
-    }
-    const intactOverload = Math.abs(storeA.pools15[idIntact * 15]! - 12.0);
-    const lesionOverload = Math.abs(storeA.pools15[idLesion * 15]! - 12.0);
-    satIntact.push(100.0 - intactOverload);
-    satLesion.push(100.0 - lesionOverload);
-  }
-  const st2 = computeStatsPair(satIntact, satLesion);
-  results.push({
-    benchmarkName: 'CQM10_gutSatiety',
-    ...st2,
-    passedGradeA: st2.cohensD >= 0.8 && st2.welchsT >= 2.75,
-    interpretation: 'POMC/GLP-1 vagal gut-load satiety prevents hyperphagic gut/glycemic overload.',
-  });
-
-  // 3. `C16R_antitheticHomeostasis`: Briat-Gupta-Khammash AIC Robust Glycemic Setpoint Tracking (`4.0 kJ`)
-  const aicIntact: number[] = [];
-  const aicLesion: number[] = [];
-  for (let t = 0; t < trialsPerArm; t++) {
-    const runArm = (useAic: boolean, shockKj: number): number => {
-      const st = new ErpRelationalStore(16);
-      st.registerBiome({
-        biomeId: 1,
-        epochId: 1,
-        name: 'Homeostat',
-        kind: 'HYDROTHERMAL_ABYSS',
-        centerX: 0,
-        centerZ: 0,
-        radius: 50,
-        nutrientPoolKj: 5000,
-        detritusPoolKj: 0,
-        o2Saturation: 1,
-        osmolarityMOsM: 300,
-        temperatureK: 293,
-      });
-      st.registerSpecies({
-        speciesId: 1,
-        parentSpeciesId: null,
-        originTick: 0,
-        casteRole: 'GUARDIAN',
-        latinBinomial: 'Asmodenius homeostatis',
-        commonGlyph: '❖',
-        genomeHashHex: '0x02',
-        baseHueDeg: 210,
-        extantCount: 0,
-        meanFitness: 1,
-      });
-      const eid = st.spawnOrganism({
-        speciesId: 1,
-        biomeId: 1,
-        generation: 1,
-        flawMask: 0,
-        pos: [0, 0, 0],
-        headingRad: 0,
-        initialPools15: DEFAULT_INITIAL_POOLS_15,
-        initialWeights126: new Float32Array(126),
-      });
-      // Inject conserved hyperglycemic mobilization shock from liver glycogen -> blood glucose
-      transferConservedPoolKj(st.pools15, eid * 15, P_LIV_GLY, P_BLD_GLC, shockKj);
-      for (let s = 0; s < 35; s++) {
-        stepPopulationMetabolism(st, 0.25, {
-          metabolicRateScale: 1.0,
-          oxygenSaturation: 1.0,
-          useAntitheticController: useAic,
-        });
-      }
-      const finalErr = Math.abs(st.pools15[eid * 15 + P_BLD_GLC]! - 4.0);
-      return 10.0 - finalErr; // Higher = tighter homeostatic precision around 4.0 kJ!
-    };
-    const shock = 4.5 + rng.nextRange(-0.8, 0.8);
-    aicIntact.push(runArm(true, shock));
-    aicLesion.push(runArm(false, shock));
-  }
-  const st3 = computeStatsPair(aicIntact, aicLesion);
-  results.push({
-    benchmarkName: 'C16R_antitheticHomeostasis',
-    ...st3,
-    passedGradeA: st3.cohensD >= 0.8 && st3.welchsT >= 2.75,
-    interpretation: 'Antithetic Integral Controller restores blood glucose to 4.0 kJ setpoint after shock.',
-  });
-
-  // 4. `HOT3_metacognitiveWagering`: Selective Opt-Out Wagering Under Variable Sensory Noise
-  const hotIntact: number[] = [];
-  const hotLesion: number[] = [];
-  const brain = new AsmodeniusV42Brain(masterSeed);
-  for (let t = 0; t < trialsPerArm; t++) {
-    let payoffIntact = 0;
-    let payoffLesion = 0;
-    for (let ep = 0; ep < 20; ep++) {
-      const highNoise = ep % 2 === 1;
-      const noiseVar = highNoise ? 2.8 : 0.04;
-      const trueDir = rng.nextFloat() < 0.5 ? 1 : -1;
-      const sense = new Float32Array(8);
-      const signalAmp = highNoise ? 0.02 : 1.25;
-      for (let ch = 0; ch < 8; ch++) {
-        sense[ch] = signalAmp * trueDir + rng.nextGaussian(0, Math.sqrt(noiseVar) * 0.75);
-      }
-      const obs = sense.reduce((a, b) => a + b, 0) / 8.0;
-
-      const tel = brain.stepBrain({
-        sensory8: sense,
-        gutLoadKj: 10,
-        bloodGlucoseKj: 4.0,
-        somaticHazard: 0.1,
-        cueNoiseVariance: noiseVar,
-        cueCost: 0.5,
-        physicsSignature: 1.0,
-        ach: 0.6,
-        ne: 0.3,
-        dtSec: 0.05,
-      });
-
-      const guess = obs >= 0 ? 1 : -1;
-      const correct = guess === trueDir;
-      // Intact HOT-3 wagers high (+5 / -8) ONLY when confidence >= 0.52, else takes safe opt-out (+1)!
-      if (tel.metacognitiveConfidenceHot3.value >= 0.52) {
-        payoffIntact += correct ? 5.0 : -8.0;
-      } else {
-        payoffIntact += 1.0;
-      }
-      // HOT-lesioned agent blindly wagers high on every trial regardless of sensory noise
-      payoffLesion += correct ? 5.0 : -8.0;
-    }
-    hotIntact.push(payoffIntact);
-    hotLesion.push(payoffLesion);
-  }
-  const st4 = computeStatsPair(hotIntact, hotLesion);
-  results.push({
-    benchmarkName: 'HOT3_metacognitiveWagering',
-    ...st4,
-    passedGradeA: st4.cohensD >= 0.8 && st4.welchsT >= 2.75,
-    interpretation: 'HOT-3 second-order confidence selectively opts out on noisy trials, preventing high-stakes losses.',
-  });
-
-  return results;
-}
+export {
+  type CausalBenchmarkName,
+  type R21BenchmarkResult,
+  runAsmodeniusR21BenchmarkSuite,
+  runComprehensive12CausalSuite,
+} from './causal-benchmarks';

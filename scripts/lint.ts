@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 /**
- * CQM2 Static Hygiene, Security, Secret, CSS & Version-Sync Linter (`bun run lint`).
+ * CQM2 v2.1.0 Static Hygiene, Root Cleanliness, OpenAPI, Security, Secret, CSS & Version-Sync Linter (`bun run lint`).
  */
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { extname, join, relative, resolve } from 'node:path';
@@ -35,17 +35,40 @@ if (!changelog.includes(`[${versionFile}]`)) {
   errors.push(`CHANGELOG.md missing section header '[${versionFile}]'`);
 }
 
-// 2. CSS Hygiene Gate: Zero `!important` in `src/styles/`
+// 2. Repository Root Cleanliness Gate (`I-065`): static pages belong in `public/`
+for (const forbiddenRootPage of ['index.html', 'docs.html', 'specs.html', 'glossary.html', 'downloads.html']) {
+  if (existsSync(join(ROOT, forbiddenRootPage))) {
+    errors.push(`Root hygiene violation: ${forbiddenRootPage} belongs in public/${forbiddenRootPage}`);
+  }
+}
+
+// 3. CSS & HTML CSP Hygiene Gate: Zero `!important` in `src/styles/` and zero inline `style=` in `public/`
 for (const cssFile of walkFiles(join(ROOT, 'src', 'styles'), new Set(['.css']))) {
   const txt = readFileSync(cssFile, 'utf8');
-  // Strip block comments before checking so explanatory comments don't trigger false positives
   const codeOnly = txt.replace(/\/\*[\s\S]*?\*\//g, '');
   if (codeOnly.includes('!important')) {
     errors.push(`Forbidden '!important' rule in ${relative(ROOT, cssFile)}`);
   }
 }
+for (const htmlFile of walkFiles(join(ROOT, 'public'), new Set(['.html']))) {
+  const html = readFileSync(htmlFile, 'utf8');
+  if (/\sstyle\s*=/.test(html)) {
+    errors.push(`Forbidden inline style= attribute in ${relative(ROOT, htmlFile)} (breaks strict CSP)`);
+  }
+}
 
-// 3. Code Security, Secret & Stub Hygiene Gate across `src/`, `python/`, `zig/`, `rust/`, `go/`
+// 4. OpenAPI 3.1.0 Specification Validation (`docs/openapi.json`)
+const openApiPath = join(ROOT, 'docs', 'openapi.json');
+if (!existsSync(openApiPath)) {
+  errors.push('Missing docs/openapi.json specification');
+} else {
+  const spec = JSON.parse(readFileSync(openApiPath, 'utf8')) as { openapi?: string; paths?: Record<string, unknown> };
+  if (spec.openapi !== '3.1.0' || !spec.paths || Object.keys(spec.paths).length < 10) {
+    errors.push('Invalid OpenAPI 3.1.0 specification in docs/openapi.json');
+  }
+}
+
+// 5. Code Security, Secret & Stub Hygiene Gate across `src/`, `python/`, `zig/`, `rust/`, `go/`
 const SECRET_PATTERNS: Array<{ name: string; regex: RegExp }> = [
   { name: 'OpenAI/Anthropic Key', regex: /\bsk-[A-Za-z0-9]{20,}/ },
   { name: 'GitHub PAT', regex: /\bgh[pousr]_[A-Za-z0-9]{24,}/ },
@@ -77,10 +100,10 @@ for (const d of sourceDirs) {
   }
 }
 
-// 4. OBLITERATUS Quarantine Fence Verification
+// 6. OBLITERATUS & Fenced Quarantine Verification
 const corpusTxt = readFileSync(join(ROOT, 'src', 'tsotchke', 'corpus.ts'), 'utf8');
-if (!corpusTxt.includes("if (pillarId === 'OBLITERATUS') return false;")) {
-  errors.push('Missing hard safety quarantine check for OBLITERATUS in src/tsotchke/corpus.ts');
+if (!corpusTxt.includes("if (pillarId === 'OBLITERATUS') return false;") || !corpusTxt.includes('descriptor.fencedQuarantine')) {
+  errors.push('Missing hard safety quarantine check for OBLITERATUS / fencedQuarantine in src/tsotchke/corpus.ts');
 }
 
 if (errors.length > 0) {
@@ -89,4 +112,4 @@ if (errors.length > 0) {
   process.exit(1);
 }
 
-console.log(`[lint] All static hygiene, version-sync (${versionFile}), CSS, and security gates PASSED.`);
+console.log(`[lint] All static hygiene, root cleanliness, OpenAPI 3.1, version-sync (${versionFile}), CSS, and security gates PASSED.`);

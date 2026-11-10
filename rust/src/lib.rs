@@ -1,5 +1,5 @@
-//! CQM2 Rust Entity-Relational Merkle State Verifier & First-Law Metabolic Auditor
-//! Memory-safe verification engine loaded via Bun.FFI on local workstations.
+//! CQM2 v2.1.0 Rust Entity-Relational Merkle State Verifier, First-Law Metabolic Auditor,
+//! Chaos-Entropy Lemire Unbiased Lattice Sampler & GeoRefine BF16 Predictive-XOR Codec.
 
 use std::slice;
 
@@ -21,7 +21,6 @@ pub fn mix_pair64(left: u64, right: u64) -> u64 {
     let mut buf = [0u8; 16];
     buf[0..8].copy_from_slice(&left.to_le_bytes());
     buf[8..16].copy_from_slice(&right.to_le_bytes());
-    // SplitMix64-hardened FNV-1a compression node
     let mut z = fnv1a64_bytes(&buf).wrapping_add(0x9e3779b97f4a7c15);
     z = (z ^ (z >> 30)).wrapping_mul(0xbf58476d1ce4e5b9);
     z = (z ^ (z >> 27)).wrapping_mul(0x94d049bb133111eb);
@@ -59,10 +58,7 @@ pub extern "C" fn cqm2_rust_merkle_root64(hashes_ptr: *const u64, count: usize) 
     layer[0]
 }
 
-/// Audits First-Law energy conservation across `entity_count` organisms.
-/// Each organism has 15 conserved pools (gut_glc..excreted) stored contiguously in `pools15_ptr`
-/// (`entity_count * 15` f64s) and cumulative `total_intake_kj` (`entity_count` f64s).
-/// Writes maximum relative conservation drift to `max_rel_err_out` and returns 1 if all `< 1e-12`.
+/// Audits First-Law energy conservation across `entity_count` organisms (`< 1e-12` tolerance).
 #[no_mangle]
 pub extern "C" fn cqm2_rust_audit_metabolic_conservation(
     pools15_ptr: *const f64,
@@ -84,7 +80,6 @@ pub extern "C" fn cqm2_rust_audit_metabolic_conservation(
 
     for e in 0..entity_count {
         let base = e * 15;
-        // Kahan compensated summation across all 15 metabolic pools
         let mut sum: f64 = 0.0;
         let mut c: f64 = 0.0;
         for k in 0..15 {
@@ -114,6 +109,98 @@ pub extern "C" fn cqm2_rust_audit_metabolic_conservation(
     all_valid
 }
 
+/// Chaos-Entropy-Art-Engine port: Lemire unbiased fast bounded sampling over `[0, bound)`.
+#[inline]
+fn splitmix64_next(state: &mut u64) -> u64 {
+    *state = state.wrapping_add(0x9e3779b97f4a7c15);
+    let mut z = *state;
+    z = (z ^ (z >> 30)).wrapping_mul(0xbf58476d1ce4e5b9);
+    z = (z ^ (z >> 27)).wrapping_mul(0x94d049bb133111eb);
+    z ^ (z >> 31)
+}
+
+#[no_mangle]
+pub extern "C" fn cqm2_rust_lemire_lattice_sample(
+    seed: u64,
+    bound: u32,
+    out_ptr: *mut u32,
+    count: usize,
+) -> u64 {
+    if out_ptr.is_null() || count == 0 || bound == 0 {
+        return seed;
+    }
+    let out = unsafe { slice::from_raw_parts_mut(out_ptr, count) };
+    let mut s = seed;
+    let b = bound as u64;
+    let threshold = (b.wrapping_neg()) % b;
+    for slot in out.iter_mut() {
+        loop {
+            let x = splitmix64_next(&mut s) as u32 as u64;
+            let m = x * b;
+            let l = m as u32 as u64;
+            if l >= threshold {
+                *slot = (m >> 32) as u32;
+                break;
+            }
+        }
+    }
+    s
+}
+
+/// GeoRefine (`Tsotchke-Corporation/GeoRefine`) reversible BF16 predictive-XOR snapshot codec.
+/// Quantizes `f32` state vectors to round-to-nearest-even BF16 (`u16`) and encodes sequential XOR residuals.
+#[inline]
+fn f32_to_bf16_rne(v: f32) -> u16 {
+    let bits = v.to_bits();
+    let lsb = (bits >> 16) & 1;
+    let rounding_bias = 0x7fff_u32.wrapping_add(lsb);
+    (bits.wrapping_add(rounding_bias) >> 16) as u16
+}
+
+#[no_mangle]
+pub extern "C" fn cqm2_rust_bf16_xor_encode(
+    src_f32_ptr: *const f32,
+    out_u16_ptr: *mut u16,
+    count: usize,
+) -> usize {
+    if src_f32_ptr.is_null() || out_u16_ptr.is_null() || count == 0 {
+        return 0;
+    }
+    let src = unsafe { slice::from_raw_parts(src_f32_ptr, count) };
+    let out = unsafe { slice::from_raw_parts_mut(out_u16_ptr, count) };
+    let mut prev: u16 = 0;
+    let mut nonzero_residuals: usize = 0;
+    for i in 0..count {
+        let q = f32_to_bf16_rne(src[i]);
+        let delta = q ^ prev;
+        out[i] = delta;
+        if delta != 0 {
+            nonzero_residuals += 1;
+        }
+        prev = q;
+    }
+    nonzero_residuals
+}
+
+#[no_mangle]
+pub extern "C" fn cqm2_rust_bf16_xor_decode(
+    deltas_u16_ptr: *const u16,
+    out_f32_ptr: *mut f32,
+    count: usize,
+) {
+    if deltas_u16_ptr.is_null() || out_f32_ptr.is_null() || count == 0 {
+        return;
+    }
+    let deltas = unsafe { slice::from_raw_parts(deltas_u16_ptr, count) };
+    let out = unsafe { slice::from_raw_parts_mut(out_f32_ptr, count) };
+    let mut prev: u16 = 0;
+    for i in 0..count {
+        let q = deltas[i] ^ prev;
+        out[i] = f32::from_bits((q as u32) << 16);
+        prev = q;
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -137,11 +224,26 @@ mod tests {
     }
 
     #[test]
-    fn test_merkle_deterministic() {
+    fn test_merkle_and_lemire_and_bf16_roundtrip() {
         let leaves = [101u64, 202u64, 303u64, 404u64];
         let r1 = cqm2_rust_merkle_root64(leaves.as_ptr(), leaves.len());
         let r2 = cqm2_rust_merkle_root64(leaves.as_ptr(), leaves.len());
         assert_eq!(r1, r2);
         assert_ne!(r1, 0);
+
+        let mut lat = [0u32; 32];
+        let next_s = cqm2_rust_lemire_lattice_sample(42, 17, lat.as_mut_ptr(), lat.len());
+        assert_ne!(next_s, 42);
+        assert!(lat.iter().all(|&v| v < 17));
+
+        let orig = [1.25f32, 1.25f32, -0.5f32, 3.75f32];
+        let mut enc = [0u16; 4];
+        let mut dec = [0.0f32; 4];
+        let nz = cqm2_rust_bf16_xor_encode(orig.as_ptr(), enc.as_mut_ptr(), 4);
+        assert_eq!(nz, 3); // duplicate 1.25 encodes to 0 XOR residual!
+        cqm2_rust_bf16_xor_decode(enc.as_ptr(), dec.as_mut_ptr(), 4);
+        for k in 0..4 {
+            assert!((orig[k] - dec[k]).abs() < 1e-2);
+        }
     }
 }

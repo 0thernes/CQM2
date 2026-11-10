@@ -1,4 +1,7 @@
-// CQM2 Hardware Telemetry & TouchDesigner / Unity / Blender OSC Streaming Bridge
+// CQM2 v2.1.0 Hardware Telemetry & TouchDesigner / Unity / Blender OSC Streaming Bridge
+// Runs a background 1 Hz `nvidia-smi` poller (zero per-request process spawns) and a continuous
+// 20 Hz UDP OSC 1.0 emitter broadcasting `/cqm2/hw`, `/cqm2/asmodenius/pci`, `/cqm2/hoggar/violated_hex`,
+// and `/cqm2/xylos/indicators` to TouchDesigner / Unity / Blender!
 package main
 
 import (
@@ -10,10 +13,12 @@ import (
 	"math"
 	"net"
 	"net/http"
+	"os"
 	"os/exec"
 	"runtime"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -28,13 +33,23 @@ type GpuMetrics struct {
 	DriverVersion string  `json:"driverVersion"`
 }
 
+type SimBridgeMetrics struct {
+	Tick              int64   `json:"tick"`
+	AsmodeniusPci     float64 `json:"asmodeniusPci"`
+	ViolatedHexLines  int     `json:"violatedHexLines"`
+	XylosVeridicalTag float64 `json:"xylosVeridicalTag"`
+	PopulationAlive   int     `json:"populationAlive"`
+}
+
 type TelemetrySnapshot struct {
-	TimestampUnixMs int64      `json:"timestampUnixMs"`
-	HostOS          string     `json:"hostOs"`
-	HostArch        string     `json:"hostArch"`
-	LogicalCores    int        `json:"logicalCores"`
-	Gpu             GpuMetrics `json:"gpu"`
-	OscTarget       string     `json:"oscTarget"`
+	TimestampUnixMs int64            `json:"timestampUnixMs"`
+	HostOS          string           `json:"hostOs"`
+	HostArch        string           `json:"hostArch"`
+	LogicalCores    int              `json:"logicalCores"`
+	Gpu             GpuMetrics       `json:"gpu"`
+	Sim             SimBridgeMetrics `json:"sim"`
+	OscTarget       string           `json:"oscTarget"`
+	OscPacketsSent  uint64           `json:"oscPacketsSent"`
 }
 
 func queryNvidiaSmi() GpuMetrics {
@@ -71,7 +86,6 @@ func queryNvidiaSmi() GpuMetrics {
 	}
 }
 
-// Encodes a standard Open Sound Control (OSC 1.0) packet with float32 args for TouchDesigner / Unity
 func buildOscFloatPacket(address string, values ...float32) []byte {
 	var buf bytes.Buffer
 	writeOscString := func(s string) {
@@ -92,50 +106,136 @@ func buildOscFloatPacket(address string, values ...float32) []byte {
 	return buf.Bytes()
 }
 
-func collectSnapshot(oscTarget string) TelemetrySnapshot {
-	return TelemetrySnapshot{
-		TimestampUnixMs: time.Now().UnixMilli(),
-		HostOS:          runtime.GOOS,
-		HostArch:        runtime.GOARCH,
-		LogicalCores:    runtime.NumCPU(),
-		Gpu:             queryNvidiaSmi(),
-		OscTarget:       oscTarget,
+func resolveOscTarget(flagVal string) string {
+	if envTarget := strings.TrimSpace(os.Getenv("CQM2_OSC_TARGET")); envTarget != "" {
+		return envTarget
 	}
+	if envPort := strings.TrimSpace(os.Getenv("CQM2_OSC_PORT")); envPort != "" {
+		return "127.0.0.1:" + envPort
+	}
+	return flagVal
 }
 
 func main() {
 	once := flag.Bool("once", false, "Print a single JSON hardware snapshot and exit")
 	httpAddr := flag.String("http", "127.0.0.1:4201", "Local HTTP telemetry bind address")
-	oscTarget := flag.String("osc", "127.0.0.1:9000", "UDP OSC target for TouchDesigner / Unity")
+	oscFlag := flag.String("osc", "127.0.0.1:9000", "UDP OSC target for TouchDesigner / Unity")
 	flag.Parse()
 
+	oscTarget := resolveOscTarget(*oscFlag)
+	var mu sync.RWMutex
+	cachedGpu := queryNvidiaSmi()
+	simState := SimBridgeMetrics{
+		Tick:              0,
+		AsmodeniusPci:     0.44,
+		ViolatedHexLines:  63,
+		XylosVeridicalTag: 0.78,
+		PopulationAlive:   128,
+	}
+	var packetsSent uint64
+
+	makeSnapshot := func() TelemetrySnapshot {
+		mu.RLock()
+		defer mu.RUnlock()
+		return TelemetrySnapshot{
+			TimestampUnixMs: time.Now().UnixMilli(),
+			HostOS:          runtime.GOOS,
+			HostArch:        runtime.GOARCH,
+			LogicalCores:    runtime.NumCPU(),
+			Gpu:             cachedGpu,
+			Sim:             simState,
+			OscTarget:       oscTarget,
+			OscPacketsSent:  packetsSent,
+		}
+	}
+
 	if *once {
-		snap := collectSnapshot(*oscTarget)
+		snap := makeSnapshot()
 		enc, _ := json.Marshal(snap)
 		fmt.Println(string(enc))
 		return
 	}
 
-	udpConn, _ := net.Dial("udp", *oscTarget)
+	// Background 1 Hz GPU sensor cache (never spawns `nvidia-smi` inside HTTP handlers!)
+	go func() {
+		ticker := time.NewTicker(1 * time.Second)
+		defer ticker.Stop()
+		for range ticker.C {
+			g := queryNvidiaSmi()
+			mu.Lock()
+			cachedGpu = g
+			mu.Unlock()
+		}
+	}()
+
+	udpConn, _ := net.Dial("udp", oscTarget)
 	if udpConn != nil {
 		defer udpConn.Close()
+		// Continuous 20 Hz autonomous OSC broadcast loop for TouchDesigner / Unity / Blender
+		go func() {
+			ticker := time.NewTicker(50 * time.Millisecond)
+			defer ticker.Stop()
+			for range ticker.C {
+				mu.RLock()
+				g := cachedGpu
+				s := simState
+				mu.RUnlock()
+
+				if g.Available {
+					_, _ = udpConn.Write(buildOscFloatPacket("/cqm2/hw",
+						float32(g.TempC),
+						float32(g.PowerWatts),
+						float32(g.MemUsedMiB),
+						float32(g.UtilGpuPct),
+					))
+				}
+				_, _ = udpConn.Write(buildOscFloatPacket("/cqm2/asmodenius/pci", float32(s.AsmodeniusPci), float32(s.PopulationAlive)))
+				_, _ = udpConn.Write(buildOscFloatPacket("/cqm2/hoggar/violated_hex", float32(s.ViolatedHexLines)))
+				_, _ = udpConn.Write(buildOscFloatPacket("/cqm2/xylos/indicators", float32(s.XylosVeridicalTag)))
+
+				mu.Lock()
+				packetsSent += 4
+				mu.Unlock()
+			}
+		}()
 	}
 
 	mux := http.NewServeMux()
-	mux.HandleFunc("/telemetry", func(w http.ResponseWriter, r *http.Request) {
-		snap := collectSnapshot(*oscTarget)
-		if udpConn != nil && snap.Gpu.Available {
-			pkt := buildOscFloatPacket("/cqm2/hw",
-				float32(snap.Gpu.TempC),
-				float32(snap.Gpu.PowerWatts),
-				float32(snap.Gpu.MemUsedMiB),
-				float32(snap.Gpu.UtilGpuPct),
-			)
-			_, _ = udpConn.Write(pkt)
-		}
+	setCors := func(w http.ResponseWriter) {
 		w.Header().Set("Content-Type", "application/json")
-		w.Header().Set("Access-Control-Allow-Origin", "http://127.0.0.1:4200")
-		_ = json.NewEncoder(w).Encode(snap)
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+		w.Header().Set("Cross-Origin-Resource-Policy", "cross-origin")
+	}
+
+	mux.HandleFunc("/telemetry", func(w http.ResponseWriter, r *http.Request) {
+		setCors(w)
+		if r.Method != http.MethodGet {
+			w.Header().Set("Allow", "GET")
+			w.WriteHeader(http.StatusMethodNotAllowed)
+			_ = json.NewEncoder(w).Encode(map[string]any{"ok": false, "error": "Method not allowed"})
+			return
+		}
+		_ = json.NewEncoder(w).Encode(makeSnapshot())
+	})
+
+	mux.HandleFunc("/state", func(w http.ResponseWriter, r *http.Request) {
+		setCors(w)
+		if r.Method != http.MethodPost {
+			w.Header().Set("Allow", "POST")
+			w.WriteHeader(http.StatusMethodNotAllowed)
+			_ = json.NewEncoder(w).Encode(map[string]any{"ok": false, "error": "Method not allowed"})
+			return
+		}
+		var next SimBridgeMetrics
+		if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 8192)).Decode(&next); err != nil {
+			w.WriteHeader(http.StatusBadRequest)
+			_ = json.NewEncoder(w).Encode(map[string]any{"ok": false, "error": "Invalid JSON"})
+			return
+		}
+		mu.Lock()
+		simState = next
+		mu.Unlock()
+		_ = json.NewEncoder(w).Encode(map[string]any{"ok": true})
 	})
 
 	srv := &http.Server{
@@ -143,6 +243,6 @@ func main() {
 		Handler:           mux,
 		ReadHeaderTimeout: 5 * time.Second,
 	}
-	fmt.Printf("[CQM2-Go-Telemetry] Listening on http://%s/telemetry (OSC -> %s)\n", *httpAddr, *oscTarget)
+	fmt.Printf("[CQM2-Go-Telemetry] Listening on http://%s/telemetry (OSC -> %s)\n", *httpAddr, oscTarget)
 	_ = srv.ListenAndServe()
 }

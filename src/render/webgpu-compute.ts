@@ -1,7 +1,8 @@
 /**
- * CQM2 Browser WebGPU (`WGSL`) Compute Pipeline.
+ * CQM2 v2.1.0 Browser WebGPU (`WGSL`) Compute Pipeline (`src/render/webgpu-compute.ts`).
  * Executes batched organism neural cortex forward passes (`8 -> 8 -> 6`) directly on the browser's GPU
- * via WGSL compute shaders when `navigator.gpu` is available, with zero-error fallback to Zig SIMD128 WASM.
+ * via WGSL compute shaders with persistent `GPUBuffer` reuse and verified numerical `Float32Array` readback,
+ * falling back cleanly to Zig SIMD128 WASM when `navigator.gpu` is unavailable.
  */
 
 export interface WebGpuCapabilities {
@@ -56,16 +57,17 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
 }
 `;
 
-// Minimal WebGPU ambient interfaces so TypeScript compiles cleanly without requiring `@webgpu/types`
+interface GpuBufferLike {
+  destroy(): void;
+  mapAsync(mode: number): Promise<void>;
+  getMappedRange(offset?: number, size?: number): ArrayBuffer;
+  unmap(): void;
+}
+
 interface GpuDeviceLike {
   createShaderModule(desc: { code: string }): unknown;
   createComputePipeline(desc: unknown): { getBindGroupLayout(idx: number): unknown };
-  createBuffer(desc: { size: number; usage: number }): {
-    destroy(): void;
-    mapAsync(mode: number): Promise<void>;
-    getMappedRange(): ArrayBuffer;
-    unmap(): void;
-  };
+  createBuffer(desc: { size: number; usage: number }): GpuBufferLike;
   createBindGroup(desc: unknown): unknown;
   createCommandEncoder(): {
     beginComputePass(): {
@@ -78,7 +80,7 @@ interface GpuDeviceLike {
     finish(): unknown;
   };
   queue: {
-    writeBuffer(buf: unknown, offset: number, data: BufferSource): void;
+    writeBuffer(buf: unknown, offset: number, data: BufferSource, dataOffset?: number, size?: number): void;
     submit(cmds: unknown[]): void;
   };
 }
@@ -89,15 +91,25 @@ export class BrowserWebGpuCompute {
   private adapterInfo = 'WebGPU Not Initialized';
   private lastDispatchMs = 0;
 
+  // Persistent GPU buffers reused across dispatches to avoid per-frame allocation churn
+  private allocatedEntities = 0;
+  private inBuf: GpuBufferLike | null = null;
+  private wBuf: GpuBufferLike | null = null;
+  private outBuf: GpuBufferLike | null = null;
+  private readBuf: GpuBufferLike | null = null;
+  private bindGroup: unknown = null;
+  private dispatchInFlight = false;
+
   public async init(): Promise<WebGpuCapabilities> {
-    const nav = typeof navigator !== 'undefined' ? (navigator as unknown as { gpu?: { requestAdapter(opts?: unknown): Promise<unknown> } }) : null;
+    const nav = typeof navigator !== 'undefined' ? (navigator as unknown as { gpu?: { requestAdapter(): Promise<unknown> } }) : null;
     if (!nav?.gpu) {
       this.adapterInfo = 'WebGPU Unavailable (Zig SIMD128 WASM Active)';
       return this.getCapabilities();
     }
 
     try {
-      const adapter = (await nav.gpu.requestAdapter({ powerPreference: 'high-performance' })) as {
+      // Omit `powerPreference` option so Windows Chromium/Edge Dawn never emits a console warning
+      const adapter = (await nav.gpu.requestAdapter()) as {
         info?: { vendor?: string; architecture?: string; description?: string };
         requestDevice(): Promise<GpuDeviceLike>;
       } | null;
@@ -107,7 +119,7 @@ export class BrowserWebGpuCompute {
       }
       const info = adapter.info;
       this.adapterInfo =
-        info?.description || [info?.vendor, info?.architecture].filter(Boolean).join(' ') || 'WebGPU High-Performance Adapter';
+        info?.description || [info?.vendor, info?.architecture].filter(Boolean).join(' ') || 'WebGPU Hardware Adapter';
       this.device = await adapter.requestDevice();
       const module = this.device.createShaderModule({ code: CORTEX_WGSL });
       this.pipeline = this.device.createComputePipeline({
@@ -131,57 +143,106 @@ export class BrowserWebGpuCompute {
     };
   }
 
-  public async runCortexBenchmark(entityCount = 1024): Promise<{ supported: boolean; elapsedMs: number; entities: number }> {
-    if (!this.device || !this.pipeline) {
-      return { supported: false, elapsedMs: 0, entities: 0 };
+  private ensurePersistentBuffers(entityCount: number): void {
+    if (!this.device || !this.pipeline) return;
+    if (this.allocatedEntities >= entityCount && this.inBuf && this.wBuf && this.outBuf && this.readBuf) {
+      return;
     }
-    const n = Math.max(64, Math.min(16384, entityCount));
+    this.releaseBuffers();
+    const cap = Math.max(64, entityCount);
     const STORAGE = 0x0080;
     const COPY_DST = 0x0008;
     const COPY_SRC = 0x0004;
     const MAP_READ = 0x0001;
 
-    const inData = new Float32Array(n * 8).fill(0.25);
-    const wData = new Float32Array(n * 126).fill(0.05);
-    const outBytes = n * 6 * 4;
-
-    const inBuf = this.device.createBuffer({ size: inData.byteLength, usage: STORAGE | COPY_DST });
-    const wBuf = this.device.createBuffer({ size: wData.byteLength, usage: STORAGE | COPY_DST });
-    const outBuf = this.device.createBuffer({ size: outBytes, usage: STORAGE | COPY_SRC });
-    const readBuf = this.device.createBuffer({ size: outBytes, usage: MAP_READ | COPY_DST });
-
-    const t0 = performance.now();
-    this.device.queue.writeBuffer(inBuf, 0, inData);
-    this.device.queue.writeBuffer(wBuf, 0, wData);
-
-    const bindGroup = this.device.createBindGroup({
+    this.inBuf = this.device.createBuffer({ size: cap * 8 * 4, usage: STORAGE | COPY_DST });
+    this.wBuf = this.device.createBuffer({ size: cap * 126 * 4, usage: STORAGE | COPY_DST });
+    this.outBuf = this.device.createBuffer({ size: cap * 6 * 4, usage: STORAGE | COPY_SRC });
+    this.readBuf = this.device.createBuffer({ size: cap * 6 * 4, usage: MAP_READ | COPY_DST });
+    this.bindGroup = this.device.createBindGroup({
       layout: this.pipeline.getBindGroupLayout(0),
       entries: [
-        { binding: 0, resource: { buffer: inBuf } },
-        { binding: 1, resource: { buffer: wBuf } },
-        { binding: 2, resource: { buffer: outBuf } },
+        { binding: 0, resource: { buffer: this.inBuf } },
+        { binding: 1, resource: { buffer: this.wBuf } },
+        { binding: 2, resource: { buffer: this.outBuf } },
       ],
     });
+    this.allocatedEntities = cap;
+  }
 
-    const enc = this.device.createCommandEncoder();
-    const pass = enc.beginComputePass();
-    pass.setPipeline(this.pipeline);
-    pass.setBindGroup(0, bindGroup);
-    pass.dispatchWorkgroups(Math.ceil(n / 64));
-    pass.end();
-    enc.copyBufferToBuffer(outBuf, 0, readBuf, 0, outBytes);
-    this.device.queue.submit([enc.finish()]);
+  public async runCortexBatch(
+    inputs8xN: Float32Array,
+    weights126xN: Float32Array,
+    entityCount: number,
+  ): Promise<Float32Array | null> {
+    if (!this.device || !this.pipeline || this.dispatchInFlight || entityCount <= 0) {
+      return null;
+    }
+    this.dispatchInFlight = true;
+    try {
+      const n = Math.max(1, Math.min(16384, entityCount));
+      this.ensurePersistentBuffers(n);
+      const outBytes = n * 6 * 4;
 
-    await readBuf.mapAsync(1);
-    readBuf.unmap();
-    const dt = performance.now() - t0;
-    this.lastDispatchMs = dt;
+      const t0 = performance.now();
+      this.device.queue.writeBuffer(this.inBuf!, 0, new Float32Array(inputs8xN.subarray(0, n * 8)));
+      this.device.queue.writeBuffer(this.wBuf!, 0, new Float32Array(weights126xN.subarray(0, n * 126)));
 
-    inBuf.destroy();
-    wBuf.destroy();
-    outBuf.destroy();
-    readBuf.destroy();
+      const enc = this.device.createCommandEncoder();
+      const pass = enc.beginComputePass();
+      pass.setPipeline(this.pipeline);
+      pass.setBindGroup(0, this.bindGroup);
+      pass.dispatchWorkgroups(Math.ceil(n / 64));
+      pass.end();
+      enc.copyBufferToBuffer(this.outBuf!, 0, this.readBuf!, 0, outBytes);
+      this.device.queue.submit([enc.finish()]);
 
-    return { supported: true, elapsedMs: dt, entities: n };
+      await this.readBuf!.mapAsync(1);
+      const mapped = new Float32Array(this.readBuf!.getMappedRange(0, outBytes));
+      const result = new Float32Array(mapped);
+      this.readBuf!.unmap();
+
+      this.lastDispatchMs = performance.now() - t0;
+      return result;
+    } finally {
+      this.dispatchInFlight = false;
+    }
+  }
+
+  public async runCortexBenchmark(entityCount = 1024): Promise<{
+    supported: boolean;
+    elapsedMs: number;
+    entities: number;
+    sampleOutput0: number;
+  }> {
+    if (!this.device || !this.pipeline) {
+      return { supported: false, elapsedMs: 0, entities: 0, sampleOutput0: 0 };
+    }
+    const n = Math.max(64, Math.min(16384, entityCount));
+    const inData = new Float32Array(n * 8).fill(0.25);
+    const wData = new Float32Array(n * 126).fill(0.05);
+    const out = await this.runCortexBatch(inData, wData, n);
+    if (!out) {
+      return { supported: false, elapsedMs: 0, entities: 0, sampleOutput0: 0 };
+    }
+    return {
+      supported: true,
+      elapsedMs: this.lastDispatchMs,
+      entities: n,
+      sampleOutput0: out[0] ?? 0,
+    };
+  }
+
+  public releaseBuffers(): void {
+    this.inBuf?.destroy();
+    this.wBuf?.destroy();
+    this.outBuf?.destroy();
+    this.readBuf?.destroy();
+    this.inBuf = null;
+    this.wBuf = null;
+    this.outBuf = null;
+    this.readBuf = null;
+    this.bindGroup = null;
+    this.allocatedEntities = 0;
   }
 }

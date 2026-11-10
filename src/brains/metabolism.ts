@@ -1,15 +1,15 @@
 /**
- * CQM2 Exact 15-Pool Conserved Biophysical Metabolism & Endocrine Homeostasis Engine.
+ * CQM2 Exact 15-Pool Conserved Biophysical Metabolism, Pulmonary Bohr-Shift & Autophagy Engine.
  * Implements Cahill/Owen multi-organ fuel partitioning + `LIFE-100` & `R21` upgrades:
  *   1. Exact pairwise pool flux transfers guaranteeing $\sum_{k=0}^{14} P_k(t) \equiv E_{\text{intake}}(t)$ (`< 1e-14` drift).
  *   2. Aerobic (`O2 >= 0.35`, high ATP yield) vs. Anaerobic glycolysis (`lactate` accumulation + Cori gluconeogenesis).
  *   3. `CQM10` POMC/GLP-1 gut-nutrient satiety gating (halts hyperphagic overshoot before blood glucose spikes).
  *   4. `C16R` Briat-Gupta-Khammash Antithetic Integral Controller (`z1, z2`) + cephalic insulin for zero-steady-state-error glycemic homeostasis.
- *   5. `N33` Synaptic/Neural ATP metabolic pricing & hydration/osmolarity thirst competition.
+ *   5. Boltzmann/Arrhenius $Q_{10}$ biome temperature scaling, Pulmonary $\mathrm{O}_2/\mathrm{CO}_2/\mathrm{pH}$ Bohr shift,
+ *      and Mitochondrial `ROS` + NREM `ULK1/AMPK` Autophagy repair (`N33`).
  */
 import { ErpRelationalStore, METABOLIC_POOL_COUNT } from '../erp/relational-store';
 
-// Pool indices in `pools15` (`[entityId * 15 + idx]`)
 export const P_GUT_GLC = 0;
 export const P_GUT_AA = 1;
 export const P_GUT_LIP = 2;
@@ -46,7 +46,7 @@ export const DEFAULT_INITIAL_POOLS_15: readonly number[] = Object.freeze([
 
 /**
  * Conserved internal transfer: moves at most `requestedKj` from `srcPool` to `dstPool`
- * without creating or destroying a single femtogram/attojoule of energy!
+ * without creating or destroying a single attojoule of energy!
  */
 export function transferConservedPoolKj(
   pools15: Float64Array,
@@ -79,7 +79,6 @@ export function ingestConservedMealKj(
   const gutLoad =
     store.pools15[base + P_GUT_GLC]! + store.pools15[base + P_GUT_AA]! + store.pools15[base + P_GUT_LIP]!;
 
-  // CQM10 POMC / GLP-1 vagal stretch + portal incretin satiety gate (capacity ~ 24 kJ)
   const glp1Satiety = Math.min(1.0, gutLoad / 22.0);
   const gatedRequest = Math.max(0, mealRequestedKj * (1.0 - 0.92 * glp1Satiety));
   if (gatedRequest <= 1e-9) {
@@ -98,19 +97,15 @@ export function ingestConservedMealKj(
 
   const cFrac = Math.max(0, Math.min(1, carbFrac));
   const pFrac = Math.max(0, Math.min(1 - cFrac, proteinFrac));
-  const lFrac = Math.max(0, 1.0 - cFrac - pFrac);
-
   const dGlc = actualMeal * cFrac;
   const dAa = actualMeal * pFrac;
-  const dLip = actualMeal - (dGlc + dAa); // Exact remainder prevents rounding residual!
-  void lFrac;
+  const dLip = actualMeal - (dGlc + dAa);
 
   store.pools15[base + P_GUT_GLC] = store.pools15[base + P_GUT_GLC]! + dGlc;
   store.pools15[base + P_GUT_AA] = store.pools15[base + P_GUT_AA]! + dAa;
   store.pools15[base + P_GUT_LIP] = store.pools15[base + P_GUT_LIP]! + dLip;
   store.totalIntakeKj[entityId] = store.totalIntakeKj[entityId]! + dGlc + dAa + dLip;
 
-  // Pavlovian / vagal cephalic-phase insulin release proportional to carbohydrate intake
   const cephalicBoost = Math.min(0.45, 0.045 * dGlc);
   store.insulin[entityId] = Math.min(1.5, store.insulin[entityId]! + cephalicBoost);
 
@@ -131,13 +126,21 @@ export interface MetabolicStepSummary {
   meanAtpKj: number;
   meanBloodGlucoseKj: number;
   meanHydration: number;
+  meanBloodPh: number;
+  meanRosDamage: number;
   totalNeuralAtpCostKj: number;
 }
 
 /**
- * Advances 15-pool metabolism, aerobic/anaerobic ATP generation, Antithetic Integral glycemic control,
- * hydration/osmolarity, synaptic ATP pricing (`N33`), and senescence across all active organisms.
+ * Computes physiological $Q_{10} = 2.0^{(T - 293.15)/10}$ enzyme rate multiplier with high-temperature denaturation guard.
  */
+export function computeBoltzmannQ10Factor(temperatureK: number): number {
+  const t = Number.isFinite(temperatureK) ? temperatureK : 293.15;
+  const rawQ10 = Math.pow(2.0, (t - 293.15) / 10.0);
+  const denaturation = t > 315.0 ? Math.exp(-(t - 315.0) * 0.12) : 1.0;
+  return Math.max(0.35, Math.min(2.4, rawQ10 * denaturation));
+}
+
 export function stepPopulationMetabolism(
   store: ErpRelationalStore,
   dtSec: number,
@@ -145,22 +148,25 @@ export function stepPopulationMetabolism(
     metabolicRateScale: number;
     oxygenSaturation: number;
     useAntitheticController?: boolean;
+    enableTemperatureQ10?: boolean;
   },
 ): MetabolicStepSummary {
   const dt = Math.max(1e-4, Math.min(0.5, dtSec));
-  const rateScale = Math.max(0.1, options.metabolicRateScale);
+  const baseRateScale = Math.max(0.1, options.metabolicRateScale);
   const envO2 = Math.max(0.05, options.oxygenSaturation);
   const useAic = options.useAntitheticController ?? true;
+  const useQ10 = options.enableTemperatureQ10 ?? true;
 
   let aliveCount = 0;
   let deaths = 0;
   let sumAtp = 0;
   let sumGlc = 0;
   let sumHyd = 0;
+  let sumPh = 0;
+  let sumRos = 0;
   let totalNeuralCost = 0;
 
   const GLYCEMIC_SETPOINT_KJ = 4.0;
-  // Briat-Gupta-Khammash Antithetic Integral Controller parameters: setpoint = mu / theta = 4.0
   const aicMu = 2.0;
   const aicTheta = 0.5;
   const aicEta = 3.2;
@@ -169,6 +175,11 @@ export function stepPopulationMetabolism(
     if (store.alive[e] !== 1) continue;
     const base = e * METABOLIC_POOL_COUNT;
     const pools = store.pools15;
+    const bm = store.biomes.get(store.biomeFk[e]!);
+    const q10 = useQ10 && bm ? computeBoltzmannQ10Factor(bm.temperatureK) : 1.0;
+    const sleepCode = store.sleepStage[e]!; // 0=WAKE, 1=NREM, 2=REM
+    const sleepMetabolicFactor = sleepCode === 1 ? 0.72 : sleepCode === 2 ? 0.88 : 1.0;
+    const rateScale = baseRateScale * q10 * sleepMetabolicFactor;
 
     store.ageSec[e] = store.ageSec[e]! + dt;
 
@@ -188,13 +199,11 @@ export function stepPopulationMetabolism(
       store.aicZ1[e] = z1;
       store.aicZ2[e] = z2;
 
-      // z2 > z1 signals hyperglycemia -> insulin-driven glycogenesis; z1 > z2 signals hypoglycemia -> glucagon glycogenolysis!
       const insTarget = Math.max(0.05, Math.min(1.5, 0.35 + 0.85 * (z2 - z1) + 0.18 * (bldGlc - GLYCEMIC_SETPOINT_KJ)));
       const glcTarget = Math.max(0.05, Math.min(1.5, 0.25 + 0.95 * (z1 - z2) + 0.22 * (GLYCEMIC_SETPOINT_KJ - bldGlc)));
       store.insulin[e] = 0.75 * store.insulin[e]! + 0.25 * insTarget;
       store.glucagon[e] = 0.75 * store.glucagon[e]! + 0.25 * glcTarget;
     } else {
-      // Lesioned open-loop controller (drifts under load!)
       store.insulin[e] = 0.35;
       store.glucagon[e] = 0.25;
     }
@@ -204,48 +213,59 @@ export function stepPopulationMetabolism(
 
     if (bldGlc > GLYCEMIC_SETPOINT_KJ && ins > 0.4) {
       const surplus = (bldGlc - GLYCEMIC_SETPOINT_KJ) * ins * 1.4 * dt;
-      const toLiver = transferConservedPoolKj(pools, base, P_BLD_GLC, P_LIV_GLY, surplus * 0.55);
-      const toMuscle = transferConservedPoolKj(pools, base, P_BLD_GLC, P_MUS_GLY, surplus * 0.35);
+      transferConservedPoolKj(pools, base, P_BLD_GLC, P_LIV_GLY, surplus * 0.55);
+      transferConservedPoolKj(pools, base, P_BLD_GLC, P_MUS_GLY, surplus * 0.35);
       if (pools[base + P_LIV_GLY]! > 85.0) {
         transferConservedPoolKj(pools, base, P_LIV_GLY, P_ADIPOSE, 0.4 * dt);
       }
-      void toLiver;
-      void toMuscle;
     } else if (bldGlc < GLYCEMIC_SETPOINT_KJ) {
       const deficit = (GLYCEMIC_SETPOINT_KJ - bldGlc) * (0.5 + glg * 1.6) * dt;
       const fromLiver = transferConservedPoolKj(pools, base, P_LIV_GLY, P_BLD_GLC, deficit);
       if (fromLiver < deficit * 0.5) {
-        // Hepatic gluconeogenesis from amino acids + ketogenesis from adipose
         transferConservedPoolKj(pools, base, P_BLD_AA, P_BLD_GLC, (deficit - fromLiver) * 0.5);
         transferConservedPoolKj(pools, base, P_ADIPOSE, P_BLD_FFA, 0.8 * glg * dt);
         transferConservedPoolKj(pools, base, P_BLD_FFA, P_BLD_KET, 0.45 * glg * dt);
       }
     }
 
-    // Leptin proportional to adipose reserve; ghrelin inversely proportional to gut load (`CQM10`)
     const adipose = pools[base + P_ADIPOSE]!;
     store.leptin[e] = Math.max(0.0, Math.min(1.0, adipose / 200.0));
     const gutTotal = pools[base + P_GUT_GLC]! + pools[base + P_GUT_AA]! + pools[base + P_GUT_LIP]!;
     store.ghrelin[e] = Math.max(0.02, Math.min(1.0, 1.0 - gutTotal / 22.0));
 
-    // 3. Oxygen Respiration (`LIFE-100`): Aerobic 30-ATP efficiency vs. Anaerobic 2-ATP + Lactate
+    // 3. Pulmonary O2/CO2 Gas Exchange, Henderson-Hasselbalch Arterial pH & Bohr Shift
     const speedSq =
       store.velX[e]! * store.velX[e]! + store.velY[e]! * store.velY[e]! + store.velZ[e]! * store.velZ[e]!;
     const motorEffort = Math.min(2.5, Math.sqrt(speedSq));
+    const prevPh = store.bloodPh[e]!;
+    // Bohr shift: mild acidemia (pH ~ 7.25) facilitates tissue O2 unloading; gill O2 uptake scales with envO2
+    const bohrUnloadingGain = Math.max(0.75, Math.min(1.25, 1.0 + 0.35 * (7.4 - prevPh)));
     const o2Demand = (0.08 + 0.14 * motorEffort) * dt * rateScale;
-    const o2Uptake = 0.24 * envO2 * dt;
+    const o2Uptake = 0.25 * envO2 * dt;
     const nextO2 = Math.max(0.0, Math.min(1.0, store.o2Reserve[e]! + o2Uptake - o2Demand));
     store.o2Reserve[e] = nextO2;
 
+    const co2Prod = 0.82 * o2Demand; // Respiratory Quotient RQ ~ 0.82
+    const gillVentilation = (0.22 + 0.12 * envO2) * dt;
+    const nextCo2 = Math.max(0.04, Math.min(1.0, store.co2Level[e]! + co2Prod - gillVentilation * store.co2Level[e]! * 2.5));
+    store.co2Level[e] = nextCo2;
+
+    const lactateNow = pools[base + P_LACTATE]!;
+    const arterialPh = Math.max(6.85, Math.min(7.65, 7.45 - 0.38 * nextCo2 - 0.035 * lactateNow));
+    store.bloodPh[e] = arterialPh;
+
+    // 4. Aerobic vs. Anaerobic Oxidative Phosphorylation
     const atpTargetBuffer = 8.5;
     const atpDeficit = Math.max(0, atpTargetBuffer - pools[base + P_ATP_BUF]!);
+    const effectiveTissueO2 = nextO2 * bohrUnloadingGain;
+    const oxphosEfficiency = arterialPh < 7.05 ? 0.50 : 0.62;
+
     if (atpDeficit > 0) {
-      if (nextO2 >= 0.35) {
-        // Aerobic oxidative phosphorylation: ~62% thermodynamic capture into ATP, 38% heat
+      if (effectiveTissueO2 >= 0.35) {
         const fuelBurn = atpDeficit * 1.15;
         let captured = 0;
-        const glcUsed = transferConservedPoolKj(pools, base, P_BLD_GLC, P_ATP_BUF, fuelBurn * 0.55 * 0.62);
-        transferConservedPoolKj(pools, base, P_BLD_GLC, P_HEAT_WORK, (glcUsed / 0.62) * 0.38);
+        const glcUsed = transferConservedPoolKj(pools, base, P_BLD_GLC, P_ATP_BUF, fuelBurn * 0.55 * oxphosEfficiency);
+        transferConservedPoolKj(pools, base, P_BLD_GLC, P_HEAT_WORK, (glcUsed / oxphosEfficiency) * (1.0 - oxphosEfficiency));
         captured += glcUsed;
 
         if (captured < atpDeficit * 0.7) {
@@ -256,19 +276,18 @@ export function stepPopulationMetabolism(
         if (captured < atpDeficit * 0.85) {
           transferConservedPoolKj(pools, base, P_BLD_KET, P_ATP_BUF, (atpDeficit - captured) * 0.60);
         }
-        // Cori cycle aerobic lactate clearance back to liver glycogen
-        if (pools[base + P_LACTATE]! > 0.1) {
+        if (lactateNow > 0.1) {
           transferConservedPoolKj(pools, base, P_LACTATE, P_LIV_GLY, 0.35 * dt);
         }
       } else {
-        // Hypoxic anaerobic glycolysis: low ATP yield (15% ATP, 85% shunted into Lactate!)
-        const glcAnaerobic = Math.min(pools[base + P_BLD_GLC]!, atpDeficit * 2.4);
+        const glcAvailAboveFloor = Math.max(0.0, pools[base + P_BLD_GLC]! - 0.45);
+        const glcAnaerobic = Math.min(glcAvailAboveFloor, atpDeficit * 3.2 * dt * rateScale);
         transferConservedPoolKj(pools, base, P_BLD_GLC, P_ATP_BUF, glcAnaerobic * 0.15);
         transferConservedPoolKj(pools, base, P_BLD_GLC, P_LACTATE, glcAnaerobic * 0.85);
       }
     }
 
-    // 4. Basal + Locomotor + `N33` Synaptic/Neural ATP Expenditure (`cellularAtpBufferKj -> dissipatedHeatWorkKj`)
+    // 5. Basal + Locomotor + `N33` Synaptic/Neural ATP Expenditure
     const mBase = e * 6;
     let neuralActivity = 0;
     for (let m = 0; m < 6; m++) {
@@ -280,22 +299,38 @@ export function stepPopulationMetabolism(
     totalNeuralCost += neuralAtpCost;
 
     transferConservedPoolKj(pools, base, P_ATP_BUF, P_HEAT_WORK, neuralAtpCost + locomotorAtpCost);
-    // Minor basal nitrogenous turnover -> excretedDetritusKj
     transferConservedPoolKj(pools, base, P_BLD_AA, P_EXCRETED, 0.008 * dt * rateScale);
 
-    // 5. Hydration / Osmolarity Thirst & Telomere Senescence
+    // 6. Mitochondrial ROS Accumulation & NREM `ULK1/AMPK` Autophagy Clearance
+    const rosGen = (0.0025 * rateScale + 0.003 * Math.max(0, envO2 - 1.0)) * dt;
+    const autophagyClearance = sleepCode === 1 ? 0.045 * dt : 0.003 * dt;
+    const nextRos = Math.max(0.0, Math.min(1.0, store.rosDamage[e]! + rosGen - autophagyClearance));
+    store.rosDamage[e] = nextRos;
+    if (sleepCode === 1 && nextRos > 0.05) {
+      // Conserved NREM mitophagy/proteostasis recycling damaged structural protein back into blood amino acids
+      transferConservedPoolKj(pools, base, P_BIOMASS, P_BLD_AA, 0.012 * dt);
+      transferConservedPoolKj(pools, base, P_BLD_AA, P_BIOMASS, 0.011 * dt);
+    }
+
+    // 7. Hydration / Osmolarity Thirst & Telomere Senescence
     const evapLoss = (0.006 + 0.004 * motorEffort) * dt * rateScale;
     store.hydration[e] = Math.max(0.0, Math.min(1.0, store.hydration[e]! - evapLoss));
-    const acidosisStress = Math.min(1.0, pools[base + P_LACTATE]! / 12.0);
+    const acidosisStress = Math.min(1.0, Math.max(0, 7.36 - arterialPh) * 2.5);
     store.cortisol[e] = Math.max(
       0.05,
-      Math.min(1.0, 0.35 * (1.0 - store.hydration[e]!) + 0.45 * acidosisStress + 0.25 * Math.max(0, 1.0 - pools[base + P_ATP_BUF]! / 3.0)),
+      Math.min(
+        1.0,
+        0.3 * (1.0 - store.hydration[e]!) +
+          0.35 * acidosisStress +
+          0.2 * nextRos +
+          0.2 * Math.max(0, 1.0 - pools[base + P_ATP_BUF]! / 3.0),
+      ),
     );
 
-    const telomereWear = (0.00018 + 0.00035 * store.cortisol[e]!) * dt * rateScale;
+    const telomereWear = (0.00014 + 0.00028 * store.cortisol[e]! + 0.00022 * nextRos) * dt * (sleepCode === 1 ? 0.45 : 1.0);
     store.telomereIntegrity[e] = Math.max(0.0, store.telomereIntegrity[e]! - telomereWear);
 
-    // 6. Mortality check (ATP exhaustion, severe dehydration, or telomere crisis)
+    // 8. Mortality check
     const atpNow = pools[base + P_ATP_BUF]!;
     if (atpNow <= 0.02 || store.hydration[e]! <= 0.03 || store.telomereIntegrity[e]! <= 0.01) {
       store.alive[e] = 0;
@@ -303,8 +338,6 @@ export function stepPopulationMetabolism(
       const sp = store.species.get(store.speciesFk[e]!);
       if (sp && sp.extantCount > 0) sp.extantCount -= 1;
 
-      // Return remaining physical biological pools (excluding heat already dissipated) to biome detritus!
-      const bm = store.biomes.get(store.biomeFk[e]!);
       if (bm) {
         let corpseMassEnergy = 0;
         for (let k = 0; k <= P_ATP_BUF; k++) {
@@ -319,6 +352,8 @@ export function stepPopulationMetabolism(
     sumAtp += atpNow;
     sumGlc += pools[base + P_BLD_GLC]!;
     sumHyd += store.hydration[e]!;
+    sumPh += arterialPh;
+    sumRos += nextRos;
   }
 
   // Ecological detritus mineralization (`detritusPoolKj -> nutrientPoolKj`)
@@ -336,6 +371,8 @@ export function stepPopulationMetabolism(
     meanAtpKj: aliveCount > 0 ? sumAtp / aliveCount : 0,
     meanBloodGlucoseKj: aliveCount > 0 ? sumGlc / aliveCount : 0,
     meanHydration: aliveCount > 0 ? sumHyd / aliveCount : 0,
+    meanBloodPh: aliveCount > 0 ? sumPh / aliveCount : 7.4,
+    meanRosDamage: aliveCount > 0 ? sumRos / aliveCount : 0,
     totalNeuralAtpCostKj: totalNeuralCost,
   };
 }

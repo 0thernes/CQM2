@@ -6,30 +6,41 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
+## [2.1.0] - 2026-11-10
+
+### Added
+- **True Simultaneous Quad-Silicon Workloads (Zero Synthetic Buffers)**:
+  - `cqm2_cuda_organism_brains_strided` (`cublasSgemmStridedBatched_v2`) in `native/gpu_cuda/cqm2_tri_accel.cpp` evaluating every living organism's unique 126-float neural cortex on persistent RTX 5070 Ti VRAM, plus persistent `ID3D12Device` + `IDMLDevice` initialization.
+  - Three compiled OpenVINO models in `python/npu_world_worker.py`: action-conditioned RSSM (`[32, 64]` `[latent48 | action16]`) on physical `Intel(R) AI Boost` NPU, sensory unscrambler (`GPU.0`), and `[1, 2, 32, 32]` 2D Gray-Scott reaction-diffusion on `Intel(R) Graphics` iGPU.
+  - Zero-copy `bun:ffi` binding to native `cqm2_zig.dll` AVX2 kernels in `src/native/zig-bridge.ts`, `cqm2_rust_lemire_lattice_sample` & `cqm2_rust_bf16_xor_encode`/`decode` in `rust/src/lib.rs`, and 1 Hz cached `nvidia-smi` + continuous 20 Hz UDP OSC emitter in `go/main.go`.
+  - Expanded Zig 0.17 kernels (`zig/src/root.zig`): Layer-1 Oja plasticity, NIST SP 800-90B `RCT`/`APT` QRNG, 5-point degree-4 `cqm2_eshkol_spine_curvature`, `cqm2_eshkol_vandermonde_jet4`, 3D spinning `cqm2_kerr_mino_geodesic` (Carter `Q` drift `< 1e-12`), `cqm2_llg_spin_step`, `cqm2_spherical_harmonics_l2`, and `cqm2_rmsnorm_swiglu`.
+- **Expanded Embodied Intelligence, Ecology & Quantum Synthesis**:
+  - **Xylos v2 (`src/brains/xylos.ts`)**: Hyperbolic `{7,3}` medusa evaluating all 14 Butlin computational indicators + non-oracle corollary-discharge vs dream reality monitoring (`runXylosRealityMonitoringAssay`).
+  - **Stephen Thaler Creativity Machine (`src/brains/thaler-creativity.ts`)**: Dual `Imagitron` + `Perceptor` critic, `DABUS` multi-hop chaining, `Gedanken-Death` cascade, 9 quantitative creativity markers, and 4 mandatory falsification ablations.
+  - **Asmodenius v42 & Glitchling Upgrades**: Non-destructive state-cloned `runTmsPokeTest` (`WAKE`, `NREM_SLOW_WAVE`, `PROPOFOL_ANESTHESIA`), Dale 80/20 E/I law, astrocyte `Ca2+`, non-oracle `CalibHead` `HOT-3`, `GNW` ignition, `CEMI` phase-lock, `AST-1R`, `PAG`, 4 neuropeptides, non-oracle perturbation-estimated Marr-Albus Jacobian, `HD` ring attractor, `FHRR` holographic memory, and full **12-Benchmark Causal Lesion Suite** (`src/brains/causal-benchmarks.ts`).
+  - **Diploid Ecology (`src/sim/ecology.ts`)**: 8-locus diploid genetics, Bateson-Dobzhansky-Muller speciation, `r=14` Big Tree Crystal Sanctuary + 6 fruiting pods, 5 Cosmological Singularities, Xenomimics entanglement, and AURUM/UMBRA economy.
+  - **27-Repo Tsotchke Catalog (`src/tsotchke/corpus.ts`)**, **3D Kerr Relativity (`src/quantum/kerr-relativity.ts`)**, **Cabello KS-18 & 4Q Ising VQE (`src/quantum/contextuality.ts`)**, **Cormidium-16 (`src/quantum/xenolinguistics.ts`)**, and **Voynich-Khôra Fibonacci Anyon Braids (`src/quantum/voynich-khora.ts`)**.
+- **Versioned OpenAPI v1 Backend, 3NF SQLite Migrations & Fenced Free-AI Studio**:
+  - Forward/rollback SQL migrations (`migrations/001..002`), immutable `audit_events` trigger ledger, `VACUUM INTO` verified backups, cursor pagination, optimistic concurrency (`version_rev` `409`), and retention purge in `src/server/db.ts`.
+  - Versioned `/api/v1/*` HTTP API + OpenAPI 3.1.0 (`/api/v1/openapi.json`), `Idempotency-Key`, duplicate-JSON-key & prototype-pollution shields, and fenced `src/pipeline/free-ai-studio.ts` (`llama3.2:3b` + 24-vector prompt-injection & PII redaction suite).
+- **Cinema-4K 10-Shell Renderer, Clean `public/` Site, `.woff2` Fonts & Watertight `.GLB`**:
+  - Watertight 2-manifold Bishop-frame binary `.glb` (`0x46546C67`, `Euler V - E + F = 2`), procedural PNG encoder, Unity 6 C#, and TouchDesigner Python exporters (`src/pipeline/exporters.ts`).
+  - All 10 analytical parametric Mechalogodrom shells, live `24x24` Gray-Scott `THREE.DataTexture` chromatophore shader, 10 render modes, 8 camera presets, Raycaster click-to-inspect, 2-pointer pinch-zoom, 9-song Web Audio synthesizer + live FFT bar, `public/bible.html`, `public/lab/quantum-wildbeyond.html`, and self-hosted SIL OFL `Inter` + `JetBrains Mono` `.woff2` fonts.
+
+### Changed
+- Moved static web assets into `public/` for clean repository root hygiene (`I-065`) and added SHA-256 content-hashed asset bundles (`I-340`).
+- Upgraded `docs/REPORT.md` to the full honest 8-tag profile (`WEB,API,DB,AI,SIM,NATIVE,AGENT,PUB`).
+
+### Fixed
+- Eliminated double `fastTanh` application in `zig/src/root.zig` Layer-1 organism cortex evaluation.
+- Made `AsmodeniusV42Brain.runTmsPokeTest` non-destructive via full state cloning and `Cqm2WorldScheduler.rollbackToSnapshot` bit-exact across PRNG substreams and all neural/ecological state.
+- Removed WebGPU `powerPreference` adapter warning on Windows Dawn and enabled persistent `GPUBuffer` reuse with numerical `Float32Array` readback.
+
+### Security
+- Fenced all 8 copyleft (`OBLITERATUS` AGPL-3.0, `quantum-quake` GPL-2.0), proprietary (`SolanaQuantumFlux`), unlicensed (`ulg`, `logo-lab`), PolyForm (`GRIMOIRE`), and LLM (`gpt2-basic`, `llm-arbitrator`) repositories behind `fencedQuarantine: true`.
+- Enforced strict `style-src 'self'` CSP with zero inline styles, SSRF private-IP/scheme blocking, constant-time token verification, and socket-IP-only LRU rate limiting.
+
 ## [2.0.0] - 2026-11-10
 
 ### Added
-- **Quad-Silicon Local Hardware Acceleration (`Tri-Engine` + iGPU)**:
-  - Native C++20 `cuBLAS` + CUDA Driver API accelerator (`native/gpu_cuda/cqm2_tri_accel.cpp`) delivering 5,600+ GFLOPS batched neural cortex & morphogen evaluation on NVIDIA GeForce RTX 5070 Ti Laptop GPU (`12 GB VRAM`).
-  - Persistent OpenVINO + Intel Level Zero (`ze_loader.dll`) neural execution engine (`python/npu_world_worker.py`) running batched RSSM world-models and sensory realignment directly on physical `Intel(R) AI Boost` NPU (`<0.6 ms/batch`) plus `Intel(R) Graphics` iGPU DirectML/OpenVINO offload.
-  - Dual-target **Zig 0.17.0** mathematical kernel library (`zig/src/root.zig`) compiling to both WebAssembly SIMD128 (`+simd128`, `+bulk_memory`) for universal browsers and native Windows x64 AVX2 (`cqm2_zig.dll`) via `Bun.FFI`.
-  - Hand-tuned **x86-64 AVX2/FMA3/POPCNT** assembly hot-path kernels (`native/gpu_cuda/cqm2_avx2_asm.S`) for ultra-low-latency micro-cortex `GEMV+tanh` and symplectic Pauli commutation parity on Intel Core Ultra 9 275HX (24 cores).
-  - **Rust 1.94.1** deterministic Entity-Relational Merkle state verifier & First-Law metabolic conservation auditor (`rust/src/lib.rs`).
-  - **Go 1.26.2** concurrent local hardware telemetry & TouchDesigner / Unity / Blender OSC + JSON streaming hub (`go/main.go`).
-- **Upgraded Embodied Cognition (`Asmodenius v42` + `Glitchling` + `Pantheon`)**:
-  - Complete 14-region spiking CNS + Enteric Nervous System (`SENS, THAL, CTX, HIP, STR, HYP, VTA, RAPHE, LC, BF, INS, SCN, MOT, ENS`) with Larkum two-compartment basal×apical NMDA coincidence gating, PV onset reset, and Hasani fused semi-implicit sLTC + 24-unit CPG locomotion.
-  - Resolved open R21 behavioral benchmarks (`Cohen's d >= 0.8`, `Welch's t >= 2.75`): Frazier Knowledge-Gradient Value-of-Information (`activeInference`), POMC/GLP-1 gut-glucose satiety (`CQM10`), Briat-Gupta-Khammash Antithetic Integral Control + cephalic insulin (`C16R`), and endogenous Higher-Order Thought confidence (`HOT-3`).
-  - Completed `LIFE-100` & `NOVEL-100` pillars: 15-pool conserved kJ metabolic ledger (`error < 1e-12`) with aerobic/anaerobic `O2/CO2` stoichiometry, water/osmolarity thirst competition, corpse detritus ecology, telomere senescence, diploid sexual crossover, metabolic synaptic ATP pricing (`N33`), reversible thought rollback (`N01`), and `P_SIM` anomaly memory quarantine (`N52`).
-  - Integrated **Glitchling** 4 congenital/adversarial flaws (`scramble`, `leaky`, `backwards`, `misfire`) alongside three biological compensatory neuroplasticity organs: **Marr-Albus Cerebellum** (cures `backwards`), **Gated-DeltaNet Fast Weights** (cures `scramble`), and **Frey-Morris Synaptic Tagging & Capture** (cures `leaky` & `misfire`).
-  - Integrated **5-Caste Kuramoto + Cholesky DPP Swarm Pantheon**, **5 Archon SuperMinds** (FHRR Phasor `HDCMap` + 256-slot Modern Hopfield + Selective Complex SSM), and **10-Shell Central Mechalogodrom** with Bi-Poo STDP.
-- **Quantum Contextuality, Tsotchke Corpus & 0thernes Physics**:
-  - 22-pillar Tsotchke mathematical integration (`Eshkol` degree-4 Taylor jets & DBSP, `Moonlab` Ising/VQE/QWZ Chern, `QGTL` Fubini-Study & Berry curvature, `TsotchkeQRNG` with live NIST SP 800-90B RCT/APT health gates, `libirrep` Majorana skyrmions, `SbNN` MinSR) with automatic local mirror discovery (`(Tsotchke)`).
-  - Bit-packed symplectic $N$-qubit Pauli engine, exact `u128` Hoggar spectral bound, and geometric contextuality detection (`|g_uv| > 1/12` on the split Cayley hexagon $H(2)$).
-  - Self-healing **Glossodrom `RS[15,11]` over `GF(16)`** 4D Zooid xenolinguistics & reversible `RV32IM_Xgloss` skin self-painting + **Thingmaker** 4-stream deterministic phonotactic taxonomy.
-- **Entity Relational Programming (`ERP`) & Full-Stack Persistence**:
-  - 10 normalized columnar Structure-of-Arrays (`SoA`) in-memory relational tables backed by `SharedArrayBuffer` (zero heap `THREE.Mesh` objects per entity) mirrored into a persistent 3NF `bun:sqlite` WAL database (`src/server/db.ts`) and browser `IndexedDB` snapshots.
-- **4K WebGPU/WebGL2 Renderer, Responsive Workstation UI & Creative Export Pipeline**:
-  - GR-exact Schwarzschild/Kerr $g^4$ multi-order photon-ring shader, Lipschitz-guarded 4D non-Euclidean manifold warp, FitzHugh-Nagumo + Gray-Scott + Guanine thin-film iridescent creature skin, `webglcontextlost` recovery, and `<= 3 Hz` WCAG flash limiter.
-  - Responsive workstation UI (`320px` mobile to `3840px` 4K) with 7 workspaces, `Ctrl+K` Command Palette, TMS Poke Test (`Casali PCI` + $F$ vs $W$), Clone Transplant Bench, 7-Rung God Dial Deck, and one-click export to **glTF 2.0 (`.gltf`), `.obj`, Blender 4.x `.py`, Unity/TouchDesigner JSON/OSC, Procedural Cosmic/Kerr-Ringdown `.wav`**, and Tripo/Meshy/Ollama Free-AI world-model adapters.
-- **Grade-A Engineering, CI/CD & Documentation**:
-  - Complete 20-point `GITHUB-REPO-STANDARD.md` compliance, 500-point product inspection (`docs/REPORT.md`), comprehensive test suite, CycloneDX SBOM generator, and GitHub Actions CI + CodeQL + GitHub Pages + Release pipelines.
+- Initial CQM2 full-stack polyglot release (`CUDA cuBLAS` + `OpenVINO NPU` + `Zig 0.17 WASM/AVX2` + `Rust 1.94` + `Go 1.26` + `Three.js` 4K InstancedMesh + 10-table SoA/SQLite ERP).

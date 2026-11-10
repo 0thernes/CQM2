@@ -1,52 +1,52 @@
-# UI/UX Systems Design, Responsive Wireframes, Typography & Ergonomics
+# UI/UX Systems Design, Responsive Wireframes, Typography & Nielsen Heuristics
 
-## 1. Viewport Breakpoint Wireframes (`320px` → `3840×2160` 4K)
+## 1. Clean `public/` Multi-Page Architecture & Breakpoints (`320px` → `3840×2160` 4K)
+
+CQM2 (`v2.1.0`) serves **7 semantic HTML5 pages** from `public/` (with zero inline `style=` attributes and strict CSP `style-src 'self'`):
+`index.html`, `docs.html`, `specs.html`, `bible.html` (13-chapter architectural & scientific bible), `glossary.html`, `downloads.html`, and `lab/quantum-wildbeyond.html` (interactive 4-qubit Ising VQE, Hoggar $H(2)=63$, `KS-18`, and `Voynich-Khôra` anyon braid workbench).
 
 ### Mobile Portrait (`320px` – `767px`)
 ```text
 +---------------------------------------+
-| [CQM2] Cosmogonic Quantum Mech. v2.0  |
-| [Browser Mode] [NOT SENTIENT] [Pause] |
+| [CQM2] Cosmogonic Quantum Mech. v2.1  |
+| [Quad-Silicon] [NOT SENTIENT] [Pause] |
 +---------------------------------------+
-| [1.Cosmos] [2.Silicon] [3.Brains] ->  |  <- Horizontal swipeable ARIA tablist (>=44px height)
+| [1.Cosmos] [2.Silicon] [3.Brains] ->  |  <- Swipeable ARIA tablist (>=44px touch target)
 +---------------------------------------+
-|                                       |
-|     3D Cosmos Viewport (320px+ H)     |  <- Touch orbit + Mobile Eco DPR cap (<=1.25x)
-|     [Tick 120 · Alive 128]            |
+|     3D Cosmos Viewport (Pinch-Zoom    |  <- 2-pointer touch pinch + click-to-inspect raycast
+|     + Mobile Eco DPR cap <=1.25x)     |
 +---------------------------------------+
-|  Live KPI Grid (2-col fluid cards)    |
-|  7-Rung God-Dial Sliders (full width) |
+|  Live KPI Grid + 7-Rung God Dials     |
 +---------------------------------------+
 ```
 
-### Desktop & 4K UHD Observatory (`1120px` – `3840×2160`)
+### Desktop & Cinema-4K Observatory (`1120px` – `3840×2160`)
 ```text
-+--------------------------------------------------------------------------------------------------+
-| [CQM2] Cosmogonic Quantum Mechalogodrom 2     [LOCAL TRI-ENGINE] [NOT SENTIENT] [4K] [Pause] [⌘K]|
-+--------------------------------------------------------------------------------------------------+
-| [1.Cosmos 4K] [2.Silicon] [3.Asmodenius & Glitchling] [4.Quantum & Tsotchke] [5.ERP] [6.Export]  |
-+---------------------------------------------------------------+----------------------------------+
-|                                                               | Live Telemetry KPI Matrix (3x2)  |
-|                                                               |----------------------------------|
-|             4K InstancedMesh Relativistic Cosmos              | Rung 1: Kerr Spin a/M     [0.84] |
-|          Kerr g^4 Singularity + 10-Shell Mechalogodrom        | Rung 1: Manifold Warp     [0.22] |
-|          Asmodenius 8-Somite Spine + S^3 Zooid Strands        | Rung 2: Pauli Coupling    [0.65] |
-|                                                               | Rung 3: Vent Flux kJ/s    [85.0] |
-| [Tick 480 · Alive 128 · Merkle 0x168671d0]    [WASD/Drag/Zoom]| Rung 4..7 Sliders (<=2.2 Hz safe)|
-+---------------------------------------------------------------+----------------------------------+
++----------------------------------------------------------------------------------------------------+
+| [CQM2 v2.1] Cosmogonic Quantum Mechalogodrom 2  [QUAD-SILICON] [NOT SENTIENT] [4K] [9-Song] [⌘K]   |
++----------------------------------------------------------------------------------------------------+
+| [1.Cosmos 4K] [2.Silicon] [3.Brains & 12-Bench] [4.Quantum & 27-Repos] [5.ERP] [6.Export & AI] [7] |
++-----------------------------------------------------------------+----------------------------------+
+|  10 Analytical Mechalogodrom Shells (Hopf, Calabi-Yau,          | Live Telemetry KPI Matrix (3x2)  |
+|  Clifford 4D, Boys, Mobius-Klein, Schlafli {7,3}, Hoggar 63,    | Selected Organism Raycast Card   |
+|  Penrose Ergosphere, Fibonacci, Eshkol Frenet) + Polar Jets     | 10 Render Modes + 8 Cam Presets  |
+|  + Big Tree r=14 Sanctuary + Asmodenius 24x24 Turing Skin       | 9-Song Synth + 32-Bin FFT Bar    |
+|  + Xylos {7,3} Medusa + Glitchling Vectors                      | 7-Rung God-Dial Sliders (<=2.2Hz)|
++-----------------------------------------------------------------+----------------------------------+
 ```
 
-## 2. Typography, Contrast & Accessibility Standards
+## 2. Self-Hosted `.woff2` Typography, WCAG 2.2 AAA Contrast & Nielsen 10 Heuristics
 
-- **UI Sans Font**: `Inter`, system geometric sans fallback, fluid `clamp()` sizing from `0.75rem` to `1.85rem`.
-- **Telemetry Numeric Font**: `JetBrains Mono` with `font-variant-numeric: tabular-nums` on every live KPI, benchmark cell, and coordinate readout to prevent horizontal layout jitter.
-- **Verified WCAG 2.2 Contrast**:
-  - Primary `#eaf1fb` on `#050913` void = **17.4:1** (AAA)
-  - Secondary `#a8bdd9` on `#0b1221` panel = **8.9:1** (AAA)
-  - Cyan `#38bdf8` on `#0b1221` = **8.8:1** (AAA)
-  - Gold `#fbbf24` on `#0b1221` = **11.2:1** (AAA)
-- **Ergonomics & Safety**:
-  - Zero `!important` declarations in `src/styles/tokens.css` (enforced by `scripts/lint.ts`).
-  - Minimum `44px` interactive height (`--touch-min: 44px`) on buttons, tabs, and selects.
-  - Hard `<= 2.2 Hz` temporal pulse clamp (`WCAG 2.3.1` Three Flashes or Below Threshold).
-  - Full keyboard control: `1`–`7` workspace switching, `ArrowLeft`/`ArrowRight` ARIA tab focus, `WASD`/Arrows/`+`/`-`/`0` 3D camera navigation, `Space` Play/Pause, `Ctrl+K` Command Palette, and `.skip-link` bypass block.
+- **Self-Hosted SIL OFL 1.1 Fonts (`public/fonts/`)**: `Inter` (`inter-latin-wght-normal.woff2`) and `JetBrains Mono` (`jetbrains-mono-latin-400/700-normal.woff2`) with `@font-face { font-display: swap }` and `font-variant-numeric: tabular-nums` on every numeric KPI.
+- **Verified Contrast**: `#eaf1fb` on `#050913` = **17.4:1** (AAA); `#a8bdd9` on `#0b1221` = **8.9:1** (AAA); `#38bdf8` on `#0b1221` = **8.8:1** (AAA).
+- **Jakob Nielsen's 10 Usability Heuristics**:
+  1. *Visibility of system status*: Live `/ws` + FPS + per-processor `CUDA`/`NPU`/`iGPU`/`Zig` latency & Merkle hash pills.
+  2. *Match between system and real world*: Biophysical units (`kJ`, `ms`, `GFLOPS`, `a/M`, `O₂ %`) and anatomical names.
+  3. *User control and freedom*: Reversible `N01` snapshot/rollback (`SQLite` + `IndexedDB`), `Reset Dials`, and `Space` pause.
+  4. *Consistency and standards*: Design tokens in `src/styles/tokens.css` (zero `!important`, zero inline styles).
+  5. *Error prevention*: Slider bounds, `sanitizeGodDials()`, and confirmation/backup guards on destructive actions.
+  6. *Recognition rather than recall*: Searchable `Ctrl+K` Command Palette and inline scientific tooltips/badges.
+  7. *Flexibility and efficiency*: URL deep-linking (`?seed=&flaws=&tier=&tab=&mode=`), `1`–`7` hotkeys, `WASD` camera, `8` camera presets.
+  8. *Aesthetic and minimalist design*: Collapsible Cinema-4K HUD (`H` toggle) and organized 7-workspace progressive disclosure.
+  9. *Help users recognize/recover from errors*: Non-fatal error boundary banner (`role="alert"`) and structured remediation messages.
+  10. *Help and documentation*: Built-in `Docs`, `Specs`, `13-Chapter Bible`, `Glossary`, `WildBeyond Lab`, and `OpenAPI 3.1`.

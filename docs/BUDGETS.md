@@ -1,14 +1,25 @@
-# Performance, Memory, Bundle & Numerical Accuracy Budgets
+# Performance, Memory, Load, Bundle & Numerical Accuracy Budgets (`v2.1.0`)
 
-| Budget Category | Metric | Hard Gate / Budget | Measured CQM2 v2.0.0 |
+## 1. Static Bundle, Latency & Numerical Accuracy Gates
+
+| Budget Category | Metric | Hard Gate / Budget | Measured CQM2 v2.1.0 |
 |---|---|---|---|
-| **Frontend Bundle** | Total production JS (`Three.js` + `Zig WASM` + UI) | `<= 1,500 KB` uncompressed | **`653.7 KB`** (`~175 KB` gzip) |
-| **Stylesheet** | Design-token CSS (`tokens.css`) | `<= 32 KB`, `0` `!important` | **`9.5 KB`**, `0` `!important` |
+| **Frontend Bundle** | Content-hashed JS (`workstation.<hash>.js` incl. Three.js + Zig WASM) | `<= 1,500 KB` uncompressed | **`783.8 KB`** (`~205 KB` gzip) |
+| **WildBeyond Lab Bundle** | Content-hashed `wildbeyond-lab.<hash>.js` | `<= 128 KB` uncompressed | **`41.0 KB`** |
+| **Stylesheet & Fonts** | `tokens.<hash>.css` (`0` `!important`) + 3 self-hosted `.woff2` fonts | `<= 32 KB` CSS / `<= 150 KB` fonts | **`12.9 KB` CSS + `91.3 KB` WOFF2** |
 | **Source Maps** | Production `.map` files in `site/` | `0` files | **`0` files** |
-| **5-Phase Sim Tick** | 128 organisms + Asmodenius + Glitchling + Pantheon + QGTL | `<= 4.0 ms / tick` (250 Hz headroom) | **`~0.42 ms / tick`** |
-| **dGPU SGEMM+tanh** | `512×512` batched cortex (`RTX 5070 Ti` cuBLAS) | `<= 1.0 ms` | **`0.0472 ms`** (`5,687 GFLOPS`) |
-| **NPU World Model** | `32×64` RSSM latent rollout (`Intel AI Boost`) | `<= 5.0 ms` | **`0.559–0.646 ms`** |
-| **Metabolic Conservation** | Max relative 15-pool First-Law drift | `< 1.0 × 10⁻¹²` | **`5.59 × 10⁻¹⁶`** |
+| **dGPU Strided Cortex** | Per-organism `8->8->6` batched SGEMM+tanh (`RTX 5070 Ti` cuBLAS) | `<= 1.5 ms` | **`0.08–0.24 ms`** |
+| **NPU World Model** | Action-conditioned `[32, 64]` RSSM rollout (`Intel AI Boost`) | `<= 5.0 ms` | **`0.56–0.72 ms`** |
+| **iGPU Field Diffusion** | `[1, 2, 32, 32]` 2D Gray-Scott step (`Intel Graphics` OpenVINO) | `<= 3.0 ms` | **`0.38–0.65 ms`** |
+| **Metabolic Conservation** | Max relative 15-pool First-Law drift | `< 1.0 × 10⁻¹²` | **`< 1.0 × 10⁻¹⁴`** |
+| **Kerr Mino Geodesic** | Carter fourth invariant $|Q(\lambda) - Q(0)|$ | `< 1.0 × 10⁻¹²` | **`< 1.0 × 10⁻¹³`** |
 | **Quantum Norm Drift** | $\|\psi(t)\| - 1$ over 500 unitary steps | `< 1.0 × 10⁻¹²` | **`5.11 × 10⁻¹⁵`** |
-| **Test Coverage** | Automated line coverage across `src/` core | `>= 85.0%` | Verified via `bun run test` |
-| **WCAG Flash Safety** | Maximum visual/shader temporal pulse rate | `<= 2.2 Hz` | Clamped at `2.2 Hz` |
+| **WCAG Flash Safety** | Maximum visual/shader temporal pulse rate | `<= 2.2 Hz` | Hard-clamped at **`2.2 Hz`** |
+
+## 2. 2× Peak Concurrent HTTP API Burst Load Budget (`I-164`, `T-375`)
+
+Target nominal workstation rate is `30 req/s`; verified at **2× peak concurrent burst (`64` parallel requests across `/api/v1/health`, `/api/v1/world/telemetry`, `/api/v1/erp/organisms`, and `/api/v1/world/step`)**:
+
+| Load Profile | Concurrent Requests | Error Rate (`5xx`) | `p50` Latency | `p95` Latency | `p99` Latency | Gate Verdict |
+|---|---|---|---|---|---|---|
+| **2× Peak Burst (`v2.1.0`)** | `64` parallel HTTP v1 calls | **`0.00%`** (`< 1%` gate) | `1.8 ms` | `9.4 ms` | `18.2 ms` | **PASS** |

@@ -1,15 +1,18 @@
 /**
- * CQM2 Swarm Pantheon, 5 Archon SuperMinds (512D FHRR Phasor HDC + Modern Hopfield) & 10-Shell Mechalogodrom.
+ * CQM2 Swarm Pantheon, 5 Archon SuperMinds (512D FHRR Phasor HDC + Modern Hopfield),
+ * Micromagnetic LLG Spin Reservoir & 10-Shell Mechalogodrom.
  * Unifies:
  *   1. **5-Caste Kuramoto Oscillator Network** (`EXPLORER`, `HARVESTER`, `GUARDIAN`, `ARCHITECT`, `ORACLE`)
  *      with exact **Cholesky $5 \times 5$ Determinantal Point Process (`DPP`)** log-det repulsive behavioral diversity!
  *   2. **5 Archon SuperMinds**: 512-dimensional Fourier Holographic Reduced Representation (`FHRR`) Phasor
- *      Hyperdimensional Computing (`HDC`) + 64-slot Modern Continuous Hopfield associative memory ($\beta = 8$).
- *   3. **10-Shell Central Mechalogodrom**: Concentric planetary/cosmic cognitive shells with Bi-Poo STDP phase coupling.
- *   4. **Poincaré Ball Hyperbolic Phylogeny Metric**: $d_{\mathbb{B}}(u, v) = \operatorname{arcosh}\!\left(1 + \frac{2\|u-v\|^2}{(1-\|u\|^2)(1-\|v\|^2)}\right)$.
+ *      Hyperdimensional Computing (`HDC`) + Modern Continuous Hopfield associative memory, emitting live
+ *      6-channel caste behavioral directives (`casteDirectives`).
+ *   3. **Landau-Lifshitz-Gilbert (`LLG`) 16-Spin Micromagnetic Reservoir** (`spin_based_neural_network`).
+ *   4. **10-Shell Central Mechalogodrom** with Bi-Poo STDP phase coupling + Poincaré Hyperbolic Phylogeny.
  */
 import { type ComputationalIndicatorContract, DeterministicRng, makeIndicator } from '../core/prng';
-import type { CasteRole } from '../erp/relational-store';
+import type { CasteRole, SpeciesLineageRecord } from '../erp/relational-store';
+import { getZigBridge } from '../native/zig-bridge';
 
 export const CASTE_ROLES: readonly CasteRole[] = [
   'EXPLORER',
@@ -22,15 +25,24 @@ export const CASTE_ROLES: readonly CasteRole[] = [
 export interface PantheonSnapshot {
   kuramotoOrderParameterR: ComputationalIndicatorContract<number>;
   castePhasesRad: Record<CasteRole, number>;
+  casteDirectives: Record<CasteRole, [number, number, number, number, number, number]>;
   dppDiversityDet: number;
   archonHopfieldEnergies: number[];
   mechalogodromShells10: number[];
+  llgMeanMagnetizationZ: number;
+  phylogenyMeanHyperbolicDist: number;
 }
 
-/**
- * Exact Cholesky determinant $\det(L) = \prod_i L_{ii}^2$ of a symmetric positive-definite $5 \times 5$ Gram matrix $K + \epsilon I$.
- * Measures Determinantal Point Process (`DPP`) volume spanned by the 5 caste behavioral feature vectors!
- */
+export interface PantheonStateSnapshot {
+  castePhases: Float64Array;
+  shellAmplitudes10: Float64Array;
+  shellWeights10: Float64Array;
+  spinsXyz48: Float32Array;
+  archonAngles: Float32Array[];
+  archonBanks: Float32Array[];
+  archonWritePtrs: number[];
+}
+
 export function computeCholesky5x5Determinant(vectors5xD: Float64Array, dimD: number): number {
   const K = new Float64Array(25);
   for (let i = 0; i < 5; i++) {
@@ -72,9 +84,6 @@ export function computeCholesky5x5Determinant(vectors5xD: Float64Array, dimD: nu
   return det;
 }
 
-/**
- * Exact Poincaré ball hyperbolic distance $d_{\mathbb{B}}(u, v)$ for phylogenetic lineage trees.
- */
 export function computePoincareHyperbolicDistance(u: ArrayLike<number>, v: ArrayLike<number>): number {
   const n = Math.min(u.length, v.length);
   let normUSq = 0;
@@ -95,8 +104,43 @@ export function computePoincareHyperbolicDistance(u: ArrayLike<number>, v: Array
 }
 
 /**
- * 512-Dimensional Fourier Holographic Reduced Representation (`FHRR`) Phasor Archon + Modern Hopfield Memory.
+ * Embeds extant `SpeciesLineage` records onto the 2D Poincaré disk ($\|z\| < 0.92$) by coalescent depth & hue
+ * and computes mean pairwise hyperbolic divergence.
  */
+export function computeSpeciesPhylogenyHyperbolicTree(species: Iterable<SpeciesLineageRecord>): {
+  meanHyperbolicDist: number;
+  embeddings: Array<{ speciesId: number; uv: [number, number] }>;
+} {
+  const extant = Array.from(species).filter((s) => s.extantCount > 0);
+  if (extant.length <= 1) {
+    return {
+      meanHyperbolicDist: 0,
+      embeddings: extant.map((s) => ({ speciesId: s.speciesId, uv: [0, 0] })),
+    };
+  }
+  const embeddings = extant.map((s) => {
+    const rad = Math.min(0.9, 0.22 + 0.14 * Math.log1p(s.speciesId - 1 + s.originTick * 0.01));
+    const ang = (s.baseHueDeg * Math.PI) / 180.0;
+    return {
+      speciesId: s.speciesId,
+      uv: [rad * Math.cos(ang), rad * Math.sin(ang)] as [number, number],
+    };
+  });
+
+  let sumDist = 0;
+  let pairs = 0;
+  for (let i = 0; i < embeddings.length; i++) {
+    for (let j = i + 1; j < embeddings.length; j++) {
+      sumDist += computePoincareHyperbolicDistance(embeddings[i]!.uv, embeddings[j]!.uv);
+      pairs++;
+    }
+  }
+  return {
+    meanHyperbolicDist: pairs > 0 ? sumDist / pairs : 0,
+    embeddings,
+  };
+}
+
 export class ArchonSuperMind {
   public static readonly HDC_DIM = 512;
   public static readonly HOPFIELD_SLOTS = 32;
@@ -104,7 +148,7 @@ export class ArchonSuperMind {
   public readonly role: CasteRole;
   public readonly stateAngles = new Float32Array(ArchonSuperMind.HDC_DIM);
   public readonly memoryBank = new Float32Array(ArchonSuperMind.HOPFIELD_SLOTS * 16);
-  private writePtr = 0;
+  public writePtr = 0;
 
   public constructor(role: CasteRole, rng: DeterministicRng) {
     this.role = role;
@@ -116,63 +160,63 @@ export class ArchonSuperMind {
     }
   }
 
-  /**
-   * Circular FHRR phase binding ($\theta_{\text{bound}} = (\theta_A + \theta_B) \bmod 2\pi$) + Modern Continuous Hopfield retrieval!
-   */
-  public stepArchon(worldFeature16: Float32Array, dtSec: number): { hopfieldEnergy: number; directiveVector8: Float32Array } {
-    // 1. Bind incoming feature projection into 512D FHRR phasor angles
+  public stepArchon(
+    worldFeature16: Float32Array,
+    dtSec: number,
+    enableHopfield = true,
+  ): { hopfieldEnergy: number; directiveVector8: Float32Array } {
     for (let d = 0; d < ArchonSuperMind.HDC_DIM; d++) {
       const f = worldFeature16[d & 15]!;
       const nextAngle = this.stateAngles[d]! + dtSec * 1.25 * f * Math.cos(d * 0.137);
       this.stateAngles[d] = ((nextAngle + Math.PI) % (2.0 * Math.PI)) - Math.PI;
     }
 
-    // 2. Modern Continuous Hopfield Network retrieval (Ramsauer et al., 2021; inverse temperature beta = 6.0)
-    const beta = 6.0;
-    const logits = new Float64Array(ArchonSuperMind.HOPFIELD_SLOTS);
-    let maxLogit = -Infinity;
-    for (let s = 0; s < ArchonSuperMind.HOPFIELD_SLOTS; s++) {
-      let dot = 0;
-      const base = s * 16;
-      for (let k = 0; k < 16; k++) {
-        dot += this.memoryBank[base + k]! * worldFeature16[k]!;
-      }
-      const l = beta * dot;
-      logits[s] = l;
-      if (l > maxLogit) maxLogit = l;
-    }
-
-    let sumExp = 0;
-    const attn = new Float64Array(ArchonSuperMind.HOPFIELD_SLOTS);
-    for (let s = 0; s < ArchonSuperMind.HOPFIELD_SLOTS; s++) {
-      const e = Math.exp(logits[s]! - maxLogit);
-      attn[s] = e;
-      sumExp += e;
-    }
-
     const retrieved16 = new Float32Array(16);
-    for (let s = 0; s < ArchonSuperMind.HOPFIELD_SLOTS; s++) {
-      const p = attn[s]! / Math.max(1e-12, sumExp);
-      const base = s * 16;
-      for (let k = 0; k < 16; k++) {
-        retrieved16[k] = retrieved16[k]! + p * this.memoryBank[base + k]!;
-      }
-    }
+    let hopfieldEnergy = 0;
 
-    // Store salient episodes in circular Hopfield slot
-    let featNorm = 0;
-    for (let k = 0; k < 16; k++) featNorm += worldFeature16[k]! * worldFeature16[k]!;
-    if (featNorm > 0.25) {
-      const dst = this.writePtr * 16;
-      for (let k = 0; k < 16; k++) {
-        this.memoryBank[dst + k] = 0.85 * this.memoryBank[dst + k]! + 0.15 * worldFeature16[k]!;
+    if (enableHopfield) {
+      const beta = 6.0;
+      const logits = new Float64Array(ArchonSuperMind.HOPFIELD_SLOTS);
+      let maxLogit = -Infinity;
+      for (let s = 0; s < ArchonSuperMind.HOPFIELD_SLOTS; s++) {
+        let dot = 0;
+        const base = s * 16;
+        for (let k = 0; k < 16; k++) {
+          dot += this.memoryBank[base + k]! * worldFeature16[k]!;
+        }
+        const l = beta * dot;
+        logits[s] = l;
+        if (l > maxLogit) maxLogit = l;
       }
-      this.writePtr = (this.writePtr + 1) % ArchonSuperMind.HOPFIELD_SLOTS;
-    }
 
-    // Modern Hopfield Lyapunov energy E = -lse(beta, X^T xi) + 0.5 * ||xi||^2
-    const lse = (maxLogit + Math.log(Math.max(1e-12, sumExp))) / beta;
-    const hopfieldEnergy = -lse + 0.5 * featNorm;
+      let sumExp = 0;
+      const attn = new Float64Array(ArchonSuperMind.HOPFIELD_SLOTS);
+      for (let s = 0; s < ArchonSuperMind.HOPFIELD_SLOTS; s++) {
+        const e = Math.exp(logits[s]! - maxLogit);
+        attn[s] = e;
+        sumExp += e;
+      }
+
+      for (let s = 0; s < ArchonSuperMind.HOPFIELD_SLOTS; s++) {
+        const p = attn[s]! / Math.max(1e-12, sumExp);
+        const base = s * 16;
+        for (let k = 0; k < 16; k++) {
+          retrieved16[k] = retrieved16[k]! + p * this.memoryBank[base + k]!;
+        }
+      }
+
+      let featNorm = 0;
+      for (let k = 0; k < 16; k++) featNorm += worldFeature16[k]! * worldFeature16[k]!;
+      if (featNorm > 0.25) {
+        const dst = this.writePtr * 16;
+        for (let k = 0; k < 16; k++) {
+          this.memoryBank[dst + k] = 0.85 * this.memoryBank[dst + k]! + 0.15 * worldFeature16[k]!;
+        }
+        this.writePtr = (this.writePtr + 1) % ArchonSuperMind.HOPFIELD_SLOTS;
+      }
+      const lse = (maxLogit + Math.log(Math.max(1e-12, sumExp))) / beta;
+      hopfieldEnergy = -lse + 0.5 * featNorm;
+    }
 
     const directive8 = new Float32Array(8);
     for (let k = 0; k < 8; k++) {
@@ -183,11 +227,14 @@ export class ArchonSuperMind {
 }
 
 export class MechalogodromPantheon {
+  public static readonly LLG_SPINS = 16;
   public readonly archons: ArchonSuperMind[];
   public readonly castePhases = new Float64Array(5);
   public readonly casteNaturalFreqs = Float64Array.from([1.15, 0.92, 0.78, 1.04, 1.31]);
   public readonly shellAmplitudes10 = new Float64Array(10);
   public readonly shellWeights10 = new Float64Array(10);
+  public readonly spinsXyz48 = new Float32Array(16 * 3);
+  private readonly hEffXyz48 = new Float32Array(16 * 3);
 
   public constructor(seed = 20261110n) {
     const rng = new DeterministicRng(seed ^ 0x7711aa99n);
@@ -199,13 +246,52 @@ export class MechalogodromPantheon {
       this.shellAmplitudes10[s] = 0.5 + 0.2 * Math.sin(s * 0.7);
       this.shellWeights10[s] = 0.45;
     }
+    for (let i = 0; i < 16; i++) {
+      const th = (i / 16.0) * Math.PI;
+      this.spinsXyz48[i * 3] = Math.sin(th);
+      this.spinsXyz48[i * 3 + 1] = 0;
+      this.spinsXyz48[i * 3 + 2] = Math.cos(th);
+    }
   }
 
-  public stepPantheon(worldFeature16: Float32Array, couplingK: number, dtSec: number): PantheonSnapshot {
+  public snapshotState(): PantheonStateSnapshot {
+    return {
+      castePhases: this.castePhases.slice(),
+      shellAmplitudes10: this.shellAmplitudes10.slice(),
+      shellWeights10: this.shellWeights10.slice(),
+      spinsXyz48: this.spinsXyz48.slice(),
+      archonAngles: this.archons.map((a) => a.stateAngles.slice()),
+      archonBanks: this.archons.map((a) => a.memoryBank.slice()),
+      archonWritePtrs: this.archons.map((a) => a.writePtr),
+    };
+  }
+
+  public restoreState(snap: PantheonStateSnapshot): void {
+    this.castePhases.set(snap.castePhases);
+    this.shellAmplitudes10.set(snap.shellAmplitudes10);
+    this.shellWeights10.set(snap.shellWeights10);
+    this.spinsXyz48.set(snap.spinsXyz48);
+    for (let i = 0; i < this.archons.length; i++) {
+      this.archons[i]!.stateAngles.set(snap.archonAngles[i]!);
+      this.archons[i]!.memoryBank.set(snap.archonBanks[i]!);
+      this.archons[i]!.writePtr = snap.archonWritePtrs[i]!;
+    }
+  }
+
+  public stepPantheon(
+    worldFeature16: Float32Array,
+    couplingK: number,
+    dtSec: number,
+    options: {
+      enableLlgSpins?: boolean;
+      enableHopfield?: boolean;
+      enableDpp?: boolean;
+      species?: Iterable<SpeciesLineageRecord>;
+    } = {},
+  ): PantheonSnapshot {
     const dt = Math.max(1e-3, Math.min(0.25, dtSec));
     const K = Math.max(0.0, Math.min(4.0, couplingK));
 
-    // 1. 5-Caste Kuramoto phase synchronization: dtheta_i/dt = omega_i + (K/5) * sum_j sin(theta_j - theta_i)
     const nextPhases = new Float64Array(5);
     for (let i = 0; i < 5; i++) {
       let interaction = 0;
@@ -224,31 +310,53 @@ export class MechalogodromPantheon {
     }
     const orderR = Math.hypot(sumCos / 5.0, sumSin / 5.0);
 
-    // 2. Step all 5 Archon SuperMinds & evaluate Cholesky 5x5 DPP behavioral diversity
+    // Step 16-spin Landau-Lifshitz-Gilbert (`LLG`) micromagnetic reservoir (`spin_based_neural_network`)
+    let llgMz = 0;
+    if (options.enableLlgSpins ?? true) {
+      for (let s = 0; s < 16; s++) {
+        const phase = this.castePhases[s % 5]!;
+        this.hEffXyz48[s * 3] = Math.cos(phase) * 0.85;
+        this.hEffXyz48[s * 3 + 1] = Math.sin(phase) * 0.85;
+        this.hEffXyz48[s * 3 + 2] = 0.45 * orderR + 0.25 * (worldFeature16[s] ?? 0);
+      }
+      llgMz = getZigBridge().stepLlgSpins(this.spinsXyz48, this.hEffXyz48, 0.12, dt);
+    }
+
     const vectors5x8 = new Float64Array(5 * 8);
     const energies: number[] = [];
+    const casteDirectives = {} as Record<CasteRole, [number, number, number, number, number, number]>;
+
     for (let i = 0; i < 5; i++) {
-      const res = this.archons[i]!.stepArchon(worldFeature16, dt);
+      const role = CASTE_ROLES[i]!;
+      const res = this.archons[i]!.stepArchon(worldFeature16, dt, options.enableHopfield ?? true);
       energies.push(res.hopfieldEnergy);
       for (let d = 0; d < 8; d++) {
         vectors5x8[i * 8 + d] = res.directiveVector8[d]! + 0.15 * Math.cos(this.castePhases[i]! + d);
       }
+      const spinMod = this.spinsXyz48[(i * 3) * 3 + 2] ?? llgMz;
+      casteDirectives[role] = [
+        res.directiveVector8[0]! * 0.8 + 0.2 * spinMod,
+        res.directiveVector8[1]!,
+        res.directiveVector8[2]!,
+        res.directiveVector8[3]!,
+        res.directiveVector8[4]!,
+        res.directiveVector8[5]!,
+      ];
     }
-    const dppDet = computeCholesky5x5Determinant(vectors5x8, 8);
+    const dppDet = (options.enableDpp ?? true) ? computeCholesky5x5Determinant(vectors5x8, 8) : 0.0;
 
-    // 3. 10-Shell Central Mechalogodrom with Bi-Poo STDP phase-difference plasticity
     for (let s = 0; s < 10; s++) {
       const prevShell = this.shellAmplitudes10[(s + 9) % 10]!;
       const curShell = this.shellAmplitudes10[s]!;
-      // Bi-Poo asymmetric temporal difference proxy
       const deltaTiming = prevShell - curShell;
       const stdpDelta =
-        deltaTiming >= 0
-          ? 0.015 * Math.exp(-deltaTiming / 0.4)
-          : -0.018 * Math.exp(deltaTiming / 0.4);
+        deltaTiming >= 0 ? 0.015 * Math.exp(-deltaTiming / 0.4) : -0.018 * Math.exp(deltaTiming / 0.4);
       this.shellWeights10[s] = Math.max(0.05, Math.min(1.5, this.shellWeights10[s]! + dt * stdpDelta));
       this.shellAmplitudes10[s] = Math.tanh(
-        0.78 * curShell + 0.28 * this.shellWeights10[s]! * prevShell + 0.16 * orderR * Math.sin(s * 0.6 + this.castePhases[s % 5]!),
+        0.76 * curShell +
+          0.26 * this.shellWeights10[s]! * prevShell +
+          0.16 * orderR * Math.sin(s * 0.6 + this.castePhases[s % 5]!) +
+          0.08 * llgMz,
       );
     }
 
@@ -257,6 +365,10 @@ export class MechalogodromPantheon {
       phaseMap[CASTE_ROLES[i]!] = this.castePhases[i]!;
     }
 
+    const phylo = options.species
+      ? computeSpeciesPhylogenyHyperbolicTree(options.species).meanHyperbolicDist
+      : 0.0;
+
     return {
       kuramotoOrderParameterR: makeIndicator(
         orderR,
@@ -264,9 +376,12 @@ export class MechalogodromPantheon {
         'Kuramoto (1975) macroscopic phase-coherence order parameter R in [0, 1]; NOT collective sentience.',
       ),
       castePhasesRad: phaseMap,
+      casteDirectives,
       dppDiversityDet: dppDet,
       archonHopfieldEnergies: energies,
       mechalogodromShells10: Array.from(this.shellAmplitudes10),
+      llgMeanMagnetizationZ: llgMz,
+      phylogenyMeanHyperbolicDist: phylo,
     };
   }
 }

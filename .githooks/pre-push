@@ -2,6 +2,18 @@
 # CQM2 Pre-Push Quality, Secret Scan & Tag Immutability Hook (I-203, I-221, T-447)
 set -e
 
+# Refuse force-moving an already-published vX.Y.Z release tag on remote
+while read local_ref local_sha remote_ref remote_sha; do
+  case "$remote_ref" in
+    refs/tags/v*)
+      if [ "$remote_sha" != "0000000000000000000000000000000000000000" ] && [ "$local_sha" != "$remote_sha" ]; then
+        echo "[pre-push] BLOCKED: Published release tag $remote_ref is immutable (I-221)."
+        exit 1
+      fi
+      ;;
+  esac
+done
+
 echo "[pre-push] Running strict typecheck, lint/secret scan, and automated tests..."
 bun run typecheck
 bun run lint

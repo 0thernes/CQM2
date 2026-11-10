@@ -1,10 +1,35 @@
 /* ==========================================================================
-   CQM2 Design-Token Observatory System (`src/styles/tokens.css`)
+   CQM2 v2.1.0 Design-Token Observatory System (`src/styles/tokens.css`)
+   - Self-hosted SIL OFL 1.1 Variable Inter + JetBrains Mono WOFF2 (`font-display: swap`)
    - Zero `!important` overrides anywhere
-   - WCAG 2.2 AA/AAA contrast (>= 7.2:1 muted, >= 15.4:1 primary)
-   - Fluid responsive ergonomics from 320px mobile thumb-sheet to 3840x2160 4K
+   - WCAG 2.2 AA/AAA contrast (>= 7.2:1 secondary, >= 15.4:1 primary)
+   - Fluid responsive ergonomics from 320px mobile thumb-sheet to 3840x2160 4K UHD
    - Strict `tabular-nums` alignment on all live scientific readouts
    ========================================================================== */
+
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url('../fonts/inter-latin-wght-normal.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: 'JetBrains Mono';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('../fonts/jetbrains-mono-latin-400-normal.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: 'JetBrains Mono';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url('../fonts/jetbrains-mono-latin-700-normal.woff2') format('woff2');
+}
 
 :root {
   --bg-void: #050913;
@@ -96,6 +121,22 @@ pre,
   font-variant-numeric: tabular-nums;
 }
 
+/* Error & Recovery Banner */
+.error-banner {
+  margin: 8px 16px 0;
+  padding: 10px 14px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--text-danger);
+  background: rgba(127, 29, 29, 0.45);
+  color: var(--text-primary);
+  font-size: var(--fs-sm);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
 /* Top Workstation Masthead */
 .cqm-header {
   display: flex;
@@ -112,12 +153,14 @@ pre,
   display: flex;
   align-items: center;
   gap: 12px;
+  min-width: 0;
 }
 
 .brand-badge {
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  flex-shrink: 0;
   width: 38px;
   height: 38px;
   border-radius: var(--radius-sm);
@@ -158,6 +201,7 @@ pre,
   border: 1px solid var(--border-subtle);
   font-size: var(--fs-xs);
   color: var(--text-secondary);
+  max-width: 100%;
 }
 
 .pill-badge.honesty-pill {
@@ -206,14 +250,35 @@ pre,
   color: #fef3c7;
 }
 
-.select-input {
+.btn-start {
+  justify-content: flex-start;
+  text-align: left;
+}
+
+.select-input,
+.text-input {
   min-height: var(--touch-min);
   padding: 6px 12px;
   border-radius: var(--radius-sm);
   border: 1px solid var(--border-strong);
   background: var(--bg-elevated);
   color: var(--text-primary);
+  font-family: var(--font-sans);
   font-size: var(--fs-sm);
+  max-width: 100%;
+}
+
+.textarea-input {
+  width: 100%;
+  min-height: 84px;
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-strong);
+  background: var(--bg-void);
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  font-size: var(--fs-sm);
+  resize: vertical;
 }
 
 /* Accessible 7-Workspace Navigation Tab Bar */
@@ -275,6 +340,32 @@ pre,
   }
 }
 
+.viewport-column {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+
+.render-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  background: var(--bg-panel);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+}
+
+.fft-canvas {
+  width: 96px;
+  height: 36px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-void);
+}
+
 .viewport-shell {
   position: relative;
   min-height: clamp(320px, 58vh, 1180px);
@@ -294,6 +385,7 @@ pre,
   display: block;
   width: 100%;
   height: 100%;
+  touch-action: none;
 }
 
 .viewport-hud-overlay {
@@ -301,6 +393,8 @@ pre,
   left: 12px;
   bottom: 12px;
   right: 12px;
+  max-height: calc(100dvh - 148px);
+  overflow-y: auto;
   display: flex;
   flex-wrap: wrap;
   justify-content: space-between;
@@ -311,10 +405,18 @@ pre,
 .hud-chip {
   padding: 6px 10px;
   border-radius: var(--radius-sm);
-  background: rgba(5, 9, 19, 0.84);
+  background: rgba(5, 9, 19, 0.86);
   border: 1px solid var(--border-subtle);
   font-size: var(--fs-xs);
   color: var(--text-primary);
+}
+
+.inspector-card {
+  background: var(--bg-panel);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-md);
+  padding: 12px 14px;
+  font-size: var(--fs-sm);
 }
 
 /* Cards, Grids & Telemetry Tables */
@@ -323,6 +425,7 @@ pre,
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-md);
   padding: 16px;
+  min-width: 0;
 }
 
 .panel-card h2,
@@ -334,7 +437,7 @@ pre,
 
 .kpi-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(175px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
   gap: 10px;
   margin-bottom: 14px;
 }
@@ -344,6 +447,7 @@ pre,
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-sm);
   padding: 10px 12px;
+  min-width: 0;
 }
 
 .kpi-label {
@@ -359,6 +463,7 @@ pre,
   font-size: var(--fs-lg);
   font-weight: 700;
   color: var(--text-accent-cyan);
+  overflow-wrap: anywhere;
 }
 
 .dial-row {
@@ -419,6 +524,81 @@ pre,
   display: none;
 }
 
+/* Utility layout classes (CSP clean — zero inline styles required) */
+.mb-18 {
+  margin-bottom: 18px;
+}
+
+.mb-14 {
+  margin-bottom: 14px;
+}
+
+.mb-10 {
+  margin-bottom: 10px;
+}
+
+.mt-10 {
+  margin-top: 10px;
+}
+
+.my-14 {
+  margin: 14px 0;
+}
+
+.flex-wrap-gap {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.flex-col-gap {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.text-muted-xs {
+  font-size: var(--fs-xs);
+  color: var(--text-secondary);
+}
+
+.text-muted {
+  color: var(--text-secondary);
+}
+
+.code-block {
+  background: var(--bg-void);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  padding: 12px;
+  overflow-x: auto;
+  font-size: var(--fs-sm);
+}
+
+.dl-term {
+  color: var(--text-accent-cyan);
+  font-weight: 700;
+  margin-top: 14px;
+}
+
+/* WildBeyond Quantum & Chaos Lab */
+.wildbeyond-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 16px;
+  margin-bottom: 18px;
+}
+
+.wildbeyond-canvas {
+  width: 100%;
+  height: 280px;
+  display: block;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-subtle);
+  background: #030711;
+}
+
 /* Command Palette Dialog (Ctrl+K) */
 .cmd-dialog {
   border: 1px solid var(--border-strong);
@@ -426,7 +606,7 @@ pre,
   background: var(--bg-panel);
   color: var(--text-primary);
   padding: 18px;
-  width: min(540px, 92vw);
+  width: min(560px, 92vw);
 }
 
 .cmd-dialog::backdrop {
@@ -445,9 +625,9 @@ pre,
   margin-bottom: 12px;
 }
 
-/* Static Reference Pages (`docs.html`, `specs.html`, `glossary.html`, `downloads.html`) */
+/* Static Reference Pages (`docs.html`, `specs.html`, `bible.html`, `glossary.html`, `downloads.html`, `lab/quantum-wildbeyond.html`) */
 .doc-container {
-  max-width: 1080px;
+  max-width: 1120px;
   margin: 0 auto;
   padding: 28px 20px 64px;
 }

@@ -1,0 +1,332 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Cosmogonic Quantum Mechalogodrom 2 (CQM2) Local Quad-Silicon Workstation API",
+    "version": "2.1.0",
+    "summary": "Local-first polyglot artificial-life, quantum contextuality, 3NF SQLite ERP, and 3D/AI studio REST API",
+    "description": "Serves real-time 5-phase artificial-life simulation ticks, CUDA/NPU/iGPU/Zig/Rust hardware dispatch receipts, 12-benchmark causal lesion suites, 3NF SQLite cursor-paginated ERP queries, fenced local AI scholarly narration, and watertight .glb/Blender/Unity/TouchDesigner/WAV exports.",
+    "license": {
+      "name": "COSMOGONIC LICENSE — NON-COMMERCIAL RESEARCH & PLAY"
+    }
+  },
+  "servers": [
+    {
+      "url": "http://127.0.0.1:4200",
+      "description": "Local Quad-Silicon Workstation Loopback Server"
+    }
+  ],
+  "components": {
+    "parameters": {
+      "IdempotencyKeyHeader": {
+        "name": "Idempotency-Key",
+        "in": "header",
+        "required": false,
+        "schema": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_-]{8,128}$"
+        },
+        "description": "Client-chosen idempotency token ensuring safe retry without duplicate side effects."
+      }
+    },
+    "schemas": {
+      "ApiErrorDetail": {
+        "type": "object",
+        "required": ["field", "code", "message"],
+        "properties": {
+          "field": { "type": "string" },
+          "code": { "type": "string" },
+          "message": { "type": "string" }
+        }
+      },
+      "ApiErrorResponse": {
+        "type": "object",
+        "required": ["ok", "code", "error", "message", "details", "requestId"],
+        "properties": {
+          "ok": { "type": "boolean", "const": false },
+          "code": { "type": "string" },
+          "error": { "type": "string" },
+          "message": { "type": "string" },
+          "details": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/ApiErrorDetail" }
+          },
+          "requestId": { "type": "string" }
+        }
+      },
+      "HealthResponse": {
+        "type": "object",
+        "required": ["ok", "service", "version", "simTick", "runState", "databaseHealthy", "sharedMemoryActive", "requestId"],
+        "properties": {
+          "ok": { "type": "boolean", "const": true },
+          "service": { "type": "string" },
+          "version": { "type": "string" },
+          "simTick": { "type": "integer", "minimum": 0 },
+          "runState": { "type": "string", "enum": ["RUNNING", "SUSPENDED", "FROZEN"] },
+          "databaseHealthy": { "type": "boolean" },
+          "sharedMemoryActive": { "type": "boolean" },
+          "requestId": { "type": "string" }
+        }
+      },
+      "BiomeResource": {
+        "type": "object",
+        "required": ["publicUid", "name", "kind", "centerX", "centerZ", "radius", "nutrientPoolKj", "o2Saturation", "temperatureK", "versionRev", "createdAtIso", "updatedAtIso"],
+        "properties": {
+          "publicUid": { "type": "string", "pattern": "^bio_[0-9a-f]{24}$" },
+          "name": { "type": "string" },
+          "kind": { "type": "string", "enum": ["HYDROTHERMAL_ABYSS", "PELAGIC_PHOTON_SHELF", "CRYSTAL_REEF", "SINGULARITY_RIM"] },
+          "centerX": { "type": "number" },
+          "centerZ": { "type": "number" },
+          "radius": { "type": "number", "exclusiveMinimum": 0 },
+          "nutrientPoolKj": { "type": "number", "minimum": 0 },
+          "o2Saturation": { "type": "number", "minimum": 0, "maximum": 2.5 },
+          "temperatureK": { "type": "number", "exclusiveMinimum": 0 },
+          "versionRev": { "type": "integer", "minimum": 1 },
+          "createdAtIso": { "type": "string" },
+          "updatedAtIso": { "type": "string" }
+        }
+      }
+    }
+  },
+  "paths": {
+    "/api/v1/health": {
+      "get": {
+        "operationId": "getHealth",
+        "summary": "Deep workstation and SQLite dependency health check",
+        "responses": {
+          "200": {
+            "description": "Healthy",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/HealthResponse" } } }
+          },
+          "503": {
+            "description": "Database dependency unavailable",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ApiErrorResponse" } } }
+          }
+        }
+      }
+    },
+    "/api/v1/openapi.json": {
+      "get": {
+        "operationId": "getOpenApiSpec",
+        "summary": "Retrieve OpenAPI 3.1.0 specification",
+        "responses": { "200": { "description": "OpenAPI JSON document" } }
+      }
+    },
+    "/api/v1/hardware": {
+      "get": {
+        "operationId": "getHardwareTopology",
+        "summary": "Inspect Quad-Silicon hardware topology and recent dispatch receipts",
+        "responses": { "200": { "description": "Hardware topology snapshot" } }
+      }
+    },
+    "/api/v1/telemetry/gpu": {
+      "get": {
+        "operationId": "getGpuTelemetry",
+        "summary": "Retrieve cached GPU / Go 20 Hz OSC bridge telemetry",
+        "responses": { "200": { "description": "GPU and silicon telemetry" } }
+      }
+    },
+    "/api/v1/world/state": {
+      "get": {
+        "operationId": "getWorldState",
+        "summary": "Retrieve current world epoch, biomes, species, 27 Tsotchke pillars, and tick telemetry",
+        "responses": { "200": { "description": "World state payload" } }
+      }
+    },
+    "/api/v1/world/step": {
+      "post": {
+        "operationId": "postWorldStep",
+        "summary": "Advance simulation across Quad-Silicon hardware (CUDA StridedBatched + Zig + Rust + optional NPU/iGPU)",
+        "parameters": [{ "$ref": "#/components/parameters/IdempotencyKeyHeader" }],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "steps": { "type": "integer", "minimum": 1, "maximum": 25 },
+                  "dtSec": { "type": "number", "minimum": 0.002, "maximum": 0.25 },
+                  "includeNpu": { "type": "boolean" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Tick telemetry and silicon receipts" },
+          "400": { "description": "Validation error", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ApiErrorResponse" } } } },
+          "409": { "description": "Idempotency conflict", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ApiErrorResponse" } } } },
+          "413": { "description": "Payload exceeds 256 KB", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ApiErrorResponse" } } } },
+          "415": { "description": "Unsupported media type", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ApiErrorResponse" } } } },
+          "429": { "description": "Rate limit exceeded", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ApiErrorResponse" } } } }
+        }
+      }
+    },
+    "/api/v1/world/dials": {
+      "post": {
+        "operationId": "postWorldDials",
+        "summary": "Update physical and cosmological God-dials",
+        "responses": { "200": { "description": "Updated God-dials" } }
+      }
+    },
+    "/api/v1/world/pause": {
+      "post": {
+        "operationId": "postWorldPause",
+        "summary": "Set simulation run state (RUNNING, SUSPENDED, FROZEN)",
+        "responses": { "200": { "description": "Updated runState" } }
+      }
+    },
+    "/api/v1/world/checkpoint": {
+      "post": {
+        "operationId": "postWorldCheckpoint",
+        "summary": "Capture bit-exact N01 reversible snapshot and persist ACID checkpoint to SQLite WAL",
+        "responses": { "200": { "description": "Checkpoint receipt" } }
+      }
+    },
+    "/api/v1/world/rollback": {
+      "post": {
+        "operationId": "postWorldRollback",
+        "summary": "Restore bit-exact N01 world, brain, and PRNG state to a saved snapshot tick",
+        "responses": { "200": { "description": "Rollback result" } }
+      }
+    },
+    "/api/v1/brain/tms-poke": {
+      "post": {
+        "operationId": "postBrainTmsPoke",
+        "summary": "Execute Casali-style cortical TMS perturbation complexity index (PCI) test",
+        "responses": { "200": { "description": "PCI report (indicatorOnly, NOT_SENTIENT)" } }
+      }
+    },
+    "/api/v1/brain/benchmarks": {
+      "post": {
+        "operationId": "postBrainBenchmarks",
+        "summary": "Run causal lesion suites (r21, full12, xylos, thaler, ai-eval)",
+        "responses": { "200": { "description": "Causal benchmark results" } }
+      }
+    },
+    "/api/v1/glitchling/configure": {
+      "post": {
+        "operationId": "postGlitchlingConfigure",
+        "summary": "Configure 4-bit Glitchling congenital flaw mask and non-oracle cerebellar compensation",
+        "responses": { "200": { "description": "Glitchling telemetry" } }
+      }
+    },
+    "/api/v1/tsotchke/toggle": {
+      "post": {
+        "operationId": "postTsotchkeToggle",
+        "summary": "Toggle active Tsotchke mathematical pillar (OBLITERATUS/copyleft/LLM pillars permanently fenced)",
+        "responses": { "200": { "description": "Pillar toggle status" } }
+      }
+    },
+    "/api/v1/erp/query": {
+      "get": {
+        "operationId": "getErpQuery",
+        "summary": "Query joined organisms, species trophic analytics, and social bonds",
+        "responses": { "200": { "description": "Joined ERP payload" } }
+      }
+    },
+    "/api/v1/erp/organisms": {
+      "get": {
+        "operationId": "listOrganismsPaginated",
+        "summary": "Cursor-paginated, filterable, sortable SQLite organism explorer (max page size 128)",
+        "parameters": [
+          { "name": "cursor", "in": "query", "schema": { "type": "string" } },
+          { "name": "limit", "in": "query", "schema": { "type": "integer", "minimum": 1, "maximum": 128 } },
+          { "name": "caste", "in": "query", "schema": { "type": "string" } },
+          { "name": "search", "in": "query", "schema": { "type": "string" } },
+          { "name": "sortBy", "in": "query", "schema": { "type": "string" } },
+          { "name": "sortDir", "in": "query", "schema": { "type": "string", "enum": ["ASC", "DESC"] } }
+        ],
+        "responses": { "200": { "description": "Paginated organism rows with publicUid and nextCursor" } }
+      }
+    },
+    "/api/v1/erp/organisms/{publicUid}": {
+      "delete": {
+        "operationId": "softDeleteOrganism",
+        "summary": "Soft-delete an organism record by publicUid",
+        "parameters": [{ "name": "publicUid", "in": "path", "required": true, "schema": { "type": "string" } }],
+        "responses": { "200": { "description": "Deleted" }, "404": { "description": "Not found" } }
+      }
+    },
+    "/api/v1/erp/biomes": {
+      "get": {
+        "operationId": "listBiomes",
+        "summary": "List biome zones",
+        "responses": { "200": { "description": "Biome list" } }
+      },
+      "post": {
+        "operationId": "createBiome",
+        "summary": "Create a new biome zone",
+        "responses": {
+          "201": { "description": "Created biome", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/BiomeResource" } } } },
+          "409": { "description": "Duplicate biome name" }
+        }
+      }
+    },
+    "/api/v1/erp/biomes/{publicUid}": {
+      "get": {
+        "operationId": "getBiome",
+        "parameters": [{ "name": "publicUid", "in": "path", "required": true, "schema": { "type": "string" } }],
+        "responses": { "200": { "description": "Biome resource" }, "404": { "description": "Not found" } }
+      },
+      "patch": {
+        "operationId": "patchBiome",
+        "summary": "Optimistic-concurrency partial update of a biome zone using expectedVersionRev",
+        "parameters": [{ "name": "publicUid", "in": "path", "required": true, "schema": { "type": "string" } }],
+        "responses": { "200": { "description": "Updated biome" }, "409": { "description": "Optimistic versionRev conflict" } }
+      },
+      "delete": {
+        "operationId": "deleteBiome",
+        "parameters": [{ "name": "publicUid", "in": "path", "required": true, "schema": { "type": "string" } }],
+        "responses": { "200": { "description": "Deleted" }, "409": { "description": "Foreign key restricted" } }
+      }
+    },
+    "/api/v1/ai/ollama": {
+      "post": {
+        "operationId": "postAiOllamaNarrator",
+        "summary": "Fenced scholarly biophysics & quantum narrator (redacted, prompt-injection guarded, HTML-sanitized)",
+        "responses": { "200": { "description": "Sanitized scholarly note" }, "422": { "description": "Safety refusal" } }
+      }
+    },
+    "/api/v1/ai/texture": {
+      "get": {
+        "operationId": "getAiProceduralTexture",
+        "summary": "Synthesize deterministic Gray-Scott Turing + Guanine iridescent PBR PNG texture",
+        "responses": { "200": { "description": "PNG image binary" } }
+      }
+    },
+    "/api/v1/ai/mesh3d": {
+      "post": {
+        "operationId": "postAiMesh3dStudio",
+        "summary": "Generate watertight Bishop-frame .glb + Tripo/Meshy studio manifest (with SSRF guard)",
+        "responses": { "200": { "description": "3D studio asset descriptor" } }
+      }
+    },
+    "/api/v1/jobs/retention": {
+      "post": {
+        "operationId": "postRetentionJob",
+        "summary": "Authenticated scheduled database retention cleanup job",
+        "responses": { "200": { "description": "Purge counts" }, "401": { "description": "Unauthorized caller" } }
+      }
+    },
+    "/api/v1/export/{format}": {
+      "get": {
+        "operationId": "exportAsset",
+        "summary": "Export watertight .glb, .gltf, .obj, Blender 4.x Python, Unity 6 C#, TouchDesigner Python, PNG, WAV, or AI-World bundle",
+        "parameters": [
+          {
+            "name": "format",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": ["glb", "gltf", "obj", "blender", "unity", "touchdesigner", "png", "wav", "ai-world", "osc-json"]
+            }
+          }
+        ],
+        "responses": { "200": { "description": "Exported artifact stream" }, "404": { "description": "Unknown format" } }
+      }
+    }
+  }
+}

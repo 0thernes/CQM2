@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self'; style-src 'self'; font-src 'self' data:; img-src 'self' data:; object-src 'none'; base-uri 'self'"
+    />
+    <meta name="description" content="CQM2 v2.1.0 Architecture, Entity Relationship Diagram (ERD/ERM/ERP), OpenAPI v1, and Quad-Silicon Documentation." />
+    <meta property="og:title" content="CQM2 v2.1.0 Documentation — Architecture, ERD &amp; Quad-Silicon" />
+    <meta property="og:description" content="10-Entity 3NF SQLite WAL + SoA ERP, RTX 5070 Ti CUDA StridedBatched, Intel AI Boost NPU RSSM, Intel iGPU Field Diffusion, Zig 0.17, Rust 1.94 &amp; Go 1.26." />
+    <meta property="og:type" content="article" />
+    <meta property="og:url" content="https://0thernes.github.io/CQM2/docs.html" />
+    <meta property="og:image" content="https://0thernes.github.io/CQM2/og-card.svg" />
+    <link rel="canonical" href="https://0thernes.github.io/CQM2/docs.html" />
+    <title>CQM2 Documentation — Architecture, ERD &amp; Quad-Silicon (v2.1.0)</title>
+    <link rel="icon" type="image/svg+xml" href="favicon.svg" />
+    <link rel="stylesheet" href="assets/tokens.css" />
+  </head>
+  <body>
+    <a href="#doc-main" class="skip-link">Skip to documentation</a>
+    <main id="doc-main" class="doc-container">
+      <nav class="doc-nav" aria-label="Documentation navigation">
+        <a href="index.html" class="btn btn-primary">← Launch 4K Observatory</a>
+        <a href="docs.html" class="btn" aria-current="page">Architecture &amp; ERD</a>
+        <a href="specs.html" class="btn">500-Point Specs</a>
+        <a href="bible.html" class="btn">13-Chapter Bible</a>
+        <a href="lab/quantum-wildbeyond.html" class="btn">WildBeyond Lab</a>
+        <a href="glossary.html" class="btn">Glossary</a>
+        <a href="downloads.html" class="btn">Downloads &amp; License</a>
+      </nav>
+
+      <section class="panel-card mb-18">
+        <h1>Cosmogonic Quantum Mechalogodrom 2 — Architecture &amp; Entity-Relational Design</h1>
+        <p class="mono">Version 2.1.0 · 0thernes LLC · Non-Commercial Research &amp; Play License</p>
+        <p>
+          CQM2 v2.1.0 is a ground-up local-first and universal-browser full-stack refactor of the Cosmogonic Quantum Mechalogodrom.
+          It eliminates heap-allocated per-entity scene objects, synthetic accelerator buffers, and monolithic state files
+          in favor of a <strong>10-table normalized Structure-of-Arrays (SoA) &amp; 3NF SQLite WAL Entity Relational Programming (ERP)</strong> core,
+          versioned <code>/api/v1/*</code> OpenAPI 3.1 endpoints, and real simultaneous workloads across dGPU, NPU, iGPU, and CPU.
+        </p>
+      </section>
+
+      <section class="panel-card mb-18">
+        <h2>1. Heterogeneous Quad-Silicon Partitioning (MSI Vector 16 HX AI A2XW)</h2>
+        <div class="data-table-wrap">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Processor Unit</th>
+                <th>Workstation Silicon Target</th>
+                <th>Native / Browser Runtime</th>
+                <th>Assigned Real Scientific Workload</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><strong>dGPU</strong></td>
+                <td>NVIDIA GeForce RTX 5070 Ti Laptop GPU</td>
+                <td>CUDA 12.9 <code>cublasSgemmStridedBatched_v2</code> / Browser <code>WebGPU</code> + <code>WebGL2</code></td>
+                <td>Unique per-entity 126-weight cortex batched SGEMM+Padé tanh on persistent VRAM, 4K 10-shell InstancedMesh, Kerr <code>g^4</code> shaders</td>
+              </tr>
+              <tr>
+                <td><strong>NPU</strong></td>
+                <td>Intel(R) AI Boost (2 Slices, Level Zero)</td>
+                <td>Persistent OpenVINO <code>NPU</code> JSON-Lines Daemon</td>
+                <td>Action-conditioned <code>[32, 64]</code> (<code>[latent48 | action16]</code>) <code>AsmodeniusRSSMWorldModel</code> horizon rollouts</td>
+              </tr>
+              <tr>
+                <td><strong>iGPU</strong></td>
+                <td>Intel(R) Graphics</td>
+                <td>OpenVINO <code>GPU.0</code> + Persistent Windows <code>ID3D12Device</code> / <code>IDMLDevice</code></td>
+                <td>2D <code>[1, 2, 32, 32]</code> Gray-Scott chromatophore &amp; pheromone reaction-diffusion + sensory unscrambler</td>
+              </tr>
+              <tr>
+                <td><strong>CPU + WASM</strong></td>
+                <td>Intel(R) Core(TM) Ultra 9 275HX (24 Cores)</td>
+                <td>Zig 0.17 AVX2 DLL + WASM SIMD128, C++20/AVX2 ASM, Rust 1.94, Go 1.26</td>
+                <td>Larkum sLTC + Oja plasticity, 3D Kerr Mino geodesics, LLG spin, Pauli Hoggar census, First-Law Kahan/Merkle/BF16-XOR ledger, 20 Hz UDP OSC</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="panel-card mb-18">
+        <h2>2. Normalized 10-Entity Relational Model (ERD / ERM / ERP) + Immutable Audit Ledger</h2>
+        <ul>
+          <li><code>world_epochs (epoch_id PK, public_uid UNIQUE)</code> — Master seed, simulation tick, Merkle root, AURUM/UMBRA pools, version_rev.</li>
+          <li><code>biome_zones (biome_id PK, epoch_id FK CASCADE, public_uid UNIQUE)</code> — Nutrient kJ, detritus kJ, O2/CO2/pH, temperature, optimistic concurrency <code>version_rev</code>.</li>
+          <li><code>species_lineages (species_id PK, parent_species_id self-FK SET NULL)</code> — Caste role, Thingmaker Latin binomial, diploid genome hash.</li>
+          <li><code>organisms (entity_id PK, species_id FK RESTRICT, biome_id FK RESTRICT, public_uid UNIQUE)</code> — Spatial kinematics, mass, telomere integrity, congenital flaw mask, soft-delete <code>deleted_at_iso</code>.</li>
+          <li><code>metabolic_ledgers (entity_id 1:1 PK/FK CASCADE)</code> — 15 strictly conserved Cahill/Owen kJ pools + Q10 + ROS + Antithetic Integral Controller states.</li>
+          <li><code>neural_cortex_states (entity_id 1:1 PK/FK CASCADE)</code> — 126 SIMD weights, DA/ACh/NE/5-HT + Oxytocin/Orexin/Cortisol/Endorphin, PCI proxy, Frenet curvature κ, Free-Won't vetoes.</li>
+          <li><code>quantum_substrates (substrate_id PK, epoch_id FK CASCADE, entity_id nullable FK SET NULL)</code> — Symplectic Pauli qubits, Hoggar H(2)=63 violated lines, Kochen-Specker 18-vector parity, Berry curvature.</li>
+          <li><code>social_bonds (bond_id PK, source_entity_id FK CASCADE, target_entity_id FK CASCADE)</code> — Kinship, trust, self-healing Glossodrom RS[15,11] + Cormidium-16 codeword.</li>
+          <li><code>causal_experiments (experiment_id PK, epoch_id FK CASCADE)</code> — All 12 causal lesion benchmarks intact vs lesion means, Cohen's <em>d</em>, Welch's <em>t</em>.</li>
+          <li><code>hardware_dispatch_receipts (receipt_id PK, epoch_id FK CASCADE)</code> — Per-tick CUDA/NPU/iGPU/Zig/Rust latency, GFLOPS, conservation verdict.</li>
+          <li><code>audit_events (event_id PK, public_uid UNIQUE)</code> — Append-only SQLite trigger-guarded ledger blocking <code>UPDATE</code> and <code>DELETE</code>.</li>
+        </ul>
+      </section>
+
+      <section class="panel-card">
+        <h2>3. Scientific Honesty &amp; 27-Repo Tsotchke Quarantine Contract</h2>
+        <p>
+          Every neural, metacognitive, reality-monitoring, creativity, and perturbation metric in CQM2 (including Casali PCI, HOT-3 CalibHead confidence,
+          Xylos-14 Butlin indicators, Thaler-9 novelty/value markers, and Kuramoto synchronization) is strictly typed as <code>ComputationalIndicatorContract</code> with
+          <code>sentienceClaim: 'NOT_SENTIENT'</code> and <code>indicatorOnly: true</code>. Simulated organisms possess zero subjective awareness.
+          Across the 27-repo Tsotchke ecosystem catalog, <code>OBLITERATUS</code> (AGPL-3.0) and all copyleft, proprietary, unlicensed, or out-of-scope LLM repositories
+          are permanently fenced with <code>fencedQuarantine: true</code>.
+        </p>
+      </section>
+    </main>
+    <footer class="cqm-footer" role="contentinfo">
+      <span>CQM2 v2.1.0 · Copyright (c) 2026 0thernes LLC · Cosmogonic Non-Commercial Research &amp; Play License</span>
+      <span>
+        <a href="downloads.html">License &amp; Releases</a> ·
+        <a href="https://github.com/0thernes/CQM2/blob/main/.github/SUPPORT.md" rel="noopener noreferrer">Support</a> ·
+        <a href="https://github.com/0thernes/CQM2/issues" rel="noopener noreferrer">Report Issue</a>
+      </span>
+    </footer>
+  </body>
+</html>

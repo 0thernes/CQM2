@@ -1,11 +1,8 @@
 #!/usr/bin/env bun
 /**
- * CQM2 Polyglot Native Accelerator Build Orchestrator (`bun run build:native`).
- * Gracefully detects installed toolchains (Zig, Clang++/CUDA/WinSDK, Rust, Go) and compiles:
- *   1. Zig SIMD128 WASM + Native AVX2 DLL (`native/bin/cqm2_zig.dll`)
- *   2. C++20 CUDA/cuBLAS + DirectML + LevelZero + x86-64 AVX2 ASM (`native/bin/cqm2_tri_accel.dll`)
- *   3. Rust 1.94 Entity-Relational Merkle & Metabolic Conservation Auditor (`native/bin/cqm2_rust_ledger.dll`)
- *   4. Go 1.26 Hardware Telemetry & TouchDesigner/Unity OSC Hub (`native/bin/cqm2-telemetry-bridge.exe`)
+ * CQM2 v2.1.0 Polyglot Native Accelerator Build Orchestrator (`bun run build:native`).
+ * Respects `CQM2_LLVM_BIN`, `CQM2_MSVC_DIR`, `CQM2_WINKITS_DIR`, and `CQM2_CUDA_INC` environment
+ * overrides before probing standard installation paths (`I-038`).
  */
 import { copyFileSync, existsSync, mkdirSync, readdirSync } from 'node:fs';
 import { join, resolve } from 'node:path';
@@ -27,22 +24,37 @@ if (zigStep.exitCode !== 0) process.exit(zigStep.exitCode);
 if (process.platform === 'win32') {
   console.log('=== [2/4] Building C++20 + x86-64 AVX2 ASM + CUDA/DirectML/LevelZero DLL ===');
   const clangCandidates = [
+    process.env.CQM2_LLVM_BIN ? join(process.env.CQM2_LLVM_BIN, 'clang++.exe') : null,
     Bun.which('clang++'),
     'Z:\\Tools\\LLVM-21\\bin\\clang++.exe',
     'C:\\Program Files\\LLVM\\bin\\clang++.exe',
   ].filter((x): x is string => Boolean(x && existsSync(x)));
 
-  const msvcBase = 'Z:\\Tools\\VS2022BuildTools\\VC\\Tools\\MSVC';
-  const msvcVer = existsSync(msvcBase) ? readdirSync(msvcBase).sort().at(-1) : null;
-  const sdkIncBase = 'C:\\Program Files (x86)\\Windows Kits\\10\\Include';
-  const sdkVer = existsSync(sdkIncBase) ? readdirSync(sdkIncBase).sort().at(-1) : null;
-  const cudaInc = 'Z:\\Tools\\cuda-12.9-redist\\include';
+  const msvcBaseCandidates = [
+    process.env.CQM2_MSVC_DIR,
+    'Z:\\Tools\\VS2022BuildTools\\VC\\Tools\\MSVC',
+    'C:\\Program Files (x86)\\Microsoft Visual Studio\\2022\\BuildTools\\VC\\Tools\\MSVC',
+    'C:\\Program Files\\Microsoft Visual Studio\\2022\\Community\\VC\\Tools\\MSVC',
+  ].filter((x): x is string => Boolean(x && existsSync(x)));
 
-  if (clangCandidates.length > 0 && msvcVer && sdkVer && existsSync(cudaInc)) {
+  const msvcBase = msvcBaseCandidates[0] ?? '';
+  const msvcVer = msvcBase ? readdirSync(msvcBase).sort().at(-1) : null;
+  const kitsBase = process.env.CQM2_WINKITS_DIR ?? 'C:\\Program Files (x86)\\Windows Kits\\10';
+  const sdkIncBase = join(kitsBase, 'Include');
+  const sdkVer = existsSync(sdkIncBase) ? readdirSync(sdkIncBase).sort().at(-1) : null;
+
+  const cudaIncCandidates = [
+    process.env.CQM2_CUDA_INC,
+    process.env.CUDA_PATH ? join(process.env.CUDA_PATH, 'include') : null,
+    'Z:\\Tools\\cuda-12.9-redist\\include',
+  ].filter((x): x is string => Boolean(x && existsSync(x)));
+  const cudaInc = cudaIncCandidates[0] ?? '';
+
+  if (clangCandidates.length > 0 && msvcVer && sdkVer && cudaInc) {
     const clang = clangCandidates[0]!;
     const msvc = join(msvcBase, msvcVer);
     const sdkInc = join(sdkIncBase, sdkVer);
-    const sdkLib = join('C:\\Program Files (x86)\\Windows Kits\\10\\Lib', sdkVer);
+    const sdkLib = join(kitsBase, 'Lib', sdkVer);
     const cppSrc = join(ROOT, 'native', 'gpu_cuda', 'cqm2_tri_accel.cpp');
     const asmSrc = join(ROOT, 'native', 'gpu_cuda', 'cqm2_avx2_asm.S');
     const dllOut = join(BIN_DIR, 'cqm2_tri_accel.dll');
