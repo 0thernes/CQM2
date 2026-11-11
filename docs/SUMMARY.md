@@ -1,8 +1,8 @@
-# Executive & Technical Summary — Cosmogonic Quantum Mechalogodrom 2 (`CQM2 v2.1.0`)
+# Executive & Technical Summary — Cosmogonic Quantum Mechalogodrom 2 (`CQM2 v2.2.0`)
 
-**Cosmogonic Quantum Mechalogodrom 2 (`CQM2` `v2.1.0`)** is a local-first quad-silicon and universal-browser full-stack observatory for embodied artificial life, compensatory neuroplasticity, symplectic quantum contextuality, and relativistic morphogenesis developed by **0thernes LLC**.
+**Cosmogonic Quantum Mechalogodrom 2 (`CQM2` `v2.2.0`)** is a local-first quad-silicon and universal-browser full-stack observatory for embodied artificial life, compensatory neuroplasticity, symplectic quantum contextuality, and relativistic morphogenesis developed by **0thernes LLC**.
 
-## Core Engineering & Scientific Achievements (`v2.1.0`)
+## Core Engineering & Scientific Achievements (`v2.2.0`)
 
 1. **Genuine Quad-Silicon Execution (`dGPU + NPU + iGPU + CPU`, Zero Dummy Buffers)**:
    - Simultaneously orchestrates discrete **dGPU** (`NVIDIA GeForce RTX 5070 Ti` CUDA `cublasSgemmStridedBatched_v2` per-organism 126-float cortex evaluation & browser `WebGPU` WGSL), physical **NPU** (`Intel(R) AI Boost` action-conditioned `[32, 64]` RSSM horizon rollouts via OpenVINO + Level Zero), **iGPU** (`Intel(R) Graphics` `[1, 2, 32, 32]` 2D Gray-Scott/pheromone habitat diffusion via OpenVINO `GPU.0` + persistent `DirectML`), and **CPU** (`Intel Core Ultra 9 275HX` via Zig `0.17` AVX2 `bun:ffi` DLL + WASM SIMD128, x86-64 `AVX2+FMA3+POPCNT` assembly, Rust `1.94` Merkle/Kahan/Lemire/BF16-XOR ledger, and Go `1.26` continuous 20 Hz UDP OSC bridge).

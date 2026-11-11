@@ -375,6 +375,89 @@ export class Cqm2WorldScheduler {
     return this.runState;
   }
 
+  /**
+   * Deterministic CQM Dock Action (`⇄ SPLIT`): Mitotic division of up to `maxSpawns` high-ATP organisms,
+   * preserving exact First-Law metabolic conservation (`totalIntakeKj` initialized to `DEFAULT_INITIAL_POOLS_15` sum).
+   */
+  public triggerMitoticSplit(maxSpawns = 12): number {
+    const worldRng = this.prng.stream('world');
+    const genRng = this.prng.stream('genome');
+    const n = this.store.activeCount;
+    let spawned = 0;
+    const childWeights = new Float32Array(ORGANISM_WEIGHT_STRIDE);
+
+    for (let e = 0; e < n && spawned < maxSpawns && this.store.activeCount < this.store.maxEntities; e++) {
+      if (this.store.alive[e] !== 1) continue;
+      const wBase = e * ORGANISM_WEIGHT_STRIDE;
+      for (let w = 0; w < ORGANISM_WEIGHT_STRIDE; w++) {
+        childWeights[w] = this.store.weights126[wBase + w]! + genRng.nextGaussian(0, 0.045);
+      }
+      const ang = worldRng.nextRange(0, Math.PI * 2);
+      const id = this.store.spawnOrganism({
+        speciesId: this.store.speciesFk[e]!,
+        biomeId: this.store.biomeFk[e]!,
+        generation: (this.store.generation[e]! + 1) & 0xffff,
+        flawMask: this.store.flawMask[e]!,
+        morphotypeId: this.store.morphotypeId[e]!,
+        pos: [
+          this.store.posX[e]! + Math.cos(ang) * 1.8,
+          Math.max(0.8, this.store.posY[e]!),
+          this.store.posZ[e]! + Math.sin(ang) * 1.8,
+        ],
+        headingRad: ang,
+        initialPools15: DEFAULT_INITIAL_POOLS_15,
+        initialWeights126: childWeights,
+      });
+      if (id >= 0) spawned++;
+    }
+    return spawned;
+  }
+
+  /**
+   * Deterministic CQM Dock Action (`✦ BURST`): Injects free-energy nutrients into every biome and feeds living organisms
+   * via `ingestConservedMealKj` so First-Law conservation remains exact (`< 1e-12` relative drift).
+   */
+  public triggerNutrientBurst(kjPerOrganism = 8.0): number {
+    for (const bm of this.store.biomes.values()) {
+      bm.nutrientPoolKj += 1200.0;
+    }
+    this.store.epoch.freeEnergyReserveKj += 1200.0 * this.store.biomes.size;
+    let fed = 0;
+    const mealKj = Math.max(0.5, kjPerOrganism);
+    for (let e = 0; e < this.store.activeCount; e++) {
+      if (this.store.alive[e] !== 1) continue;
+      ingestConservedMealKj(this.store, e, mealKj, 0.5, 0.25);
+      fed++;
+    }
+    return fed;
+  }
+
+  /**
+   * Deterministic CQM Dock Action (`☢ MUTATE`): Perturbs neural cortex weights across living organisms
+   * using the deterministic `genome` PRNG substream.
+   */
+  public triggerMutagenicPulse(sigma = 0.08): number {
+    const genRng = this.prng.stream('genome');
+    let mutated = 0;
+    const s = Math.max(0.005, Math.min(0.5, sigma));
+    for (let e = 0; e < this.store.activeCount; e++) {
+      if (this.store.alive[e] !== 1) continue;
+      const wBase = e * ORGANISM_WEIGHT_STRIDE;
+      for (let w = 0; w < ORGANISM_WEIGHT_STRIDE; w += 3) {
+        this.store.weights126[wBase + w] = this.store.weights126[wBase + w]! + genRng.nextGaussian(0, s);
+      }
+      mutated++;
+    }
+    return mutated;
+  }
+
+  /**
+   * Deterministic CQM Dock Action (`◈ XENOMIMIC`): Entangles an additional pair of living organisms as Xenomimic twins.
+   */
+  public triggerXenomimicPair(): number {
+    return this.ecology.seedXenomimicEntangledPairs(this.store, 1);
+  }
+
   public stepTick(requestedDtSec = 0.05, externalCortexFn?: ExternalCortexBatchFn): WorldTickTelemetry {
     if (this.runState !== 'RUNNING' && this.lastTelemetry) {
       return { ...this.lastTelemetry, runState: this.runState };

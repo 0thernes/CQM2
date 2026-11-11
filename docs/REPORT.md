@@ -1,11 +1,11 @@
 # Inspection report
 
 - Project: CQM2
-- Version: 2.1.0
-- Date: 2026-11-10
+- Version: 2.2.0
+- Date: 2026-11-11
 - Profile: WEB, API, DB, AI, SIM, NATIVE, AGENT, PUB
 - Standard: 2.2.0 (catalog 5cc223ef1d1a)
-- Inspector: 0thernes LLC Engineering (2026-11-10)
+- Inspector: 0thernes LLC Engineering (2026-11-11)
 - Grade with: inspect.mjs grade <this file> --profile WEB,API,DB,AI,SIM,NATIVE,AGENT,PUB --no-diligence
 
 A self-assessment against the Grade-A MVP Standard. It is not an independent audit or a certification.
@@ -16,14 +16,14 @@ A self-assessment against the Grade-A MVP Standard. It is not an independent aud
 Written by `inspect.mjs grade --write`. Do not edit this block; grade again instead.
 
 ```text
-Standard    2.2.0 (catalog 5cc223ef1d1a), graded 2026-11-10
+Standard    2.2.0 (catalog 5cc223ef1d1a), graded 2026-11-11
 Profile     WEB, API, DB, AI, SIM, NATIVE, AGENT, PUB
 Applies     459 inspection points (108 gates), 385 tests
 Inspection  446 of 446 applicable points pass (100.0%); 13 not applicable, 0 waived, 0 failed, 0 not inspected, 0 without evidence
 Gates       every P0 and P1 point passes
 Tests       368 of 368 applicable tests pass (100.0%); 0 failing, 0 not written, 17 not applicable
 Grade       A+
-Rows        c6ef787b10ecc7c4 (digest of the rows, profile, version and result)
+Rows        77190e910f0aae12 (digest of the rows, profile, version and result)
 Diligence   not graded (--no-diligence), so no readiness verdict
 
 Gate points marked NA (the owner checks each reason):

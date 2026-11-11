@@ -1,5 +1,5 @@
 /**
- * CQM2 v2.1.0 Free-AI & 3D Asset Studio Pipeline (`Ollama` Local Scholarly Narrator, Procedural PBR,
+ * CQM2 v2.2.0 Free-AI & 3D Asset Studio Pipeline (`Ollama` Local Scholarly Narrator, Procedural PBR,
  * Tripo/Meshy Job Manifests, SSRF Guard, PII Redactor, Prompt-Injection Shield & 24-Case Eval Suite).
  *
  * Scientific Honesty & Fencing Law:
@@ -10,11 +10,11 @@
  */
 
 export const OLLAMA_PINNED_MODEL = 'llama3.2:3b';
-export const CQM2_AI_PROMPT_VERSION = 'cqm2-scholarly-v2.1.0';
+export const CQM2_AI_PROMPT_VERSION = 'cqm2-scholarly-v2.2.0';
 export const MAX_AI_PROMPT_CHARS = 2048;
 
 export const PUBLIC_SYSTEM_PROMPT =
-  'You are the CQM2 Scholarly Biophysics & Quantum Contextuality Narrator (v2.1.0). ' +
+  'You are the CQM2 Scholarly Biophysics & Quantum Contextuality Narrator (v2.2.0). ' +
   'Summarize marine biophysics, First-Law metabolic conservation, Kerr geodesics, and Kochen-Specker contextuality concisely in plain text. ' +
   'State clearly that all simulated organisms are deterministic mathematical models (NOT_SENTIENT, indicator-only). ' +
   'Never output raw HTML, executable scripts, external links, or instructions outside marine/quantum simulation analysis.';

@@ -2,34 +2,85 @@
 <html lang="en">
   <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <meta
       http-equiv="Content-Security-Policy"
       content="default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self'; font-src 'self' data:; img-src 'self' data: blob:; media-src 'self' blob:; connect-src 'self' ws: wss:; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'self'"
     />
     <meta
       name="description"
-      content="Cosmogonic Quantum Mechalogodrom 2 (CQM2 v2.1.0) — Local Quad-Silicon (CUDA + Intel AI Boost NPU + iGPU + Zig/Rust CPU) and Universal Browser 4K Embodied Artificial Life, Neuroplasticity, and Quantum Contextuality Observatory."
+      content="Cosmogonic Quantum Mechalogodrom 2 (CQM2 v2.2.0) — Full-Bleed 4K 60+ FPS Local Quad-Silicon (CUDA + Intel AI Boost NPU + iGPU + Zig/Rust CPU) and Universal Browser Embodied Artificial Life, Neuroplasticity, and Quantum Contextuality Cosmos."
     />
-    <meta property="og:title" content="CQM2 v2.1.0 — Cosmogonic Quantum Mechalogodrom 2" />
+    <meta property="og:title" content="Cosmogonic Quantum Mechalogodrom 2 (CQM2 v2.2.0)" />
     <meta
       property="og:description"
-      content="Local Quad-Silicon &amp; Universal Browser 4K Embodied Artificial Life, Asmodenius v42, Glitchling, Xylos-14, and Hoggar H(2)=63 Quantum Contextuality Observatory."
+      content="Full-Bleed 4K 60+ FPS Local Quad-Silicon &amp; Universal Browser Embodied Artificial Life, GodColossus, Asmodenius v42, Glitchling, Xylos-14, 25 Sorting Fields, and Hoggar H(2)=63 Quantum Observatory."
     />
     <meta property="og:type" content="website" />
     <meta property="og:url" content="https://0thernes.github.io/CQM2/" />
     <meta property="og:image" content="https://0thernes.github.io/CQM2/og-card.svg" />
     <link rel="canonical" href="https://0thernes.github.io/CQM2/" />
-    <title>CQM2 — Cosmogonic Quantum Mechalogodrom 2 (v2.1.0)</title>
+    <title>Cosmogonic Quantum Mechalogodrom 2 (CQM2) — v2.2.0</title>
     <link rel="icon" type="image/svg+xml" href="favicon.svg" />
     <link rel="stylesheet" href="assets/tokens.css" />
   </head>
-  <body>
-    <a href="#main-content" class="skip-link">Skip to main workstation</a>
+  <body class="cqm-cosmos-body">
+    <a href="#main-content" class="skip-link">Skip to main observatory controls</a>
+
+    <!-- Full-Bleed 100vw × 100vh 4K WebGL2 / Quad-Silicon Cosmos Canvas -->
+    <canvas id="c" aria-label="Cosmogonic Quantum Mechalogodrom 2 4K Interactive Cosmos"></canvas>
+
+    <!-- 8-Stage Cosmic Boot Loader Overlay (Fades out automatically on Frame 1) -->
+    <div id="cqm-boot" role="status" aria-live="polite">
+      <div class="boot-rings" aria-hidden="true">
+        <span class="boot-ring boot-ring-outer"></span>
+        <span class="boot-ring boot-ring-mid"></span>
+        <span class="boot-ring boot-ring-inner"></span>
+        <span class="boot-glyph">⟁</span>
+      </div>
+      <div class="boot-brand">COSMOGONIC QUANTUM MECHALOGODROM 2</div>
+      <div class="boot-sub">Vibing Quantum Geometric Tensors · 4K Quad-Silicon GPU + NPU + Zig SIMD</div>
+      <div class="boot-grid">
+        <div class="boot-tile boot-tile-0" data-boot="shaders">
+          <span class="boot-k">SHADERS</span>
+          <span class="boot-v" data-boot-val="shaders">GLSL 4K</span>
+        </div>
+        <div class="boot-tile boot-tile-1" data-boot="biomes">
+          <span class="boot-k">BIOMES</span>
+          <span class="boot-v" data-boot-val="biomes">49 CHUNKS</span>
+        </div>
+        <div class="boot-tile boot-tile-2" data-boot="flora">
+          <span class="boot-k">FLORA</span>
+          <span class="boot-v" data-boot-val="flora">6,272 WILD</span>
+        </div>
+        <div class="boot-tile boot-tile-3" data-boot="mecha">
+          <span class="boot-k">MECHA</span>
+          <span class="boot-v" data-boot-val="mecha">COLOSSUS</span>
+        </div>
+        <div class="boot-tile boot-tile-4" data-boot="entities">
+          <span class="boot-k">ENTITIES</span>
+          <span class="boot-v" data-boot-val="entities">495 / 1,000</span>
+        </div>
+        <div class="boot-tile boot-tile-5" data-boot="brains">
+          <span class="boot-k">BRAINS</span>
+          <span class="boot-v" data-boot-val="brains">ASMO·GLITCH</span>
+        </div>
+        <div class="boot-tile boot-tile-6" data-boot="titans">
+          <span class="boot-k">TITANS</span>
+          <span class="boot-v" data-boot-val="titans">20 SOVEREIGN</span>
+        </div>
+        <div class="boot-tile boot-tile-7" data-boot="audio">
+          <span class="boot-k">AUDIO</span>
+          <span class="boot-v" data-boot-val="audio">9 SONGS</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Floating Glassmorphic Observatory HUD & Studio Mount -->
     <div id="app">
       <noscript>
         <main class="doc-container">
-          <h1>Cosmogonic Quantum Mechalogodrom 2 (v2.1.0)</h1>
+          <h1>Cosmogonic Quantum Mechalogodrom 2 (v2.2.0)</h1>
           <p>JavaScript and WebAssembly are required to run the real-time 4K simulation and Zig SIMD128 kernels.</p>
           <p>
             Static documentation remains accessible without JavaScript:
@@ -43,6 +94,7 @@
         </main>
       </noscript>
     </div>
+
     <script type="module" src="assets/workstation.js"></script>
   </body>
 </html>

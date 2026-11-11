@@ -6,6 +6,24 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
+## [2.2.0] - 2026-11-11
+
+### Added
+- **Full-Bleed `100vw × 100vh` 4K Cosmogonic World & Shader Synthesis (`src/render/cqm-world-builders.ts`, `src/render/shaders.ts`, `src/render/scene-4k.ts`)**:
+  - Restored and upgraded every iconic landmark of `Cosmogonic Quantum Mechalogodrom` at 4K `60+ FPS` via batched GPU `THREE.InstancedMesh` pools and GLSL fragment/vertex shaders (replacing CQM v1's `9 fps` CPU loops):
+    - **`GodColossus` Center-Sky Manifold**: 81,920-triangle multi-lobed folded quasicrystal-gyroid manifold at `(0, 178, -210)` with iterative 4D orbit-trap + Inigo Quilez rainbow cosine oil-slick contour interference bands.
+    - **Cosmic Coordinate-Grid Sky Dome & Bioluminescent Terrain**: Deep plum-magenta sky dome with perspective grid lines, aurora/brutalist/Stage-II crimson crossfades, and undulating bioluminescent terrain coupled to live Gray-Scott `DataTexture`.
+    - **`6,272` GPU-Instanced Wild Alien Flora** across 4 compound pools (`0` per-frame CPU loop cost), **16 Obsidian/Emerald Obelisk Spires** + glowing frustum toppers + data catenaries, **148 Cantilevered Brutalist Megastructure Slabs**, **26 Floating Emerald Frustums**, **6 Cyan Light-Ribbon Shafts**, **32 Quantized 3D Voxel Glitch-Cubes**, **22-Ring Woven Holographic Sanctuary Dome**, and **`CrystalEcosystem` Big Tree Sanctuary**.
+- **Complete Floating Glassmorphic Observatory HUD & 3-Row Dock (`src/ui/workstation.ts`, `src/ui/observatory-16.ts`, `src/ui/live-brains-3.ts`, `src/styles/tokens.css`, `public/index.html`)**:
+  - Top-center `✦ Enter Mini World — full glory` macro sanctuary dive pill + 8-stage `#cqm-boot` cosmic loader.
+  - Left column: `TELEMETRY` (`495/1000` live SoA entities + 4 sparklines), `SORTING FIELDS` (all 25 algorithms with `✶ ALL` & `▸ AUTO`), and `#perf-hud` live FPS / `ms` / `p95` / `MB` / Quad-Silicon provenance + 6 hardware tier selectors (`[phone]` .. `[mega]`).
+  - Right column: `OBSERVATORY` (`OVER | VAR | ECO | WAR` 16 real-time HiDPI canvases), `SORTING · FIELD` (`PANCAKE FLIP`, `#g-alg`, Voronoi sector `HELTIBOR`, `Ω`), `SIM · SETTINGS`, and `3 Live Brains` (`APEX`, `MECHA`, `GLYPH`).
+  - Bottom 3-row floating dock (`⇄ SPLIT`, `✦ BURST`, `☢ MUTATE`, `⚡ CHAOS+`, `◎ GOD`, `◈ XENOMIMIC`, `♧ LIFE TREE`, docs/studio launchers, and scrollable 22-button `#bar`) + Center-HUD translucent modal hosting all Quad-Silicon, Asmodenius/Glitchling/Xylos/Thaler/Causal-12, Hoggar/Tsotchke-27, ERP/N01, Market/Titans, Fenced AI Copilot, and 3D `.GLB` export studios.
+- **25 Spatial Sorting Fields, `HELTIBOR` Voronoi Lore & 20-Titan Diplomacy (`src/sim/sorting-fields.ts`, `tests/sorting-fields-lore-titans.test.ts`)**:
+  - Full step-by-step implementations of all 25 CQM sorting fields (`BUBBLE FIELD` .. `PREFIX PANCAKE`), deterministic 83-syllable `CosmologicalLoreEngine`, `TitanDiplomacySimulator`, and First-Law-conserving `SPLIT`/`BURST`/`MUTATE`/`XENOMIMIC` actions on `Cqm2WorldScheduler`.
+- **9 Canonical Procedural Cosmic Songs & 8 SFX (`src/render/audio-synth.ts`)**:
+  - `VOIDCROWN`, `BLACK MERIDIAN`, `ELDER ENGINE`, `LAST THEOREM`, `QUANTUM`, `STARKILLER REQUIEM`, `HORIZON HYMN`, `CROWN OF ASH`, and `DEEP MERIDIAN` on the `C3 = 130.81 Hz` natural minor scale.
+
 ## [2.1.0] - 2026-11-10
 
 ### Added
