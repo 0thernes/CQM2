@@ -1175,4 +1175,101 @@ CQM2_TS_API float cqm2_glyph_brain_batch_step(
     return static_cast<float>(total_energy / static_cast<double>(num_glyphs * 1024u));
 }
 
+/**
+ * 11. Asmodensius-v40 272-Neuron Spiking CNS/ENS Connectome Kernel
+ *   - [0..159]  : 160 Cortical LIF + Somatic [Ca2+] Trace Neurons
+ *   - [160..191]: 32 Basal Ganglia Striatal D1 (Go) / D2 (No-Go) Action-Selection Neurons
+ *   - [192..271]: 80 Enteric Nervous System (ENS) Gut-Vagal Slow-Wave Oscillators
+ *   - Neuromodulated by 4-channel vector [DA, 5-HT, NE, ACh]
+ */
+CQM2_TS_API int32_t cqm2_asmodenius_lif272_step(
+    float* v_mem272,       // [272] membrane potentials in mV (resting -65, threshold -50, reset -70)
+    float* ca_trace272,    // [272] somatic calcium trace
+    uint8_t* spikes_out272,// [272] 0/1 spike raster this step
+    const float* drive272, // [272] sensory + interoceptive synaptic current
+    const float* neuromod4,// [4] = [DA, 5-HT, NE, ACh] in [0, 1]
+    float dt_ms,
+    float out_summary6[6]  // [cortical_hz, d1_go_rate, d2_nogo_rate, ens_vagal_tone, mean_ca, total_spikes]
+) {
+    if (!v_mem272 || !ca_trace272 || !spikes_out272 || !drive272 || !neuromod4) return -1;
+
+    const float da = std::clamp(neuromod4[0], 0.0f, 1.5f);
+    const float sht = std::clamp(neuromod4[1], 0.0f, 1.5f);
+    const float ne = std::clamp(neuromod4[2], 0.0f, 1.5f);
+    const float ach = std::clamp(neuromod4[3], 0.0f, 1.5f);
+    const float dt = std::clamp(dt_ms, 0.05f, 5.0f);
+
+    uint32_t spk_cort = 0, spk_d1 = 0, spk_d2 = 0, spk_ens = 0;
+    double ca_sum = 0.0;
+    double ens_phase_acc = 0.0;
+
+    // Recurrent ring + small-world coupling from previous calcium trace
+    float rec_in[272];
+    for (int i = 0; i < 272; ++i) {
+        int prev1 = (i + 271) % 272;
+        int next1 = (i + 1) % 272;
+        int long_hop = (i + 37) % 272;
+        rec_in[i] = 2.4f * ca_trace272[prev1] + 2.4f * ca_trace272[next1] + 1.6f * ach * ca_trace272[long_hop];
+    }
+
+    for (int i = 0; i < 272; ++i) {
+        float tau_m = 20.0f;
+        float gain = 1.0f + 0.35f * ne;
+        float bias = 0.0f;
+        if (i >= 160 && i < 176) {
+            // Basal ganglia D1 Direct "Go" pathway excited by Dopamine
+            tau_m = 15.0f;
+            gain *= (0.85f + 0.75f * da);
+        } else if (i >= 176 && i < 192) {
+            // Basal ganglia D2 Indirect "No-Go" pathway suppressed by Dopamine, stabilized by 5-HT
+            tau_m = 16.0f;
+            gain *= std::max(0.25f, 1.25f - 0.65f * da + 0.30f * sht);
+        } else if (i >= 192) {
+            // Enteric Nervous System (ENS) interstitial Cajal slow wave + 5-HT gut-vagal coupling
+            tau_m = 32.0f;
+            bias = 4.5f * sht * std::sin(0.19f * static_cast<float>(i - 192) + ca_trace272[i] * 3.1f);
+        }
+
+        const float v = v_mem272[i];
+        const float i_syn = gain * (drive272[i] * 18.0f + rec_in[i]) + bias;
+        const float dv = (-(v - (-65.0f)) + i_syn) * (dt / tau_m);
+        float v_next = v + dv;
+
+        const float v_thresh = -50.0f - 2.0f * ne + 1.5f * sht;
+        uint8_t fired = 0u;
+        if (v_next >= v_thresh) {
+            fired = 1u;
+            v_next = -70.0f;
+            ca_trace272[i] = std::min(4.0f, ca_trace272[i] * (1.0f - dt * 0.04f) + 1.0f);
+        } else {
+            v_next = std::clamp(v_next, -85.0f, -45.0f);
+            ca_trace272[i] *= std::max(0.0f, 1.0f - dt * 0.04f);
+        }
+
+        v_mem272[i] = v_next;
+        spikes_out272[i] = fired;
+        ca_sum += static_cast<double>(ca_trace272[i]);
+
+        if (i < 160) spk_cort += fired;
+        else if (i < 176) spk_d1 += fired;
+        else if (i < 192) spk_d2 += fired;
+        else {
+            spk_ens += fired;
+            ens_phase_acc += static_cast<double>((v_next + 70.0f) / 25.0f);
+        }
+    }
+
+    const uint32_t total_spk = spk_cort + spk_d1 + spk_d2 + spk_ens;
+    if (out_summary6) {
+        const float inv_dt_s = 1000.0f / dt;
+        out_summary6[0] = (static_cast<float>(spk_cort) / 160.0f) * inv_dt_s;
+        out_summary6[1] = (static_cast<float>(spk_d1) / 16.0f);
+        out_summary6[2] = (static_cast<float>(spk_d2) / 16.0f);
+        out_summary6[3] = static_cast<float>(ens_phase_acc / 80.0);
+        out_summary6[4] = static_cast<float>(ca_sum / 272.0);
+        out_summary6[5] = static_cast<float>(total_spk);
+    }
+    return static_cast<int32_t>(total_spk);
+}
+
 } // extern "C"

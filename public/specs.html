@@ -7,14 +7,14 @@
       http-equiv="Content-Security-Policy"
       content="default-src 'self'; script-src 'self'; style-src 'self'; font-src 'self' data:; img-src 'self' data:; object-src 'none'; base-uri 'self'"
     />
-    <meta name="description" content="CQM2 v3.0.0 500-Point Grade-A+ Specifications, Conservation Tolerances, 12 Causal Lesion Benchmarks, and API/DB/AI Gates." />
-    <meta property="og:title" content="CQM2 v3.0.0 Specifications — Conservation Laws &amp; 12 Causal Benchmarks" />
-    <meta property="og:description" content="Quantitative mathematical contracts across First-Law conservation, Kerr Mino geodesics, Hoggar H(2)=63, Kochen-Specker 18, and 12 lesion assays." />
+    <meta name="description" content="CQM2 v4.0.0 500-Point Grade-A+ Specifications, 11/11/2026 Errata (A-01..D-02), FP64 Compensated KBN Conservation, Holm-Bonferroni FWER, and CQM-25 Gates." />
+    <meta property="og:title" content="CQM2 v4.0.0 Specifications — 11/11/2026 Errata, Conservation Laws &amp; Causal Benchmarks" />
+    <meta property="og:description" content="Quantitative mathematical contracts across FP64 compensated (KBN) First-Law conservation, Sub-Byte BitNet b1.58, Holm-Bonferroni FWER, Kerr Mino geodesics, Hoggar H(2)=63, and 5-mutant falsifiers." />
     <meta property="og:type" content="article" />
     <meta property="og:url" content="https://0thernes.github.io/CQM2/specs.html" />
     <meta property="og:image" content="https://0thernes.github.io/CQM2/og-card.svg" />
     <link rel="canonical" href="https://0thernes.github.io/CQM2/specs.html" />
-    <title>CQM2 Specifications — Conservation Laws, 12 Causal Benchmarks &amp; Budgets (v3.0.0)</title>
+    <title>CQM2 Specifications — Conservation Laws, 11/11/2026 Errata &amp; Causal Benchmarks (v4.0.0)</title>
     <link rel="icon" type="image/svg+xml" href="favicon.svg" />
     <link rel="stylesheet" href="assets/tokens.css" />
   </head>
@@ -27,13 +27,15 @@
         <a href="specs.html" class="btn" aria-current="page">500-Point Specs</a>
         <a href="bible.html" class="btn">13-Chapter Bible</a>
         <a href="lab/quantum-wildbeyond.html" class="btn">WildBeyond Lab</a>
+        <a href="alife/cqm-capability-profile.html" class="btn">CQM-25 Profile</a>
+        <a href="alife/cqm-alife-catalog.html" class="btn">150-Peer Catalog</a>
         <a href="glossary.html" class="btn">Glossary</a>
         <a href="downloads.html" class="btn">Downloads &amp; License</a>
       </nav>
 
       <section class="panel-card mb-18">
-        <h1>CQM2 v3.0.0 Quantitative Specifications &amp; Grade-A+ Verification Gates</h1>
-        <p class="mono">Evaluated under Full Honest 8-Tag Profile: WEB,API,DB,AI,SIM,NATIVE,AGENT,PUB</p>
+        <h1>CQM2 v4.0.0 Quantitative Specifications, 11/11/2026 Errata &amp; Grade-A+ Verification Gates</h1>
+        <p class="mono">Evaluated under Full Honest 8-Tag Profile: WEB,API,DB,AI,SIM,NATIVE,AGENT,PUB · ALife Framework v2.0 Errata Enforced</p>
         <div class="data-table-wrap">
           <table class="data-table">
             <thead>
@@ -46,10 +48,22 @@
             </thead>
             <tbody>
               <tr>
-                <td>First-Law Metabolic + Ecological Conservation</td>
+                <td>A-03 · First-Law Conservation (FP64, compensated KBN)</td>
                 <td><span class="mono">|Σ P_k(t) + E_world(t) - E_total(0)| / max(1, E_total)</span></td>
-                <td><span class="mono">&lt; 1.0 × 10⁻¹²</span></td>
-                <td>Rust 1.94 Kahan FFI + Diploid Ecology Auditor</td>
+                <td><span class="mono">≤ 1.0 × 10⁻¹² (FP64, compensated KBN)</span></td>
+                <td>Zig <code>cqm2_first_law_kbn_step</code> + Rust 1.94 Kahan/KBN Ledger (non-bitwise)</td>
+              </tr>
+              <tr>
+                <td>B-04 · Sub-Byte Quantized Neural Compute</td>
+                <td>Packed 2-bit ternary BitNet b1.58 &amp; 4-bit symmetric INT4 GEMV</td>
+                <td><span class="mono">Exact match vs FP32 dequantized ref</span></td>
+                <td>Zig <code>cqm2_bitnet_ternary_gemv</code> + NPU LevelZero Dispatch</td>
+              </tr>
+              <tr>
+                <td>C-01 / D-02 · Holm-Bonferroni FWER &amp; Forked-Snapshot PCI</td>
+                <td>Step-down Holm-Bonferroni FWER across multi-family tests; state-forked LZ76 PCI</td>
+                <td><span class="mono">FWER α ≤ 0.05; 0 live-state mutation</span></td>
+                <td>12-Benchmark Lesion Runner + 5-Mutant Falsifier Harness (<em>Leaky, Cosmetic, Oracle, Frozen, Shuffled</em>)</td>
               </tr>
               <tr>
                 <td>3D Kerr Mino Geodesic Integrability</td>
@@ -105,7 +119,7 @@
       </section>
     </main>
     <footer class="cqm-footer" role="contentinfo">
-      <span>CQM2 v3.0.0 · Copyright (c) 2026 0thernes LLC · Cosmogonic Non-Commercial Research &amp; Play License</span>
+      <span>CQM2 v4.0.0 · Copyright (c) 2026 0thernes LLC · Cosmogonic Non-Commercial Research &amp; Play License</span>
       <span>
         <a href="downloads.html">License &amp; Releases</a> ·
         <a href="https://github.com/0thernes/CQM2/blob/main/.github/SUPPORT.md" rel="noopener noreferrer">Support</a> ·

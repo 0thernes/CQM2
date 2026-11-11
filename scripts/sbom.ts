@@ -37,9 +37,11 @@ for (const [depName, depVer] of Object.entries(pkg.dependencies ?? {})) {
 }
 
 const nativeBinaries = [
-  { name: 'cqm2_zig.wasm', path: join(ROOT, 'src', 'native', 'zig-wasm-embedded.ts'), desc: 'Embedded Zig 0.17 SIMD128 WebAssembly module' },
-  { name: 'cqm2_zig.dll', path: join(ROOT, 'native', 'bin', 'cqm2_zig.dll'), desc: 'Native Zig 0.17 AVX2 Windows x64 DLL' },
-  { name: 'cqm2_tri_accel.dll', path: join(ROOT, 'native', 'bin', 'cqm2_tri_accel.dll'), desc: 'C++20 CUDA/cuBLAS + DirectML + LevelZero + x86-64 AVX2 ASM DLL' },
+  { name: 'CQM2.exe', path: join(ROOT, 'native', 'bin', 'CQM2.exe'), desc: 'Standalone C++20 OpenGL 3.3 + Jolt Physics 5.5.0 + Dear ImGui 1.92.8 + WinMM Workstation' },
+  { name: 'cqm2_zig.wasm', path: join(ROOT, 'src', 'native', 'zig-wasm-embedded.ts'), desc: 'Embedded Zig 0.17 SIMD128 WebAssembly module (43 kernels)' },
+  { name: 'cqm2_zig.dll', path: join(ROOT, 'native', 'bin', 'cqm2_zig.dll'), desc: 'Native Zig 0.17 AVX2 Windows x64 DLL (43 kernels)' },
+  { name: 'cqm2_tri_accel.dll', path: join(ROOT, 'native', 'bin', 'cqm2_tri_accel.dll'), desc: 'C++20 CUDA 12.9/cuBLAS + DirectML + LevelZero + x86-64 AVX2 ASM DLL' },
+  { name: 'cqm2_tsotchke_native.dll', path: join(ROOT, 'native', 'bin', 'cqm2_tsotchke_native.dll'), desc: 'C17 RosettaWire + C++20 Moonlab/libirrep/Eshkol/QGTL/Asmodenius Native DLL' },
   { name: 'cqm2_rust_ledger.dll', path: join(ROOT, 'native', 'bin', 'cqm2_rust_ledger.dll'), desc: 'Rust 1.94 Merkle & First-Law Conservation Ledger DLL' },
   { name: 'cqm2-telemetry-bridge.exe', path: join(ROOT, 'native', 'bin', 'cqm2-telemetry-bridge.exe'), desc: 'Go 1.26 Hardware Telemetry & OSC 1.0 UDP Hub' },
 ];

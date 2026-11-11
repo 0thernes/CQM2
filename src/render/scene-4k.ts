@@ -539,6 +539,9 @@ export class Cqm2Scene4kRenderer {
         depthWrite: false,
       }),
     );
+    // Tether-Removal Law: inter-entity connectome laser tethers are hidden in normal dome sightlines (enabled only in X-Ray / explicit Sandbox toggle)
+    this.linkLineSegments.visible = false;
+    this.worldSystemEnabled.set('links', false);
     this.scene.add(this.linkLineSegments);
 
     // 9. Hero Embodied Beings: Asmodenius v42 8-Somite Spine + Xylos `{7,3}` Medusa + Glitchling Vectors

@@ -27,7 +27,9 @@ if (-not (Test-Path -LiteralPath $DesktopDir)) {
 }
 $DesktopExe = Join-Path $DesktopDir "CQM2.exe"
 Copy-Item -LiteralPath $SourceExe -Destination $DesktopExe -Force
-Write-Host "[launcher] Installed Desktop executable -> $DesktopExe"
+$DesktopRootSidecar = Join-Path $DesktopDir "cqm2_root.txt"
+[System.IO.File]::WriteAllText($DesktopRootSidecar, $RepoRoot, [System.Text.UTF8Encoding]::new($false))
+Write-Host "[launcher] Installed Desktop executable -> $DesktopExe (with cqm2_root.txt sidecar)"
 
 # Helper to create a clean Win32 IShellLink (.lnk) with AppUserModelID and custom multi-size .ico
 $WshShell = New-Object -ComObject WScript.Shell
@@ -48,7 +50,7 @@ function New-Cqm2Shortcut {
   } else {
     $Sc.IconLocation = "$TargetExe,0"
   }
-  $Sc.Description = "Cosmogonic Quantum Mechalogodrom 2 (CQM2 v3.0.0) — 4K Quad-Silicon & Browser Cosmos"
+  $Sc.Description = "Cosmogonic Quantum Mechalogodrom 2 (CQM2 v4.0.0) — Standalone Native OpenGL 3.3 / Jolt 5.5 / Quad-Silicon Workstation"
   $Sc.WindowStyle = 1
   $Sc.Save()
 }

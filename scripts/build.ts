@@ -23,11 +23,12 @@ mkdirSync(ASSETS_DIR, { recursive: true });
 // 1. Copy all static files from `public/` (`*.html`, `lab/*.html`, `fonts/*.woff2`, `favicon.svg`, `og-card.svg`, `robots.txt`, `sitemap.xml`)
 cpSync(PUBLIC_DIR, SITE_DIR, { recursive: true });
 
-// 2. Bundle TypeScript entrypoints (`workstation.ts` & `wildbeyond-lab.ts`)
+// 2. Bundle TypeScript entrypoints (`workstation.ts`, `wildbeyond-lab.ts`, `alife-catalog.ts`)
 const buildResult = await Bun.build({
   entrypoints: [
     join(ROOT, 'src', 'ui', 'workstation.ts'),
     join(ROOT, 'src', 'ui', 'wildbeyond-lab.ts'),
+    join(ROOT, 'src', 'ui', 'alife-catalog.ts'),
   ],
   outdir: ASSETS_DIR,
   target: 'browser',
@@ -56,6 +57,7 @@ function emitHashedAsset(filename: string): string {
 
 const hashedWorkstation = emitHashedAsset('workstation.js');
 const hashedWildBeyond = emitHashedAsset('wildbeyond-lab.js');
+const hashedAlifeCatalog = emitHashedAsset('alife-catalog.js');
 const hashedTokens = emitHashedAsset('tokens.css');
 
 writeFileSync(
@@ -64,6 +66,7 @@ writeFileSync(
     {
       'workstation.js': hashedWorkstation,
       'wildbeyond-lab.js': hashedWildBeyond,
+      'alife-catalog.js': hashedAlifeCatalog,
       'tokens.css': hashedTokens,
     },
     null,
@@ -85,7 +88,8 @@ for (const htmlFile of walkHtmlFiles(SITE_DIR)) {
   const html = readFileSync(htmlFile, 'utf8')
     .replace(/assets\/tokens\.css/g, `assets/${hashedTokens}`)
     .replace(/assets\/workstation\.js/g, `assets/${hashedWorkstation}`)
-    .replace(/assets\/wildbeyond-lab\.js/g, `assets/${hashedWildBeyond}`);
+    .replace(/assets\/wildbeyond-lab\.js/g, `assets/${hashedWildBeyond}`)
+    .replace(/assets\/alife-catalog\.js/g, `assets/${hashedAlifeCatalog}`);
   writeFileSync(htmlFile, html);
 }
 

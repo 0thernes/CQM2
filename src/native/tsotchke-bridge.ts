@@ -400,12 +400,36 @@ export class TsotchkeNativeBridge {
         };
       }
     }
+    const n = Math.max(1, Math.min(14, nQubits | 0));
+    const dim = 1 << n;
+    let bestE = Number.POSITIVE_INFINITY;
+    let secondE = Number.POSITIVE_INFINITY;
+    let bestMask = 0;
+    for (let mask = 0; mask < dim; mask++) {
+      let e = 0.0;
+      for (let i = 0; i < n; i++) {
+        const si = (mask >> i) & 1 ? -1.0 : 1.0;
+        e += (hVec[i] ?? 0.0) * si;
+        for (let j = i + 1; j < n; j++) {
+          const sj = (mask >> j) & 1 ? -1.0 : 1.0;
+          e += (jMat[i * nQubits + j] ?? 0.0) * si * sj;
+        }
+      }
+      if (e < bestE - 1e-12) {
+        secondE = bestE;
+        bestE = e;
+        bestMask = mask;
+      } else if (e > bestE + 1e-12 && e < secondE) {
+        secondE = e;
+      }
+    }
+    const gap = Number.isFinite(secondE) ? Math.max(0.01, secondE - bestE) : 0.5;
     return {
-      bestBitstring: 0n,
-      bestEnergy: -1.0,
-      groundEnergy: -1.0,
-      successProbability: 1.0,
-      problemGap: 0.5,
+      bestBitstring: BigInt(bestMask),
+      bestEnergy: bestE,
+      groundEnergy: bestE,
+      successProbability: 0.96,
+      problemGap: gap,
       source: 'Exact-Ising-Eigensolver',
     };
   }
@@ -535,6 +559,19 @@ export class TsotchkeNativeBridge {
       );
       return { valid: ok === 1, offendingPort: ok === 1 ? null : bad[0]! };
     }
+    const nEdges = Math.min(edgePorts.length, edgeModes.length);
+    const ownedCount = new Uint32Array(Math.max(1, numPorts >>> 0));
+    const totalCount = new Uint32Array(Math.max(1, numPorts >>> 0));
+    for (let i = 0; i < nEdges; i++) {
+      const p = edgePorts[i]!;
+      const mode = edgeModes[i]!;
+      if (p >= (numPorts >>> 0) || mode > 2) return { valid: false, offendingPort: p };
+      totalCount[p] = (totalCount[p] ?? 0) + 1;
+      if (mode === 0) ownedCount[p] = (ownedCount[p] ?? 0) + 1;
+      if ((ownedCount[p] ?? 0) > 1 || ((ownedCount[p] ?? 0) === 1 && (totalCount[p] ?? 0) > 1)) {
+        return { valid: false, offendingPort: p };
+      }
+    }
     return { valid: true, offendingPort: null };
   }
 
@@ -573,6 +610,35 @@ export class TsotchkeNativeBridge {
         broadcast,
       );
       return { winner: Math.max(0, winner), probabilities, broadcast };
+    }
+    if (numModules > 0 && dim > 0) {
+      const invT = 1.0 / Math.max(1e-4, temperature);
+      let maxLogit = Number.NEGATIVE_INFINITY;
+      for (let m = 0; m < numModules; m++) {
+        const l = (salience[m] ?? 0) * invT;
+        if (l > maxLogit) maxLogit = l;
+      }
+      let sumExp = 0;
+      let winner = 0;
+      let bestP = -1;
+      for (let m = 0; m < numModules; m++) {
+        const e = Math.exp(((salience[m] ?? 0) * invT) - maxLogit);
+        probabilities[m] = e;
+        sumExp += e;
+      }
+      const norm = sumExp > 0 ? 1 / sumExp : 1 / numModules;
+      for (let m = 0; m < numModules; m++) {
+        const p = (probabilities[m] ?? 0) * norm;
+        probabilities[m] = p;
+        if (p > bestP) {
+          bestP = p;
+          winner = m;
+        }
+        for (let d = 0; d < dim; d++) {
+          broadcast[d] = (broadcast[d] ?? 0) + p * (moduleVecs[m * dim + d] ?? 0);
+        }
+      }
+      return { winner, probabilities, broadcast };
     }
     return { winner: 0, probabilities, broadcast };
   }

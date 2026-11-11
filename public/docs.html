@@ -7,14 +7,14 @@
       http-equiv="Content-Security-Policy"
       content="default-src 'self'; script-src 'self'; style-src 'self'; font-src 'self' data:; img-src 'self' data:; object-src 'none'; base-uri 'self'"
     />
-    <meta name="description" content="CQM2 v3.0.0 Architecture, Entity Relationship Diagram (ERD/ERM/ERP), OpenAPI v1, and Quad-Silicon Documentation." />
-    <meta property="og:title" content="CQM2 v3.0.0 Documentation — Architecture, ERD &amp; Quad-Silicon" />
-    <meta property="og:description" content="10-Entity 3NF SQLite WAL + SoA ERP, RTX 5070 Ti CUDA StridedBatched, Intel AI Boost NPU RSSM, Intel iGPU Field Diffusion, Zig 0.17, Rust 1.94 &amp; Go 1.26." />
+    <meta name="description" content="CQM2 v4.0.0 Architecture, Standalone Native OpenGL 3.3 / Jolt 5.5 CQM2.exe Workstation, ERD/ERM/ERP, 5 Neural Tiers, and Quad-Silicon Documentation." />
+    <meta property="og:title" content="CQM2 v4.0.0 Documentation — Native OpenGL/Jolt Workstation, Architecture &amp; Quad-Silicon" />
+    <meta property="og:description" content="Standalone C++20/C17/AVX2 ASM/Zig 0.17/OpenGL 3.3/Jolt 5.5 CQM2.exe + RTX 5070 Ti CUDA 12.9 + Intel AI Boost NPU LevelZero + Moonlab + Eshkol v1.3.6 + RosettaWire + Rust 1.94." />
     <meta property="og:type" content="article" />
     <meta property="og:url" content="https://0thernes.github.io/CQM2/docs.html" />
     <meta property="og:image" content="https://0thernes.github.io/CQM2/og-card.svg" />
     <link rel="canonical" href="https://0thernes.github.io/CQM2/docs.html" />
-    <title>CQM2 Documentation — Architecture, ERD &amp; Quad-Silicon (v3.0.0)</title>
+    <title>CQM2 Documentation — Architecture, Native Workstation &amp; Quad-Silicon (v4.0.0)</title>
     <link rel="icon" type="image/svg+xml" href="favicon.svg" />
     <link rel="stylesheet" href="assets/tokens.css" />
   </head>
@@ -27,18 +27,17 @@
         <a href="specs.html" class="btn">500-Point Specs</a>
         <a href="bible.html" class="btn">13-Chapter Bible</a>
         <a href="lab/quantum-wildbeyond.html" class="btn">WildBeyond Lab</a>
+        <a href="alife/cqm-capability-profile.html" class="btn">CQM-25 Profile</a>
+        <a href="alife/cqm-alife-catalog.html" class="btn">150-Peer Catalog</a>
         <a href="glossary.html" class="btn">Glossary</a>
         <a href="downloads.html" class="btn">Downloads &amp; License</a>
       </nav>
 
       <section class="panel-card mb-18">
-        <h1>Cosmogonic Quantum Mechalogodrom 2 — Architecture &amp; Entity-Relational Design</h1>
-        <p class="mono">Version 3.0.0 · 0thernes LLC · Non-Commercial Research &amp; Play License</p>
+        <h1>Cosmogonic Quantum Mechalogodrom 2 — Architecture &amp; Native Workstation Design</h1>
+        <p class="mono">Version 4.0.0 (11/11/2026 Canonical Build) · 0thernes LLC · Non-Commercial Research &amp; Play License</p>
         <p>
-          CQM2 v3.0.0 is a ground-up local-first and universal-browser full-stack refactor of the Cosmogonic Quantum Mechalogodrom.
-          It eliminates heap-allocated per-entity scene objects, synthetic accelerator buffers, and monolithic state files
-          in favor of a <strong>10-table normalized Structure-of-Arrays (SoA) &amp; 3NF SQLite WAL Entity Relational Programming (ERP)</strong> core,
-          versioned <code>/api/v1/*</code> OpenAPI 3.1 endpoints, and real simultaneous workloads across dGPU, NPU, iGPU, and CPU.
+          CQM2 v4.0.0 delivers a true dual-surface polyglot architecture: (1) a <strong>standalone native local Windows 11 workstation executable (<code>CQM2.exe</code>)</strong> built directly in C++20, C17, x86-64 AVX2/FMA3 ASM, Zig 0.17, OpenGL 3.3 Core, GLFW 3.4, GLM 1.0.3, Jolt Physics v5.5.0, Dear ImGui 1.92.8, and WinMM 44.1 kHz procedural audio with <strong>zero Bun or browser runtime dependency</strong>, paired with (2) the <strong>Universal WebGL2 / REST API Edition</strong> backed by a 10-table normalized Structure-of-Arrays (SoA) &amp; 3NF SQLite WAL Entity Relational Programming (ERP) core.
         </p>
       </section>
 
@@ -101,19 +100,30 @@
         </ul>
       </section>
 
+      <section class="panel-card mb-18">
+        <h2>3. Five Live Neural Tiers &amp; 16-Indicator Archon SuperMind Telemetry</h2>
+        <ul>
+          <li><strong>Tier 1 · Entity Brains (70 FP32 params × up to 50,000 entities):</strong> 6→8→3+1 actor-critic with TD(0) advantage learning and Lamarckian somatic-to-germline heredity on CUDA 12.9 cuBLAS / Zig AVX2.</li>
+          <li><strong>Tier 2 · Mechalogodrom Cortex (54,048 FP32 params):</strong> 3-timescale recurrent cortex (64→256→128→32) with reward-modulated STDP traces.</li>
+          <li><strong>Tier 3 · Xylos Hyperbolic Core (48 Poincaré Disk Foci):</strong> Mobius geodesic distance modulation, Oja plasticity, 14-tap NLMS predictor, and 192 KiB deterministic replay tape.</li>
+          <li><strong>Tier 4 · 100 GlyphBrains + #101 FINAL SIGMA Apex:</strong> 100 coupled Kuramoto-Hopfield attractors plus ADR-0007 4-channel octonion digest.</li>
+          <li><strong>Tier 5 · Asmodenius 272-Neuron CNS + Enteric Gut Brain &amp; 5 Archon SuperMinds:</strong> 160 cortical Dale 80/20 + 32 striatal D1/D2 + 80 ENS gut LIF neurons, paired with the 5 Dehaene-Changeux Global Workspace Archons (<code>ORACLE-Σ</code>, <code>STARKILLER-Ω</code>, <code>MANHATTAN-Φ</code>, <code>BROLY-Ψ</code>, <code>VOID-Λ</code>) exposing 16 unaggregated cognitive indicators: <code>VAL, ARO, DOM, SUR, AGG, DEC, CUR, DRE, HAL, REA (Reasoning), SAW, NOV, IGN, INTG, PHI, CONF</code>.</li>
+        </ul>
+      </section>
+
       <section class="panel-card">
-        <h2>3. Scientific Honesty &amp; 27-Repo Tsotchke Quarantine Contract</h2>
+        <h2>4. Scientific Honesty, Art-Direction Invariants &amp; 27-Repo Tsotchke Quarantine Contract</h2>
         <p>
-          Every neural, metacognitive, reality-monitoring, creativity, and perturbation metric in CQM2 (including Casali PCI, HOT-3 CalibHead confidence,
-          Xylos-14 Butlin indicators, Thaler-9 novelty/value markers, and Kuramoto synchronization) is strictly typed as <code>ComputationalIndicatorContract</code> with
-          <code>sentienceClaim: 'NOT_SENTIENT'</code> and <code>indicatorOnly: true</code>. Simulated organisms possess zero subjective awareness.
-          Across the 27-repo Tsotchke ecosystem catalog, <code>OBLITERATUS</code> (AGPL-3.0) and all copyleft, proprietary, unlicensed, or out-of-scope LLM repositories
-          are permanently fenced with <code>fencedQuarantine: true</code>.
+          Every neural, metacognitive, reality-monitoring, creativity, and perturbation metric in CQM2 (including forked-snapshot Lempel-Ziv Casali PCI [D-02], Holm-Bonferroni FWER [C-01],
+          Archon <code>REA</code> Reasoning indicator, Xylos-14 Butlin indicators, and CQM-25 v1.0.0 axes) is strictly typed with
+          <code>sentienceClaim: 'NOT_SENTIENT'</code>, <code>indicatorOnly: true</code>, and <code>aggregation: 'prohibited'</code>.
+          Under the Monolith-Megalith Art-Direction Law, <code>GodColossus</code> is the sole 1,000-hue iridescent Mandelbulb monolith, <code>Stage II MonolithTemple</code> and monoliths are strictly achromatic (<code>r == g == b</code>), and chiral <code>Xenomimics</code> plus dome connectomes remain completely untethered.
+          Across the 27-repo Tsotchke ecosystem catalog, <code>OBLITERATUS</code> (AGPL-3.0) and all fenced repositories remain strictly quarantined (<code>fencedQuarantine: true</code>).
         </p>
       </section>
     </main>
     <footer class="cqm-footer" role="contentinfo">
-      <span>CQM2 v3.0.0 · Copyright (c) 2026 0thernes LLC · Cosmogonic Non-Commercial Research &amp; Play License</span>
+      <span>CQM2 v4.0.0 · Copyright (c) 2026 0thernes LLC · Cosmogonic Non-Commercial Research &amp; Play License</span>
       <span>
         <a href="downloads.html">License &amp; Releases</a> ·
         <a href="https://github.com/0thernes/CQM2/blob/main/.github/SUPPORT.md" rel="noopener noreferrer">Support</a> ·

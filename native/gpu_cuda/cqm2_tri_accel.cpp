@@ -468,6 +468,217 @@ __declspec(dllexport) uint32_t cqm2_asm_pauli_commute(uint64_t ux, uint64_t uz, 
     return cqm2_asm_pauli_popcnt64(ux, uz, vx, vz);
 }
 
+// Executes Original CQM 70-parameter (6->6->4) Recurrent EntityBrain batch on RTX 5070 Ti cuBLAS StridedBatched
+// + online TD Actor-Critic & Lamarckian motor plasticity!
+__declspec(dllexport) double cqm2_cuda_entity_brains_70_strided(
+    const float* inputs,   // [count * 6]
+    float* weights,        // [count * 70]: w1[36], b1[6], w2[24], b2[4]
+    float* prev_hid,       // [count * 6]
+    float* prev_val,       // [count]
+    const float* rewards,  // [count]
+    float* outputs,        // [count * 4]
+    int count,
+    float td_lr,
+    float lamarck_lr,
+    double* elapsed_ms_out
+) {
+    std::lock_guard<std::mutex> lk(g_mtx);
+    if (!g_initialized) cqm2_hw_init(nullptr, 0);
+    if (count <= 0) return 0.0;
+
+    LARGE_INTEGER freq, t0, t1;
+    QueryPerformanceFrequency(&freq);
+    QueryPerformanceCounter(&t0);
+
+    size_t wBytes = (size_t)count * 70ULL * sizeof(float);
+    size_t inBytes = (size_t)count * 6ULL * sizeof(float);
+    size_t outBytes = (size_t)count * 4ULL * sizeof(float);
+
+    float stackHid[8192 * 6];
+    float* h_hid = count <= 8192 ? stackHid : (float*)malloc(inBytes);
+
+    if (g_cuda_ready && p_cublasSgemmStridedBatched && ensureDeviceBuffers(wBytes)) {
+        p_cudaMemcpy(g_dA, weights, wBytes, 1);
+        p_cudaMemcpy(g_dB, inputs, inBytes, 1);
+        float alpha = 1.0f, beta = 0.0f;
+        // Layer 1: 6x6 row-major -> CUBLAS_OP_T (6, 1, 6), strideA=70, strideB=6, strideC=6
+        p_cublasSgemmStridedBatched(
+            g_cublas, CUBLAS_OP_T, CUBLAS_OP_N,
+            6, 1, 6,
+            &alpha,
+            (const float*)g_dA, 6, 70,
+            (const float*)g_dB, 6, 6,
+            &beta,
+            (float*)g_dC, 6, 6,
+            count
+        );
+        p_cudaDeviceSynchronize();
+        p_cudaMemcpy(h_hid, g_dC, inBytes, 2);
+
+        for (int e = 0; e < count; ++e) {
+            const float* b1 = weights + (size_t)e * 70ULL + 36ULL;
+            float* he = h_hid + (size_t)e * 6ULL;
+            float* phe = prev_hid + (size_t)e * 6ULL;
+            for (int h = 0; h < 6; ++h) {
+                float h_new = 0.8f * fastPadeTanh(he[h] + b1[h]) + 0.2f * phe[h];
+                he[h] = h_new;
+                phe[h] = h_new;
+            }
+        }
+        p_cudaMemcpy(g_dB, h_hid, inBytes, 1);
+
+        // Layer 2: 4x6 row-major at offset +42 -> CUBLAS_OP_T on A(6x4, lda=6, strideA=70) -> (4x1)
+        p_cublasSgemmStridedBatched(
+            g_cublas, CUBLAS_OP_T, CUBLAS_OP_N,
+            4, 1, 6,
+            &alpha,
+            ((const float*)g_dA) + 42, 6, 70,
+            (const float*)g_dB, 6, 6,
+            &beta,
+            (float*)g_dC, 4, 4,
+            count
+        );
+        p_cudaDeviceSynchronize();
+        p_cudaMemcpy(outputs, g_dC, outBytes, 2);
+
+        for (int e = 0; e < count; ++e) {
+            const float* b2 = weights + (size_t)e * 70ULL + 66ULL;
+            float* oe = outputs + (size_t)e * 4ULL;
+            for (int o = 0; o < 4; ++o) {
+                oe[o] = fastPadeTanh(oe[o] + b2[o]);
+            }
+        }
+    } else {
+        for (int e = 0; e < count; ++e) {
+            const float* in_e = inputs + (size_t)e * 6ULL;
+            const float* w_e = weights + (size_t)e * 70ULL;
+            float* he = h_hid + (size_t)e * 6ULL;
+            float* phe = prev_hid + (size_t)e * 6ULL;
+            float* oe = outputs + (size_t)e * 4ULL;
+            for (int h = 0; h < 6; ++h) {
+                float dot = cqm2_asm_dot8_fma_avx2(in_e, w_e + h * 6, 6);
+                float h_new = 0.8f * fastPadeTanh(dot + w_e[36 + h]) + 0.2f * phe[h];
+                he[h] = h_new;
+                phe[h] = h_new;
+            }
+            const float* w2 = w_e + 42;
+            const float* b2 = w_e + 66;
+            for (int o = 0; o < 4; ++o) {
+                float dot = cqm2_asm_dot8_fma_avx2(he, w2 + o * 6, 6);
+                oe[o] = fastPadeTanh(dot + b2[o]);
+            }
+        }
+    }
+
+    // Online TD Actor-Critic + Lamarckian plasticity on host-mapped weight slice
+    if (fabsf(td_lr) > 1e-8f || fabsf(lamarck_lr) > 1e-8f) {
+        for (int e = 0; e < count; ++e) {
+            float* w2 = weights + (size_t)e * 70ULL + 42ULL;
+            const float* he = h_hid + (size_t)e * 6ULL;
+            const float* oe = outputs + (size_t)e * 4ULL;
+            float v_now = oe[3];
+            float td_err = (rewards ? rewards[e] : 0.0f) + 0.95f * v_now - prev_val[e];
+            if (td_err > 2.0f) td_err = 2.0f;
+            if (td_err < -2.0f) td_err = -2.0f;
+            prev_val[e] = v_now;
+            float m_gain = lamarck_lr * td_err;
+            float c_gain = td_lr * td_err;
+            for (int h = 0; h < 6; ++h) {
+                float m0 = w2[0 * 6 + h] + m_gain * oe[0] * he[h];
+                float m1 = w2[1 * 6 + h] + m_gain * oe[1] * he[h];
+                float c3 = w2[3 * 6 + h] + c_gain * he[h];
+                w2[0 * 6 + h] = m0 > 1.0f ? 1.0f : (m0 < -1.0f ? -1.0f : m0);
+                w2[1 * 6 + h] = m1 > 1.0f ? 1.0f : (m1 < -1.0f ? -1.0f : m1);
+                w2[3 * 6 + h] = c3 > 1.5f ? 1.5f : (c3 < -1.5f ? -1.5f : c3);
+            }
+        }
+    }
+
+    if (h_hid != stackHid) free(h_hid);
+
+    QueryPerformanceCounter(&t1);
+    double ms = (double)(t1.QuadPart - t0.QuadPart) * 1000.0 / (double)freq.QuadPart;
+    if (elapsed_ms_out) *elapsed_ms_out = ms;
+    double ops = (double)count * (2.0 * 36.0 + 2.0 * 24.0);
+    return ms > 0.0 ? ops / (ms * 1e6) : 0.0;
+}
+
+// Executes Mechalogodrom 54,048-parameter 10-shell recurrent cortex on CUDA cuBLAS / AVX2 ASM!
+__declspec(dllexport) float cqm2_cuda_mecha_54k_step(
+    const float* shell_inputs90,
+    float* params54048,
+    float* pre_trace64,
+    float* post_trace64,
+    float* out64,
+    float stdp_lr
+) {
+    std::lock_guard<std::mutex> lk(g_mtx);
+    if (!g_initialized) cqm2_hw_init(nullptr, 0);
+    if (!shell_inputs90 || !params54048 || !pre_trace64 || !post_trace64 || !out64) return 0.0f;
+
+    float concat480[480];
+    for (int s = 0; s < 10; ++s) {
+        const float* in9 = shell_inputs90 + s * 9;
+        const float* sb = params54048 + s * 1904;
+        float h32[32];
+        for (int h = 0; h < 32; ++h) {
+            float dot = cqm2_asm_dot8_fma_avx2(in9, sb + h * 9, 9);
+            h32[h] = fastPadeTanh(dot + sb[288 + h]);
+        }
+        const float* w2 = sb + 320;
+        const float* b2 = sb + 1856;
+        for (int o = 0; o < 48; ++o) {
+            float dot = cqm2_asm_dot8_fma_avx2(h32, w2 + o * 32, 32);
+            concat480[s * 48 + o] = fastPadeTanh(dot + b2[o]);
+        }
+    }
+
+    const float* g_w1 = params54048 + 19040; // [64 x 480]
+    const float* g_b1 = g_w1 + 30720;
+    float* g_w2 = params54048 + 19040 + 30720 + 64; // [64 x 64]
+    const float* g_b2 = g_w2 + 4096;
+    float* rec64 = g_w2 + 4096 + 64;
+
+    float mid64[64];
+    if (g_cuda_ready && ensureDeviceBuffers(30720 * sizeof(float))) {
+        p_cudaMemcpy(g_dA, g_w1, 30720 * sizeof(float), 1);
+        p_cudaMemcpy(g_dB, concat480, 480 * sizeof(float), 1);
+        float alpha = 1.0f, beta = 0.0f;
+        p_cublasSgemm(g_cublas, CUBLAS_OP_T, CUBLAS_OP_N, 64, 1, 480, &alpha, (const float*)g_dA, 480, (const float*)g_dB, 480, &beta, (float*)g_dC, 64);
+        p_cudaDeviceSynchronize();
+        p_cudaMemcpy(mid64, g_dC, 64 * sizeof(float), 2);
+        for (int m = 0; m < 64; ++m) {
+            mid64[m] = fastPadeTanh(mid64[m] + g_b1[m]);
+            pre_trace64[m] = 0.90f * pre_trace64[m] + 0.10f * fabsf(mid64[m]);
+        }
+    } else {
+        for (int m = 0; m < 64; ++m) {
+            float dot = cqm2_asm_dot8_fma_avx2(concat480, g_w1 + m * 480, 480);
+            mid64[m] = fastPadeTanh(dot + g_b1[m]);
+            pre_trace64[m] = 0.90f * pre_trace64[m] + 0.10f * fabsf(mid64[m]);
+        }
+    }
+
+    float energy = 0.0f;
+    for (int q = 0; q < 64; ++q) {
+        float dot = cqm2_asm_dot8_fma_avx2(mid64, g_w2 + q * 64, 64);
+        float y = fastPadeTanh(dot + g_b2[q] + 0.25f * rec64[q]);
+        out64[q] = y;
+        rec64[q] = y;
+        post_trace64[q] = 0.88f * post_trace64[q] + 0.12f * fabsf(y);
+        energy += fabsf(y);
+        if (fabsf(stdp_lr) > 1e-8f) {
+            for (int m2 = 0; m2 < 64; ++m2) {
+                float ltp = pre_trace64[m2] * (y > 0.0f ? y : 0.0f);
+                float ltd = post_trace64[q] * (-mid64[m2] > 0.0f ? -mid64[m2] : 0.0f) * 1.05f;
+                float nw = g_w2[q * 64 + m2] + stdp_lr * (ltp - ltd);
+                g_w2[q * 64 + m2] = nw > 1.5f ? 1.5f : (nw < -1.5f ? -1.5f : nw);
+            }
+        }
+    }
+    return energy * (1.0f / 64.0f);
+}
+
 __declspec(dllexport) void cqm2_hw_shutdown() {
     std::lock_guard<std::mutex> lk(g_mtx);
     if (g_dA && p_cudaFree) { p_cudaFree(g_dA); g_dA = nullptr; }

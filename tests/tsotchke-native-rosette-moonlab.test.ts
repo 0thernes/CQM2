@@ -1,7 +1,7 @@
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, test } from 'bun:test';
-import { getTsotchkeNativeBridge } from '../src/native/tsotchke-bridge';
+import { TsotchkeNativeBridge, getTsotchkeNativeBridge } from '../src/native/tsotchke-bridge';
 import { getZigBridge } from '../src/native/zig-bridge';
 import { createCqm2Server } from '../src/server/main';
 
@@ -187,4 +187,33 @@ describe('Tsotchke Native C17/C++20 Bridge (Moonlab + libirrep + Eshkol + Rosett
       srv.stop();
     }
   }, 20000);
+
+  test('guarantees 100% mathematical parity in Linux/macOS/Browser non-DLL fallback mode', () => {
+    const portable = new TsotchkeNativeBridge();
+    expect(portable.getStatus().dllLoaded).toBe(false);
+
+    const hVec = new Float64Array([0, 0, 0]);
+    const jMat = new Float64Array([0, -1, 0, -1, 0, -1, 0, -1, 0]);
+    const ising = portable.annealMoonlabIsing(3, hVec, jMat, 1337n);
+    expect(ising.groundEnergy).toBeLessThanOrEqual(-1.999999);
+    expect(ising.bestEnergy).toBeLessThanOrEqual(-1.999999);
+    expect(ising.problemGap).toBeGreaterThanOrEqual(1.999999);
+
+    expect(Math.abs(portable.clebschGordan(1, 1, 1, -1, 2, 0) - 1 / Math.sqrt(6))).toBeLessThan(1e-9);
+    expect(Math.abs(portable.clebschGordan(1, 1, 1, 1, 2, 2) - 1.0)).toBeLessThan(1e-9);
+
+    const doubleOwned = portable.verifyLinearPortOwnership(4, new Uint32Array([0, 0]), new Uint8Array([0, 0]));
+    expect(doubleOwned.valid).toBe(false);
+    expect(doubleOwned.offendingPort).toBe(0);
+
+    const gw = portable.eshkolGlobalWorkspaceStep(
+      new Float32Array([0.1, 3.5, 0.2]),
+      new Float32Array([1, 0, 0, 1, 0.5, 0.5]),
+      3,
+      2,
+      0.5,
+    );
+    expect(gw.winner).toBe(1);
+    expect(gw.broadcast[1]!).toBeGreaterThan(0.9);
+  });
 });

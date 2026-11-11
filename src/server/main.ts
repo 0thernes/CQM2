@@ -537,7 +537,7 @@ export async function createCqm2Server(options: {
           ws.send(
           JSON.stringify({
             type: 'welcome',
-            version: '3.0.0',
+            version: '4.0.0',
             hardware: triEngine.getTopology(),
             epoch: world.store.epoch,
           }),
@@ -891,7 +891,7 @@ export async function createCqm2Server(options: {
           return sendJson({
             ok: true,
             service: 'cqm2-workstation',
-            version: '3.0.0',
+            version: '4.0.0',
             simTick: world.store.epoch.simTick,
             runState: world.runState,
             databaseHealthy: true,
@@ -1853,6 +1853,8 @@ export async function createCqm2Server(options: {
         '/lab/sentience': 'lab/sentience.html',
         '/docs/alife/cqm-capability-profile.html': 'alife/cqm-capability-profile.html',
         '/alife/cqm-capability-profile': 'alife/cqm-capability-profile.html',
+        '/docs/alife/cqm-alife-catalog.html': 'alife/cqm-alife-catalog.html',
+        '/alife/cqm-alife-catalog': 'alife/cqm-alife-catalog.html',
       };
       const relReq = ROUTE_HTML_ALIASES[decodedPath] ?? decodedPath.replace(/^\/+/, '');
       if (relReq.startsWith('.') || relReq === 'package.json' || relReq.startsWith('src/') || relReq.startsWith('data/')) {
@@ -1860,15 +1862,19 @@ export async function createCqm2Server(options: {
       }
 
       let candidatePath: string | null = null;
+      let candidateMtime = -1;
       for (const baseDir of [SITE_DIR, PUBLIC_DIR]) {
         if (existsSync(baseDir)) {
           const candidate = resolve(baseDir, relReq);
           if (!candidate.startsWith(baseDir + sep) && candidate !== baseDir) {
             return sendError(403, 'FORBIDDEN_PATH', 'Forbidden static path');
           }
-          if (existsSync(candidate) && statSync(candidate).isFile()) {
-            candidatePath = candidate;
-            break;
+          if (existsSync(candidate)) {
+            const st = statSync(candidate);
+            if (st.isFile() && st.mtimeMs > candidateMtime) {
+              candidatePath = candidate;
+              candidateMtime = st.mtimeMs;
+            }
           }
         }
       }
@@ -1944,6 +1950,6 @@ if (import.meta.main) {
   const enableNpu = process.env.CQM2_DISABLE_NPU !== '1';
   const enableGoOsc = process.env.CQM2_DISABLE_GO_OSC !== '1';
   const srv = await createCqm2Server({ enableNpuDaemon: enableNpu, enableGoOscDaemon: enableGoOsc });
-  console.log(`[CQM2] Local Quad-Silicon Workstation v3.0.0 listening at ${srv.url}`);
+  console.log(`[CQM2] Local Quad-Silicon Workstation v4.0.0 listening at ${srv.url}`);
   console.log(`[CQM2] Silicon Topology:`, JSON.stringify(srv.triEngine.getTopology()));
 }

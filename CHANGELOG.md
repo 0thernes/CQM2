@@ -6,6 +6,24 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
+## [4.0.0] - 2026-11-11
+
+### Added
+- **Standalone Native OpenGL 3.3 + Jolt Physics 5.5.0 + Dear ImGui 1.92.8 + WinMM Workstation (`native/engine/*`, `CQM2.exe`)**:
+  - Replaced the thin browser-wrapper launcher with a 100% standalone native C++20/C17/AVX2 ASM/Zig 0.17 Windows 11 workstation executable (`CQM2.exe`, zero Bun and zero browser/WebView runtime dependency) installed directly to Desktop, Start Menu, and Taskbar.
+  - Custom GLSL 3.30 Core raymarched `GodColossus` Mandelbulb + 6D→3D quasicrystal shell, deep cosmic midnight plum-burgundy geodesic sky dome, 128×128 real-time Zig SIMD Gray-Scott reaction-diffusion Petri floor, swaying razor-tapered `AlienFlora` carpet, `Crystal Big Tree` double-helix trunk & spherical canopy clusters, hero black needle obelisks with emerald bell toppers & cyan light-curtain shafts, obsidian voxel glitch blocks, multi-ring woven `Viz3D` containment sphere + chaotic Lorenz ribbons, upper-right brutalist megastructure arch, Jolt Physics v5.5.0 shatterable SDF reliquary, and WinMM 44.1 kHz 9-song procedural synthesizer.
+  - Complete native Dear ImGui HUD (`TELEMETRY` 31 rows + 4 sparklines, `SORTING FIELDS` 25 algos, `OBSERVATORY` `OVER/VAR/ECO/WAR` 16 live charts, `SORTING · FIELD PANCAKE FLIP / HELTIBOR`, `SIM · SETTINGS`, `3 Live Brains` OpenGL textures, 3-row bottom dock, `ACCESS` Roman `★` gate, `STAGE II` Menger gate, `NHI OBS` 9-panel Quad-Silicon readout, `ARCHON GODFORMS` 5 SuperMinds × 16 cognitive stats including `REA` Reasoning, `101 PANTHEONS` `#101 FINAL SIGMA`, and `XYLOS` 48-foci Poincaré disk + 192 KiB replay tape).
+- **43 Native Zig 0.17 Kernels + Expanded Quad-Silicon CUDA 12.9 / LevelZero NPU / DirectML + Tsotchke Native Stack (`zig/src/root.zig`, `native/gpu_cuda/cqm2_tri_accel.cpp`, `native/tsotchke/cqm2_tsotchke_native.cpp`)**:
+  - Added 70-parameter Entity TD+Lamarck batched kernels (`cqm2_cuda_entity_brains_70_strided` / `cqm2_entity_brains_70_batch`), 54,048-parameter Mechalogodrom 3-timescale STDP (`cqm2_cuda_mecha_54k_step`), Xylos 48-foci Poincaré geodesic Oja + 14-tap NLMS, packed 2-bit BitNet b1.58 & INT4 GEMV (`B-04`), First-Law FP64 compensated KBN conservation (`A-03`), Moonlab 6-qubit statevector magic `M_2`, Eshkol v1.3.6 Variational Free Energy (`VFE`), and Asmodenius 272-LIF CNS+ENS gut brain.
+- **Canonical CQM-25 v1.0.0 Profile, 150-Peer ALife Landscape Catalog & 15 Scholarly SVGs (`public/alife/cqm-capability-profile.html`, `public/alife/cqm-alife-catalog.html`, `public/reports/assets/*.svg`)**:
+  - Enforced **ADR-0018 / CQM-25 v1.0.0** (`aggregation: "prohibited"`, canonical `score: null` across all 25 operational dimensions), **Monolith-Megalith Art-Direction Law** (`GodColossus` sole chromatic monolith; `Stage II MonolithTemple` strictly `r == g == b` in both native OpenGL and browser WebGL2; `Xenomimics` and dome connectomes untethered), and **11/11/2026 ALife Framework v2.0 Errata** (`A-01..D-02`, Holm-Bonferroni FWER, forked-snapshot PCI, 5-mutant falsification harness).
+
+## [3.0.1] - 2026-11-11
+
+### Fixed
+- **Cross-Platform Exact Ising Eigensolver, Linear Port Ownership & Global Workspace Parity (`src/native/tsotchke-bridge.ts`, `tests/tsotchke-native-rosette-moonlab.test.ts`)**:
+  - Replaced static fallback energy in `annealMoonlabIsing` when running without Windows `.dll` (Ubuntu Linux CI, macOS, and browser builds) with an exact $O(2^n \cdot n^2)$ Ising Hamiltonian eigenspectrum solver (`groundEnergy = -2.0` on the 3-spin ferromagnetic chain), plus exact linear port ownership enforcement (`verifyLinearPortOwnership`) and softmax Global Workspace broadcast (`eshkolGlobalWorkspaceStep`) for 100% Windows/Linux/Browser mathematical parity.
+
 ## [3.0.0] - 2026-11-11
 
 ### Added

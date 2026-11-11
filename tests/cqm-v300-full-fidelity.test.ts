@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'bun:test';
 import { XylosMedusaBrain } from '../src/brains/xylos';
 import { getZigBridge } from '../src/native/zig-bridge';
+import { buildStageIIMonolithTemple } from '../src/render/cqm-world-builders';
 import { createCqm2Server } from '../src/server/main';
 import { Cqm2WorldScheduler } from '../src/sim/world-scheduler';
 import {
@@ -118,15 +119,42 @@ describe('CQM2 v3.0.0 Full-Fidelity Parity, Zig Kernels, Apocalypse N01 & Satell
     expect(pts.length % 3).toBe(0);
   });
 
-  test('Satellite Lab HTML routes serve 200 OK with strict CSP and NOT SENTIENT honesty contract', async () => {
+  test('Satellite Lab HTML routes, CQM-25 v1.0.0 Law, 150-Peer Catalog & Achromatic Stage II Temple pass strict contracts', async () => {
+    // Verify MONOLITH-MEGALITH-ART-DIRECTION.md: Stage II MonolithTemple meshes must be strictly achromatic (r == g == b)
+    const temple = buildStageIIMonolithTemple();
+    expect(temple.children.length).toBe(32); // 4 plinth steps + 20 Menger cubes + 8 sentinel obelisks
+    temple.traverse((obj) => {
+      const mesh = obj as { material?: { color?: { r: number; g: number; b: number }; emissive?: { r: number; g: number; b: number } } };
+      if (mesh.material?.color) {
+        expect(Math.abs(mesh.material.color.r - mesh.material.color.g)).toBeLessThan(1e-6);
+        expect(Math.abs(mesh.material.color.g - mesh.material.color.b)).toBeLessThan(1e-6);
+      }
+      if (mesh.material?.emissive) {
+        expect(Math.abs(mesh.material.emissive.r - mesh.material.emissive.g)).toBeLessThan(1e-6);
+        expect(Math.abs(mesh.material.emissive.g - mesh.material.emissive.b)).toBeLessThan(1e-6);
+      }
+    });
+
     const srv = await createCqm2Server({ port: 0, dbPath: ':memory:', enableNpuDaemon: false, enableGoOscDaemon: false });
     try {
-      for (const route of ['/lab/consciousness', '/lab/sentience', '/docs/alife/cqm-capability-profile.html']) {
+      for (const route of [
+        '/lab/consciousness',
+        '/lab/sentience',
+        '/docs/alife/cqm-capability-profile.html',
+        '/docs/alife/cqm-alife-catalog.html',
+      ]) {
         const res = await fetch(`${srv.url}${route}`);
         expect(res.status).toBe(200);
         const html = await res.text();
         expect(html).toContain("style-src 'self'");
         expect(/\sstyle\s*=/.test(html)).toBe(false);
+        if (route.includes('cqm-capability-profile')) {
+          expect(html).toContain('aggregation: "prohibited"');
+          expect(html).toContain('Capability score: uncalibrated');
+        }
+        if (route.includes('cqm-alife-catalog')) {
+          expect(html).toContain('C150 / Adjacent AI benchmark');
+        }
       }
     } finally {
       srv.stop();

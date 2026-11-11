@@ -315,7 +315,7 @@ describe('Watertight Exporters (.glb/.png/Unity6/TD), OpenAPI /api/v1/* Security
     }
   }, 30_000);
 
-  test('All 7 public HTML surfaces enforce semantic skip-links, lang="en", zero inline styles, and zero CSS !important', () => {
+  test('All 11 public HTML surfaces enforce semantic skip-links, lang="en", zero inline styles, and zero CSS !important', () => {
     const pages = [
       'index.html',
       'docs.html',
@@ -324,6 +324,10 @@ describe('Watertight Exporters (.glb/.png/Unity6/TD), OpenAPI /api/v1/* Security
       'glossary.html',
       'downloads.html',
       'lab/quantum-wildbeyond.html',
+      'lab/consciousness.html',
+      'lab/sentience.html',
+      'alife/cqm-capability-profile.html',
+      'alife/cqm-alife-catalog.html',
     ];
     for (const p of pages) {
       const html = readFileSync(join(ROOT, 'public', p), 'utf8');

@@ -971,7 +971,8 @@ export function buildNhiTossedProbePool(maxProbes = 64): THREE.InstancedMesh {
 }
 
 /**
- * Builds the `◈ STAGE II` (`UwU`) Obsidian-Rune `Monolith Temple` that rises smoothly from beneath the central seabed.
+ * Builds the `◈ STAGE II` (`UwU`) strictly achromatic (`r == g == b`) Level-1 Menger Sponge `Monolith Temple`
+ * + 8 sentinel obelisks per `MONOLITH-MEGALITH-ART-DIRECTION.md` (GodColossus is the sole chromatic monolith).
  */
 export function buildStageIIMonolithTemple(): THREE.Group {
   const temple = new THREE.Group();
@@ -980,65 +981,54 @@ export function buildStageIIMonolithTemple(): THREE.Group {
   temple.visible = false;
 
   const obsidianMat = new THREE.MeshStandardMaterial({
-    color: 0x07040e,
-    emissive: 0x4c0519,
-    emissiveIntensity: 0.62,
-    metalness: 0.88,
-    roughness: 0.18,
+    color: 0x101010,
+    emissive: 0x050505,
+    emissiveIntensity: 0.45,
+    metalness: 0.90,
+    roughness: 0.22,
   });
-  const runeMat = new THREE.MeshStandardMaterial({
-    color: 0xf43f5e,
-    emissive: 0xe11d48,
-    emissiveIntensity: 1.15,
-    metalness: 0.35,
-    roughness: 0.2,
+  const graphiteMat = new THREE.MeshStandardMaterial({
+    color: 0x262626,
+    emissive: 0x0c0c0c,
+    emissiveIntensity: 0.40,
+    metalness: 0.84,
+    roughness: 0.26,
   });
 
-  // 4-stepped obsidian ziggurat plinth
+  // 4-stepped strictly achromatic obsidian plinth (r == g == b)
   for (let s = 0; s < 4; s++) {
-    const w = 44 - s * 8.5;
-    const stepMesh = new THREE.Mesh(new THREE.BoxGeometry(w, 3.2, w), obsidianMat);
-    stepMesh.position.y = s * 3.2 + 1.6;
+    const w = 44 - s * 7.5;
+    const stepMesh = new THREE.Mesh(new THREE.BoxGeometry(w, 2.8, w), obsidianMat);
+    stepMesh.position.y = s * 2.8 + 1.4;
     temple.add(stepMesh);
   }
 
-  // 12 perimeter rune obelisks
-  const pillarGeo = new THREE.CylinderGeometry(0.9, 1.35, 22, 6);
-  for (let i = 0; i < 12; i++) {
-    const a = (i / 12) * Math.PI * 2;
-    const px = Math.cos(a) * 19.5;
-    const pz = Math.sin(a) * 19.5;
-    const pMesh = new THREE.Mesh(pillarGeo, i % 2 === 0 ? obsidianMat : runeMat);
-    pMesh.position.set(px, 12.8 + 11, pz);
+  // 20-cube Level-1 Menger Sponge Crown (3x3x3 minus 7 center-cross voids, strictly r == g == b)
+  const cell = 6.2;
+  const mengerGeo = new THREE.BoxGeometry(cell * 0.96, cell * 0.96, cell * 0.96);
+  for (let ix = -1; ix <= 1; ix++) {
+    for (let iy = -1; iy <= 1; iy++) {
+      for (let iz = -1; iz <= 1; iz++) {
+        const zeroAxes = (ix === 0 ? 1 : 0) + (iy === 0 ? 1 : 0) + (iz === 0 ? 1 : 0);
+        if (zeroAxes >= 2) continue;
+        const mCube = new THREE.Mesh(mengerGeo, (ix + iy + iz) % 2 === 0 ? obsidianMat : graphiteMat);
+        mCube.position.set(ix * cell, 22.0 + iy * cell, iz * cell);
+        temple.add(mCube);
+      }
+    }
+  }
+
+  // 8 perimeter strictly achromatic sentinel obelisks (r == g == b)
+  const pillarGeo = new THREE.BoxGeometry(2.1, 24, 2.1);
+  for (let i = 0; i < 8; i++) {
+    const a = (i / 8) * Math.PI * 2;
+    const px = Math.cos(a) * 21.0;
+    const pz = Math.sin(a) * 21.0;
+    const pMesh = new THREE.Mesh(pillarGeo, i % 2 === 0 ? obsidianMat : graphiteMat);
+    pMesh.position.set(px, 11.2 + 12, pz);
     temple.add(pMesh);
   }
 
-  // Twin portal rings + zenith dimensional rift spire
-  const portalOuter = new THREE.Mesh(
-    new THREE.TorusGeometry(11.5, 0.55, 10, 48),
-    new THREE.MeshBasicMaterial({ color: 0xf43f5e }),
-  );
-  portalOuter.position.y = 32;
-  const portalInner = new THREE.Mesh(
-    new THREE.TorusGeometry(8.2, 0.42, 10, 40),
-    new THREE.MeshBasicMaterial({ color: 0x22d3ee }),
-  );
-  portalInner.position.y = 32;
-  portalInner.rotation.y = Math.PI / 4;
-
-  const beacon = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.6, 2.4, 96, 8),
-    new THREE.MeshBasicMaterial({
-      color: 0xf43f5e,
-      transparent: true,
-      opacity: 0.36,
-      blending: THREE.AdditiveBlending,
-      depthWrite: false,
-    }),
-  );
-  beacon.position.y = 58;
-
-  temple.add(portalOuter, portalInner, beacon);
   return temple;
 }
 

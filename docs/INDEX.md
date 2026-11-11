@@ -1,10 +1,10 @@
-# Documentation Index — CQM2 (`v2.2.0`)
+# Documentation Index — CQM2 (`v4.0.0`)
 
 Every architectural, API, database, scientific, operational, legal, and verification document under `docs/` is cataloged below:
 
 | Document | Scope & Contents |
 |---|---|
-| [SUMMARY.md](SUMMARY.md) | Executive & technical overview of CQM2 v2.2.0 Quad-Silicon, 10-entity ERP, and creature intelligence |
+| [SUMMARY.md](SUMMARY.md) | Executive & technical overview of CQM2 v4.0.0 Standalone OpenGL/Jolt Workstation, Quad-Silicon, and CQM-25 |
 | [ARCHITECTURE.md](ARCHITECTURE.md) | Polyglot system architecture, 5-phase scheduler pipeline, and cohesive module size registry (`I-068`) |
 | [openapi.json](openapi.json) | Machine-readable OpenAPI 3.1.0 specification for all `/api/v1/*` endpoints and error envelopes |
 | [ERD-ERM-ERP.md](ERD-ERM-ERP.md) | Normalized 10-entity Mermaid ERD, `migrations/001..002` 3NF SQLite WAL schema, and SoA ERP spec |

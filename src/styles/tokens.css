@@ -2007,6 +2007,346 @@ pre,
   font-size: var(--fs-sm);
 }
 
+/* CQM-25 v1.0.0 Canonical Profile & 150-Peer ALife Comparative Catalog */
+.cqm-svg-figure {
+  margin: 14px 0 20px;
+  padding: 14px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-subtle);
+  background: #ffffff;
+  color: #0f172a;
+}
+
+.cqm-svg-figure img {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+
+.cqm-svg-caption {
+  margin-top: 8px;
+  font-size: var(--fs-xs);
+  color: #334155;
+  font-family: var(--font-mono);
+}
+
+.cqm-svg-grid-2 {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 14px;
+  margin-top: 12px;
+}
+
+.cqm-archive-details {
+  margin-top: 16px;
+  padding: 12px 16px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-panel);
+}
+
+.cqm-archive-details > summary {
+  cursor: pointer;
+  font-family: var(--font-mono);
+  font-weight: 700;
+  color: var(--text-accent-cyan);
+}
+
+.alife-catalog-controls {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin: 16px 0 10px;
+  padding: 12px;
+  border-radius: var(--radius-md);
+  background: var(--bg-panel);
+  border: 1px solid var(--border-subtle);
+}
+
+.alife-catalog-controls input,
+.alife-catalog-controls select {
+  font-family: var(--font-sans);
+  font-size: var(--fs-sm);
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-strong);
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+}
+
+.alife-catalog-controls input {
+  flex: 2;
+  min-width: 240px;
+}
+
+.alife-catalog-controls select {
+  flex: 1;
+  min-width: 200px;
+}
+
+.alife-catalog-count {
+  font-family: var(--font-mono);
+  font-size: var(--fs-xs);
+  color: var(--text-secondary);
+  margin: 8px 0 16px;
+}
+
+.alife-catalog-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(310px, 1fr));
+  gap: 14px;
+}
+
+.alife-catalog-grid article {
+  background: var(--bg-panel);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.alife-catalog-grid article[hidden] {
+  display: none;
+}
+
+.alife-catalog-grid article .eyebrow {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-accent-cyan);
+}
+
+.alife-catalog-grid article h2 {
+  font-size: var(--fs-lg);
+  margin: 8px 0 10px;
+  color: var(--text-primary);
+}
+
+.alife-catalog-grid article .badge {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: rgba(16, 185, 129, 0.16);
+  border: 1px solid rgba(52, 211, 153, 0.45);
+  color: var(--text-accent-emerald);
+  margin-bottom: 8px;
+}
+
+.alife-catalog-grid article .badge.partial {
+  background: rgba(245, 158, 11, 0.16);
+  border-color: rgba(251, 191, 36, 0.45);
+  color: var(--text-accent-gold);
+}
+
+.alife-catalog-grid article .note {
+  font-size: var(--fs-sm);
+  color: var(--text-secondary);
+}
+
+.alife-catalog-grid article details {
+  font-size: var(--fs-xs);
+  color: var(--text-muted-hud);
+  margin-bottom: 12px;
+}
+
+.alife-catalog-grid article details summary {
+  cursor: pointer;
+  color: var(--text-secondary);
+}
+
+.alife-catalog-grid article a {
+  margin-top: auto;
+  font-family: var(--font-mono);
+  font-size: var(--fs-xs);
+  font-weight: 700;
+}
+
+/* CQM-25 Canonical 25-Axis Profile Styles (Strict CSP, Zero !important) */
+.cqm25-law,
+.cqm25-notice,
+.cqm25-method {
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--bg-panel);
+  padding: 18px 22px;
+  margin: 20px 0;
+}
+
+.cqm25-law {
+  border-left: 4px solid var(--text-accent-cyan);
+}
+
+.cqm25-notice,
+.cqm25-method.provisional {
+  border-left: 4px solid var(--text-accent-gold);
+}
+
+.cqm25-filters {
+  display: grid;
+  grid-template-columns: 2fr repeat(3, 1fr) auto;
+  gap: 12px;
+  border: 1px solid var(--border-subtle);
+  padding: 16px;
+  border-radius: var(--radius-md);
+  margin: 22px 0 12px;
+  background: var(--bg-panel);
+}
+
+@media (max-width: 900px) {
+  .cqm25-filters {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.cqm25-filters label {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  font-size: var(--fs-xs);
+  color: var(--text-secondary);
+}
+
+.cqm25-filters input,
+.cqm25-filters select,
+.cqm25-filters button {
+  font-family: var(--font-sans);
+  font-size: var(--fs-sm);
+  color: var(--text-primary);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  min-height: 42px;
+  padding: 8px 10px;
+}
+
+.cqm25-filters button {
+  align-self: end;
+  cursor: pointer;
+}
+
+.cqm25-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+@media (max-width: 720px) {
+  .cqm25-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.cqm25-grid .axis {
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--bg-panel);
+  padding: 20px;
+  min-width: 0;
+}
+
+.cqm25-grid .axis[hidden],
+p[hidden] {
+  display: none;
+}
+
+.cqm25-grid .axis-top {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.cqm25-grid .number {
+  font-family: var(--font-mono);
+  font-size: 1.45rem;
+  font-weight: 700;
+  color: var(--text-accent-cyan);
+  font-variant-numeric: tabular-nums;
+}
+
+.cqm25-grid .kind {
+  font-family: var(--font-mono);
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  font-size: 0.72rem;
+  color: var(--text-muted-hud);
+}
+
+.cqm25-grid .tags {
+  display: flex;
+  gap: 7px;
+  flex-wrap: wrap;
+  font-size: 0.75rem;
+  margin-bottom: 10px;
+}
+
+.cqm25-grid .tags span {
+  padding: 3px 8px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 5px;
+  background: var(--bg-elevated);
+}
+
+.cqm25-grid .bounded-test {
+  color: var(--text-accent-emerald);
+}
+
+.cqm25-grid .implemented {
+  color: var(--text-accent-cyan);
+}
+
+.cqm25-grid .mixed {
+  color: var(--text-accent-gold);
+}
+
+.cqm25-grid .unassessed {
+  color: var(--text-secondary);
+}
+
+.cqm25-grid .finding {
+  border-top: 1px solid var(--border-subtle);
+  padding-top: 10px;
+  font-size: var(--fs-sm);
+}
+
+.cqm25-grid .uncalibrated {
+  font-family: var(--font-mono);
+  font-size: var(--fs-xs);
+  color: var(--text-accent-gold);
+}
+
+.estimate-table {
+  overflow-x: auto;
+  margin-top: 16px;
+}
+
+.estimate-table table,
+.crosswalk {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--fs-sm);
+}
+
+.estimate-table th,
+.estimate-table td,
+.crosswalk th,
+.crosswalk td {
+  border: 1px solid var(--border-subtle);
+  padding: 10px 12px;
+  text-align: left;
+  vertical-align: top;
+}
+
+.estimate-value {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  color: var(--text-accent-gold);
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

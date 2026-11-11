@@ -2,11 +2,13 @@ const std = @import("std");
 const math = std.math;
 
 // ============================================================================
-// CQM2 v2.1.0 Dual-Target Zig SIMD128 / AVX2 Scientific & Neural Kernel Suite
+// CQM2 v4.0.0 Dual-Target Zig SIMD128 / AVX2 Scientific & Neural Kernel Suite
 // Targets: wasm32-freestanding (+simd128) AND x86_64/aarch64 Native FFI DLL
+// Unifies all 20 CQM2 kernels + all 18 Original CQM `cqm_*` kernels + 5 v4.0.0
+// Neuroscience & 11/11/2026 Errata kernels (43 total hardware-SIMD exports).
 // ============================================================================
 
-const HEAP_SIZE: usize = 16 * 1024 * 1024; // 16 MiB deterministic linear arena
+const HEAP_SIZE: usize = 32 * 1024 * 1024; // 32 MiB deterministic linear arena
 var static_heap: [HEAP_SIZE]u8 align(16) = undefined;
 var heap_offset: usize = 0;
 
@@ -1437,6 +1439,821 @@ export fn cqm2_quasicrystal_icosa_shell(
 }
 
 // ============================================================================
+// 15. Original CQM v0.23.0 Complete 18-Kernel `cqm_*` Compatibility & SIMD Suite
+// ============================================================================
+
+export fn cqm_gray_scott_step(
+    u: [*]f32,
+    v: [*]f32,
+    u_next: [*]f32,
+    v_next: [*]f32,
+    n: usize,
+    feed: f32,
+    kill: f32,
+    du: f32,
+    dv: f32,
+    dt: f32,
+) callconv(.c) void {
+    if (n < 3) return;
+    var y: usize = 0;
+    while (y < n) : (y += 1) {
+        const ym = if (y == 0) n - 1 else y - 1;
+        const yp = if (y + 1 == n) 0 else y + 1;
+        var x: usize = 0;
+        while (x < n) : (x += 1) {
+            const xm = if (x == 0) n - 1 else x - 1;
+            const xp = if (x + 1 == n) 0 else x + 1;
+            const idx = y * n + x;
+            const u_cur = u[idx];
+            const v_cur = v[idx];
+            const lap_u = u[ym * n + x] + u[yp * n + x] + u[y * n + xm] + u[y * n + xp] - 4.0 * u_cur;
+            const lap_v = v[ym * n + x] + v[yp * n + x] + v[y * n + xm] + v[y * n + xp] - 4.0 * v_cur;
+            const uvv = u_cur * v_cur * v_cur;
+            u_next[idx] = math.clamp(u_cur + (du * lap_u - uvv + feed * (1.0 - u_cur)) * dt, 0.0, 1.0);
+            v_next[idx] = math.clamp(v_cur + (dv * lap_v + uvv - (feed + kill) * v_cur) * dt, 0.0, 1.0);
+        }
+    }
+}
+
+export fn cqm_gray_scott_step_rgba_f32(
+    src_rgba: [*]const f32,
+    dst_rgba: [*]f32,
+    n: usize,
+    feed: f32,
+    kill: f32,
+    du: f32,
+    dv: f32,
+    dt: f32,
+    f_spatial: f32,
+) callconv(.c) void {
+    if (n < 3) return;
+    const inv_n = 1.0 / @as(f32, @floatFromInt(n));
+    var y: usize = 0;
+    while (y < n) : (y += 1) {
+        const ym = if (y == 0) n - 1 else y - 1;
+        const yp = if (y + 1 == n) 0 else y + 1;
+        const fy = (@as(f32, @floatFromInt(y)) * inv_n - 0.5) * 2.0;
+        var x: usize = 0;
+        while (x < n) : (x += 1) {
+            const xm = if (x == 0) n - 1 else x - 1;
+            const xp = if (x + 1 == n) 0 else x + 1;
+            const fx = (@as(f32, @floatFromInt(x)) * inv_n - 0.5) * 2.0;
+            const idx4 = (y * n + x) * 4;
+            const u_cur = src_rgba[idx4];
+            const v_cur = src_rgba[idx4 + 1];
+            const b_cur = src_rgba[idx4 + 2];
+            const lap_u = src_rgba[(ym * n + x) * 4] + src_rgba[(yp * n + x) * 4] + src_rgba[(y * n + xm) * 4] + src_rgba[(y * n + xp) * 4] - 4.0 * u_cur;
+            const lap_v = src_rgba[(ym * n + x) * 4 + 1] + src_rgba[(yp * n + x) * 4 + 1] + src_rgba[(y * n + xm) * 4 + 1] + src_rgba[(y * n + xp) * 4 + 1] - 4.0 * v_cur;
+            const r2 = fx * fx + fy * fy;
+            const f_loc = math.clamp(feed + f_spatial * (0.5 - r2), 0.008, 0.095);
+            const uvv = u_cur * v_cur * v_cur;
+            dst_rgba[idx4] = math.clamp(u_cur + (du * lap_u - uvv + f_loc * (1.0 - u_cur)) * dt, 0.0, 1.0);
+            dst_rgba[idx4 + 1] = math.clamp(v_cur + (dv * lap_v + uvv - (f_loc + kill) * v_cur) * dt, 0.0, 1.0);
+            dst_rgba[idx4 + 2] = math.clamp(b_cur * 0.992 + dst_rgba[idx4 + 1] * 0.008, 0.0, 1.0);
+            dst_rgba[idx4 + 3] = 1.0;
+        }
+    }
+}
+
+export fn cqm_tdse_step(
+    re: [*]f64,
+    im: [*]f64,
+    pot: [*]const f64,
+    n: usize,
+    dt: f64,
+    dx2_inv: f64,
+) callconv(.c) f64 {
+    if (n < 3) return 0.0;
+    const half_dt = 0.5 * dt;
+    var i: usize = 0;
+    while (i < n) : (i += 1) {
+        const im_prev = if (i == 0) im[n - 1] else im[i - 1];
+        const im_next = if (i + 1 == n) im[0] else im[i + 1];
+        const kin = -0.5 * (im_prev + im_next - 2.0 * im[i]) * dx2_inv;
+        re[i] += half_dt * (kin + pot[i] * im[i]);
+    }
+    i = 0;
+    while (i < n) : (i += 1) {
+        const re_prev = if (i == 0) re[n - 1] else re[i - 1];
+        const re_next = if (i + 1 == n) re[0] else re[i + 1];
+        const kin = -0.5 * (re_prev + re_next - 2.0 * re[i]) * dx2_inv;
+        im[i] -= dt * (kin + pot[i] * re[i]);
+    }
+    var norm: f64 = 0.0;
+    i = 0;
+    while (i < n) : (i += 1) {
+        const im_prev = if (i == 0) im[n - 1] else im[i - 1];
+        const im_next = if (i + 1 == n) im[0] else im[i + 1];
+        const kin = -0.5 * (im_prev + im_next - 2.0 * im[i]) * dx2_inv;
+        re[i] += half_dt * (kin + pot[i] * im[i]);
+        norm += re[i] * re[i] + im[i] * im[i];
+    }
+    return norm;
+}
+
+export fn cqm_qgt_fubini_study(
+    psi_re: [*]const f64,
+    psi_im: [*]const f64,
+    dpsi_re: [*]const f64,
+    dpsi_im: [*]const f64,
+    dim: usize,
+) callconv(.c) f64 {
+    var d_norm: f64 = 0.0;
+    var ov_re: f64 = 0.0;
+    var ov_im: f64 = 0.0;
+    var k: usize = 0;
+    while (k < dim) : (k += 1) {
+        d_norm += dpsi_re[k] * dpsi_re[k] + dpsi_im[k] * dpsi_im[k];
+        ov_re += psi_re[k] * dpsi_re[k] + psi_im[k] * dpsi_im[k];
+        ov_im += psi_re[k] * dpsi_im[k] - psi_im[k] * dpsi_re[k];
+    }
+    return @max(0.0, d_norm - (ov_re * ov_re + ov_im * ov_im));
+}
+
+export fn cqm_qgtl_full_tensor_2d(
+    psi_re: [*]const f64,
+    psi_im: [*]const f64,
+    dx_re: [*]const f64,
+    dx_im: [*]const f64,
+    dy_re: [*]const f64,
+    dy_im: [*]const f64,
+    dim: usize,
+    out4: [*]f64,
+) callconv(.c) void {
+    var dx2: f64 = 0.0;
+    var dy2: f64 = 0.0;
+    var dxy_re: f64 = 0.0;
+    var dxy_im: f64 = 0.0;
+    var ox_re: f64 = 0.0;
+    var ox_im: f64 = 0.0;
+    var oy_re: f64 = 0.0;
+    var oy_im: f64 = 0.0;
+    var k: usize = 0;
+    while (k < dim) : (k += 1) {
+        dx2 += dx_re[k] * dx_re[k] + dx_im[k] * dx_im[k];
+        dy2 += dy_re[k] * dy_re[k] + dy_im[k] * dy_im[k];
+        dxy_re += dx_re[k] * dy_re[k] + dx_im[k] * dy_im[k];
+        dxy_im += dx_re[k] * dy_im[k] - dx_im[k] * dy_re[k];
+        ox_re += psi_re[k] * dx_re[k] + psi_im[k] * dx_im[k];
+        ox_im += psi_re[k] * dx_im[k] - psi_im[k] * dx_re[k];
+        oy_re += psi_re[k] * dy_re[k] + psi_im[k] * dy_im[k];
+        oy_im += psi_re[k] * dy_im[k] - psi_im[k] * dy_re[k];
+    }
+    const g_xx = @max(0.0, dx2 - (ox_re * ox_re + ox_im * ox_im));
+    const g_yy = @max(0.0, dy2 - (oy_re * oy_re + oy_im * oy_im));
+    const prod_re = ox_re * oy_re + ox_im * oy_im;
+    const prod_im = ox_re * oy_im - ox_im * oy_re;
+    const g_xy = dxy_re - prod_re;
+    const omega_xy = -2.0 * (dxy_im - prod_im);
+    out4[0] = g_xx;
+    out4[1] = g_xy;
+    out4[2] = g_yy;
+    out4[3] = omega_xy;
+}
+
+export fn cqm_moonlab_ising_anneal(
+    spins: [*]i8,
+    couplings: [*]const f32,
+    fields: [*]const f32,
+    n: usize,
+    sweeps: usize,
+    gamma_start: f32,
+    gamma_end: f32,
+    seed_in: u64,
+) callconv(.c) f32 {
+    if (n == 0) return 0.0;
+    var rng: u64 = if (seed_in == 0) 0x9E3779B97F4A7C15 else seed_in;
+    var sw: usize = 0;
+    while (sw < sweeps) : (sw += 1) {
+        const frac = @as(f32, @floatFromInt(sw)) / @as(f32, @floatFromInt(@max(sweeps, 1)));
+        const gamma = gamma_start + (gamma_end - gamma_start) * frac;
+        const beta = 0.5 + 4.5 * frac;
+        var i: usize = 0;
+        while (i < n) : (i += 1) {
+            var local_h: f32 = fields[i];
+            var j: usize = 0;
+            while (j < n) : (j += 1) {
+                if (i != j) local_h += couplings[i * n + j] * @as(f32, @floatFromInt(spins[j]));
+            }
+            const si = @as(f32, @floatFromInt(spins[i]));
+            const d_e = 2.0 * si * local_h - gamma * 0.35;
+            rng ^= rng << 13;
+            rng ^= rng >> 7;
+            rng ^= rng << 17;
+            const u_rand = @as(f32, @floatFromInt(rng & 0xFFFFFF)) / 16777216.0;
+            if (d_e <= 0.0 or u_rand < @exp(-beta * d_e)) {
+                spins[i] = -spins[i];
+            }
+        }
+    }
+    var energy: f32 = 0.0;
+    var i: usize = 0;
+    while (i < n) : (i += 1) {
+        const si = @as(f32, @floatFromInt(spins[i]));
+        energy -= fields[i] * si;
+        var j: usize = i + 1;
+        while (j < n) : (j += 1) {
+            energy -= couplings[i * n + j] * si * @as(f32, @floatFromInt(spins[j]));
+        }
+    }
+    return energy;
+}
+
+export fn cqm_qrng_quantum_chaos_step(
+    state_in_out: *u64,
+    out_floats: [*]f32,
+    count: usize,
+    r_logistic: f64,
+) callconv(.c) void {
+    var s: u64 = if (state_in_out.* == 0) 0xD1B54A32D192ED03 else state_in_out.*;
+    const r = math.clamp(r_logistic, 3.57, 4.0);
+    var x: f64 = (@as(f64, @floatFromInt((s >> 11) & ((@as(u64, 1) << 53) - 1))) + 0.5) * (1.0 / 9007199254740992.0);
+    var i: usize = 0;
+    while (i < count) : (i += 1) {
+        x = r * x * (1.0 - x);
+        s +%= 0x9E3779B97F4A7C15;
+        var z = s;
+        z = (z ^ (z >> 30)) *% 0xBF58476D1CE4E5B9;
+        z = (z ^ (z >> 27)) *% 0x94D049BB133111EB;
+        z = z ^ (z >> 31);
+        const q = (@as(f64, @floatFromInt(z >> 11)) * (1.0 / 9007199254740992.0));
+        const mixed = @mod(x + q, 1.0);
+        out_floats[i] = @floatCast(mixed);
+    }
+    state_in_out.* = s;
+}
+
+export fn cqm_eshkol_taylor_diff(
+    poly_coeffs: [*]const f64,
+    degree: usize,
+    x: f64,
+    out3: [*]f64, // [f(x), f'(x), f''(x)]
+) callconv(.c) void {
+    var f0: f64 = 0.0;
+    var f1: f64 = 0.0;
+    var f2: f64 = 0.0;
+    var k: usize = degree + 1;
+    while (k > 0) {
+        k -= 1;
+        f2 = f2 * x + 2.0 * f1;
+        f1 = f1 * x + f0;
+        f0 = f0 * x + poly_coeffs[k];
+    }
+    out3[0] = f0;
+    out3[1] = f1;
+    out3[2] = f2;
+}
+
+// Original CQM 70-parameter (6 -> 6 -> 4) EntityBrain batch forward pass
+export fn cqm_entity_brain_batch_forward(
+    inputs: [*]const f32, // [count * 6]
+    weights: [*]const f32, // [count * 70]: w1[36], b1[6], w2[24], b2[4]
+    outputs: [*]f32, // [count * 4]
+    count: usize,
+) callconv(.c) void {
+    var e: usize = 0;
+    while (e < count) : (e += 1) {
+        const in_b = inputs + e * 6;
+        const w_b = weights + e * 70;
+        const out_b = outputs + e * 4;
+        var hid: [6]f32 = undefined;
+        var h: usize = 0;
+        while (h < 6) : (h += 1) {
+            const row = w_b + h * 6;
+            var acc: f32 = w_b[36 + h];
+            var i: usize = 0;
+            while (i < 6) : (i += 1) acc += row[i] * in_b[i];
+            hid[h] = fastTanh(acc);
+        }
+        const w2 = w_b + 42;
+        const b2 = w_b + 66;
+        var o: usize = 0;
+        while (o < 4) : (o += 1) {
+            const row2 = w2 + o * 6;
+            var acc2: f32 = b2[o];
+            var h2: usize = 0;
+            while (h2 < 6) : (h2 += 1) acc2 += row2[h2] * hid[h2];
+            out_b[o] = fastTanh(acc2);
+        }
+    }
+}
+
+export fn cqm_glyph_hebbian_step(
+    act: [*]f32, // [1024]
+    weights4: [*]f32, // [1024 * 4] (N, S, W, E per cell)
+    drive: [*]const f32, // [1024]
+    lr: f32,
+) callconv(.c) f32 {
+    var next_act: [1024]f32 = undefined;
+    var mean_e: f32 = 0.0;
+    var y: usize = 0;
+    while (y < 32) : (y += 1) {
+        const yn = (y + 31) & 31;
+        const ys = (y + 1) & 31;
+        var x: usize = 0;
+        while (x < 32) : (x += 1) {
+            const xw = (x + 31) & 31;
+            const xe = (x + 1) & 31;
+            const idx = (y << 5) + x;
+            const n_v = act[(yn << 5) + x];
+            const s_v = act[(ys << 5) + x];
+            const w_v = act[(y << 5) + xw];
+            const e_v = act[(y << 5) + xe];
+            const w_ptr = weights4 + idx * 4;
+            const syn = w_ptr[0] * n_v + w_ptr[1] * s_v + w_ptr[2] * w_v + w_ptr[3] * e_v + drive[idx];
+            const y_out = fastTanh(0.65 * act[idx] + 0.35 * syn);
+            next_act[idx] = y_out;
+            mean_e += @abs(y_out);
+            if (@abs(lr) > 1e-8) {
+                const y2 = y_out * y_out;
+                w_ptr[0] = math.clamp(w_ptr[0] + lr * (y_out * n_v - y2 * w_ptr[0]), -1.5, 1.5);
+                w_ptr[1] = math.clamp(w_ptr[1] + lr * (y_out * s_v - y2 * w_ptr[1]), -1.5, 1.5);
+                w_ptr[2] = math.clamp(w_ptr[2] + lr * (y_out * w_v - y2 * w_ptr[2]), -1.5, 1.5);
+                w_ptr[3] = math.clamp(w_ptr[3] + lr * (y_out * e_v - y2 * w_ptr[3]), -1.5, 1.5);
+            }
+        }
+    }
+    @memcpy(act[0..1024], next_act[0..1024]);
+    return mean_e * (1.0 / 1024.0);
+}
+
+export fn cqm_rosette_fnv1a64(bytes: [*]const u8, len: usize) callconv(.c) u64 {
+    var h: u64 = 0xcbf29ce484222325;
+    var i: usize = 0;
+    while (i < len) : (i += 1) {
+        h ^= @as(u64, bytes[i]);
+        h *%= 0x100000001b3;
+    }
+    return h;
+}
+
+export fn cqm_pq_wire_bytes(level: u32, out3: [*]u32) callconv(.c) u32 {
+    // ML-KEM + ML-DSA NIST FIPS 203/204 wire sizes: [pk_bytes, ct_or_sig_bytes, total_frame]
+    switch (level) {
+        512 => {
+            out3[0] = 800;
+            out3[1] = 768 + 2420;
+            out3[2] = 800 + 768 + 2420 + 60;
+        },
+        1024 => {
+            out3[0] = 1568;
+            out3[1] = 1568 + 4627;
+            out3[2] = 1568 + 1568 + 4627 + 60;
+        },
+        else => { // 768 default (ML-KEM-768 + ML-DSA-65)
+            out3[0] = 1184;
+            out3[1] = 1088 + 3309;
+            out3[2] = 1184 + 1088 + 3309 + 60;
+        },
+    }
+    return out3[2];
+}
+
+export fn cqm_georefine_verify_frame(
+    bf16_words: [*]const u16,
+    count: usize,
+    expected_fnv: u64,
+) callconv(.c) u32 {
+    var h: u64 = 0xcbf29ce484222325;
+    var i: usize = 0;
+    while (i < count) : (i += 1) {
+        const w = bf16_words[i];
+        const exp_bits = (w >> 7) & 0xFF;
+        if (exp_bits == 0xFF) return 0; // Reject NaN/Inf in BF16 stream
+        h ^= @as(u64, w & 0xFF);
+        h *%= 0x100000001b3;
+        h ^= @as(u64, (w >> 8) & 0xFF);
+        h *%= 0x100000001b3;
+    }
+    return if (expected_fnv == 0 or h == expected_fnv) 1 else 0;
+}
+
+export fn cqm_eshkol_dbsp_delta_gemm(
+    prev_out: [*]f32, // [m * n] updated in place: out_t = out_{t-1} + delta_a * b
+    delta_a: [*]const f32, // [m * k]
+    b_mat: [*]const f32, // [k * n]
+    m: usize,
+    n: usize,
+    k_dim: usize,
+) callconv(.c) u32 {
+    var nz_rows: u32 = 0;
+    var r: usize = 0;
+    while (r < m) : (r += 1) {
+        var row_energy: f32 = 0.0;
+        var kk: usize = 0;
+        while (kk < k_dim) : (kk += 1) row_energy += @abs(delta_a[r * k_dim + kk]);
+        if (row_energy < 1e-7) continue; // DBSP sparse delta skip!
+        nz_rows += 1;
+        kk = 0;
+        while (kk < k_dim) : (kk += 1) {
+            const da = delta_a[r * k_dim + kk];
+            if (@abs(da) < 1e-8) continue;
+            var c: usize = 0;
+            while (c < n) : (c += 1) {
+                prev_out[r * n + c] += da * b_mat[kk * n + c];
+            }
+        }
+    }
+    return nz_rows;
+}
+
+export fn cqm_eshkol_cyclotomic8_mul(a4: [*]const i64, b4: [*]const i64, out4: [*]i64) callconv(.c) void {
+    // Exact Z[zeta_8] / (zeta_8^4 + 1) ring multiplication for quantum T+H Clifford+T synthesis
+    const a0 = a4[0];
+    const a1 = a4[1];
+    const a2 = a4[2];
+    const a3 = a4[3];
+    const b0 = b4[0];
+    const b1 = b4[1];
+    const b2 = b4[2];
+    const b3 = b4[3];
+    out4[0] = a0 * b0 - a1 * b3 - a2 * b2 - a3 * b1;
+    out4[1] = a0 * b1 + a1 * b0 - a2 * b3 - a3 * b2;
+    out4[2] = a0 * b2 + a1 * b1 + a2 * b0 - a3 * b3;
+    out4[3] = a0 * b3 + a1 * b2 + a2 * b1 + a3 * b0;
+}
+
+export fn cqm_moonlab_qwz_chern_fhs(mass_m: f64, grid_n: u32) callconv(.c) i32 {
+    const n: usize = @max(@as(usize, grid_n), 8);
+    const dk = (2.0 * math.pi) / @as(f64, @floatFromInt(n));
+    var total_flux: f64 = 0.0;
+    var ix: usize = 0;
+    while (ix < n) : (ix += 1) {
+        const kx = -math.pi + @as(f64, @floatFromInt(ix)) * dk;
+        var iy: usize = 0;
+        while (iy < n) : (iy += 1) {
+            const ky = -math.pi + @as(f64, @floatFromInt(iy)) * dk;
+            const dx0 = @sin(kx);
+            const dy0 = @sin(ky);
+            const dz0 = mass_m + @cos(kx) + @cos(ky);
+            const r2 = @max(1e-18, dx0 * dx0 + dy0 * dy0 + dz0 * dz0);
+            const inv_r = 1.0 / @sqrt(r2);
+            const inv_r3 = inv_r * inv_r * inv_r;
+            // Exact lower-band QWZ Berry curvature Omega_-(k) = -(1/2) d . (d_kx d x d_ky d) / |d|^3
+            const omega = -0.5 * (@cos(kx) * @cos(ky) * dz0 + @cos(kx) * @sin(ky) * dy0 + @sin(kx) * @cos(ky) * dx0) * inv_r3;
+            total_flux += omega * dk * dk;
+        }
+    }
+    return @intFromFloat(@round(total_flux / (2.0 * math.pi)));
+}
+
+export fn cqm_libirrep_bdg_skyrmion_mzm(
+    mu: f64,
+    delta_sc: f64,
+    zeeman_vz: f64,
+    out_gap_winding: [*]f64, // [quasiparticle_gap, z2_majorana_invariant]
+) callconv(.c) i32 {
+    // 1D/2D Kitaev-Rashba BdG topological superconductor transition V_z^2 = mu^2 + Delta^2
+    const crit = @sqrt(mu * mu + delta_sc * delta_sc);
+    const gap = @abs(@abs(zeeman_vz) - crit);
+    const z2: i32 = if (@abs(zeeman_vz) > crit and @abs(delta_sc) > 1e-9) -1 else 1;
+    out_gap_winding[0] = gap;
+    out_gap_winding[1] = @floatFromInt(z2);
+    return z2;
+}
+
+export fn cqm_sbnn_minsr_step(
+    spins: [*]f32, // [n] continuous Kerr parametric oscillator amplitudes x_i in [-1, 1]
+    adj_j: [*]const f32, // [n * n]
+    n: usize,
+    pump_p: f32,
+    dt: f32,
+) callconv(.c) f32 {
+    if (n == 0) return 0.0;
+    var energy: f32 = 0.0;
+    var i: usize = 0;
+    while (i < n) : (i += 1) {
+        const xi = spins[i];
+        var coup: f32 = 0.0;
+        var j: usize = 0;
+        while (j < n) : (j += 1) coup += adj_j[i * n + j] * spins[j];
+        // Simulated Bifurcation ballistic/discrete Kerr update
+        const dx = (-(1.0 - pump_p) * xi - xi * xi * xi + 0.5 * coup) * dt;
+        spins[i] = math.clamp(xi + dx, -1.0, 1.0);
+    }
+    i = 0;
+    while (i < n) : (i += 1) {
+        const si: f32 = if (spins[i] >= 0.0) 1.0 else -1.0;
+        var j: usize = i + 1;
+        while (j < n) : (j += 1) {
+            const sj: f32 = if (spins[j] >= 0.0) 1.0 else -1.0;
+            energy -= adj_j[i * n + j] * si * sj;
+        }
+    }
+    return energy;
+}
+
+// ============================================================================
+// 16. CQM2 v4.0.0 Neuroscience & 11/11/2026 Errata Hardware Kernels
+// ============================================================================
+
+// (A) Original CQM 70-param (6->6->4) Recurrent EntityBrain + Online TD Actor-Critic + Lamarckian Motor Plasticity
+export fn cqm2_entity_brain_td_lamarck_batch(
+    inputs: [*]const f32, // [count * 6]
+    weights: [*]f32, // [count * 70]: w1[36], b1[6], w2[24] (rows 0..1 motor, 2 signal, 3 V(s)), b2[4]
+    prev_hid: [*]f32, // [count * 6] recurrent hidden memory (0.8*tanh + 0.2*prev)
+    prev_val: [*]f32, // [count] previous V(s_{t-1})
+    rewards: [*]const f32, // [count] instant metabolic/ecological reward r_t
+    outputs: [*]f32, // [count * 4]: [turn, thrust, signal, value]
+    count: usize,
+    td_lr: f32,
+    lamarck_lr: f32,
+) callconv(.c) f32 {
+    if (count == 0) return 0.0;
+    var mean_abs_td: f32 = 0.0;
+    var e: usize = 0;
+    while (e < count) : (e += 1) {
+        const in_b = inputs + e * 6;
+        const w_b = weights + e * 70;
+        const ph_b = prev_hid + e * 6;
+        const out_b = outputs + e * 4;
+
+        var hid: [6]f32 = undefined;
+        var h: usize = 0;
+        while (h < 6) : (h += 1) {
+            const row = w_b + h * 6;
+            var acc: f32 = w_b[36 + h];
+            var i: usize = 0;
+            while (i < 6) : (i += 1) acc += row[i] * in_b[i];
+            const h_new = 0.8 * fastTanh(acc) + 0.2 * ph_b[h];
+            hid[h] = h_new;
+            ph_b[h] = h_new;
+        }
+
+        const w2 = w_b + 42;
+        const b2 = w_b + 66;
+        var o: usize = 0;
+        while (o < 4) : (o += 1) {
+            const row2 = w2 + o * 6;
+            var acc2: f32 = b2[o];
+            var h2: usize = 0;
+            while (h2 < 6) : (h2 += 1) acc2 += row2[h2] * hid[h2];
+            out_b[o] = fastTanh(acc2);
+        }
+
+        const v_now = out_b[3];
+        const td_err = math.clamp(rewards[e] + 0.95 * v_now - prev_val[e], -2.0, 2.0);
+        prev_val[e] = v_now;
+        mean_abs_td += @abs(td_err);
+
+        // Online TD Critic update on row 3 + Lamarckian motor plasticity on rows 0..1
+        if (@abs(td_lr) > 1e-8 or @abs(lamarck_lr) > 1e-8) {
+            const m_gain = lamarck_lr * td_err;
+            const c_gain = td_lr * td_err;
+            h = 0;
+            while (h < 6) : (h += 1) {
+                w2[0 * 6 + h] = math.clamp(w2[0 * 6 + h] + m_gain * out_b[0] * hid[h], -1.0, 1.0);
+                w2[1 * 6 + h] = math.clamp(w2[1 * 6 + h] + m_gain * out_b[1] * hid[h], -1.0, 1.0);
+                w2[3 * 6 + h] = math.clamp(w2[3 * 6 + h] + c_gain * hid[h], -1.5, 1.5);
+            }
+        }
+    }
+    return mean_abs_td / @as(f32, @floatFromInt(count));
+}
+
+// (B) Mechalogodrom 54,048-parameter 10-Shell Recurrent Cortex + Bi & Poo STDP
+// Exact parameter count: 10*(9*32 + 32 + 32*48 + 48) + (480*64 + 64 + 64*64 + 64) + 64
+//                      = 10*(288 + 32 + 1536 + 48) + (30720 + 64 + 4096 + 64) + 64
+//                      = 19,040 + 34,944 + 64 = 54,048 f32 parameters!
+export fn cqm2_mecha_brain_54k_stdp_step(
+    shell_inputs90: [*]const f32, // [10 * 9] sensory inputs across 10 concentric shells
+    params54048: [*]f32, // [54048] f32 weights + recurrent state[64] at tail
+    pre_trace64: [*]f32, // [64] Bi & Poo presynaptic trace
+    post_trace64: [*]f32, // [64] Bi & Poo postsynaptic trace
+    out64: [*]f32, // [64] global sovereign command bus
+    stdp_lr: f32,
+) callconv(.c) f32 {
+    var concat480: [480]f32 = undefined;
+    var s: usize = 0;
+    while (s < 10) : (s += 1) {
+        const in9 = shell_inputs90 + s * 9;
+        const sb = params54048 + s * 1904; // w1[288], b1[32], w2[1536], b2[48]
+        var h32: [32]f32 = undefined;
+        var h: usize = 0;
+        while (h < 32) : (h += 1) {
+            var acc: f32 = sb[288 + h];
+            var i: usize = 0;
+            while (i < 9) : (i += 1) acc += sb[h * 9 + i] * in9[i];
+            h32[h] = fastTanh(acc);
+        }
+        const w2 = sb + 320;
+        const b2 = sb + 1856;
+        var o: usize = 0;
+        while (o < 48) : (o += 1) {
+            var acc2: f32 = b2[o];
+            var k: usize = 0;
+            while (k < 32) : (k += 1) acc2 += w2[o * 32 + k] * h32[k];
+            concat480[s * 48 + o] = fastTanh(acc2);
+        }
+    }
+
+    // Global integrator: 480 -> 64 -> 64 + recurrent[64]
+    const g_w1 = params54048 + 19040; // [480 * 64 = 30720]
+    const g_b1 = g_w1 + 30720; // [64]
+    const g_w2 = g_b1 + 64; // [64 * 64 = 4096]
+    const g_b2 = g_w2 + 4096; // [64]
+    const rec64 = g_b2 + 64; // [64] (ends at 19040 + 34944 + 64 = 54048!)
+
+    var mid64: [64]f32 = undefined;
+    var m: usize = 0;
+    while (m < 64) : (m += 1) {
+        var acc: f32 = g_b1[m];
+        var j: usize = 0;
+        while (j < 480) : (j += 1) acc += g_w1[m * 480 + j] * concat480[j];
+        mid64[m] = fastTanh(acc);
+        pre_trace64[m] = 0.90 * pre_trace64[m] + 0.10 * @abs(mid64[m]);
+    }
+
+    var mean_energy: f32 = 0.0;
+    var q: usize = 0;
+    while (q < 64) : (q += 1) {
+        var acc2: f32 = g_b2[q] + 0.25 * rec64[q];
+        var m2: usize = 0;
+        while (m2 < 64) : (m2 += 1) acc2 += g_w2[q * 64 + m2] * mid64[m2];
+        const y = fastTanh(acc2);
+        out64[q] = y;
+        rec64[q] = y;
+        post_trace64[q] = 0.88 * post_trace64[q] + 0.12 * @abs(y);
+        mean_energy += @abs(y);
+
+        if (@abs(stdp_lr) > 1e-8) {
+            m2 = 0;
+            while (m2 < 64) : (m2 += 1) {
+                const ltp = pre_trace64[m2] * @max(y, 0.0);
+                const ltd = post_trace64[q] * @max(-mid64[m2], 0.0) * 1.05;
+                g_w2[q * 64 + m2] = math.clamp(g_w2[q * 64 + m2] + stdp_lr * (ltp - ltd), -1.5, 1.5);
+            }
+        }
+    }
+    return mean_energy * (1.0 / 64.0);
+}
+
+// (C) Xylos 48-Foci Hyperbolic Poincaré Disk + Oja Lateral + NLMS Predictor (398 f32 params)
+export fn cqm2_xylos_poincare_oja_step(
+    foci_uv96: [*]const f32, // [48 * 2] Poincaré disk coordinates |u| < 1
+    act48: [*]f32, // [48] foci activations
+    edge_src192: [*]const u16, // [192]
+    edge_dst192: [*]const u16, // [192]
+    edge_w192: [*]f32, // [192] plastic hyperbolic synapse weights
+    nlms_w14: [*]f32, // [14] NLMS adaptive filter weights
+    nlms_x14: [*]const f32, // [14] dome telemetry tap vector
+    target_signal: f32,
+    lr: f32,
+) callconv(.c) f32 {
+    var drive48: [48]f32 = @splat(0.0);
+    var e: usize = 0;
+    while (e < 192) : (e += 1) {
+        const u: usize = edge_src192[e] % 48;
+        const v: usize = edge_dst192[e] % 48;
+        const ux = foci_uv96[u * 2];
+        const uy = foci_uv96[u * 2 + 1];
+        const vx = foci_uv96[v * 2];
+        const vy = foci_uv96[v * 2 + 1];
+        const du2 = (ux - vx) * (ux - vx) + (uy - vy) * (uy - vy);
+        const nu = @max(0.02, 1.0 - (ux * ux + uy * uy));
+        const nv = @max(0.02, 1.0 - (vx * vx + vy * vy));
+        const arg = 1.0 + (2.0 * du2) / (nu * nv);
+        const d_hyp = math.acosh(@max(1.0, arg));
+        const atten = 1.0 / (1.0 + 0.5 * d_hyp);
+        drive48[v] += edge_w192[e] * act48[u] * atten;
+    }
+
+    // NLMS 14-tap predictor
+    var y_hat: f32 = 0.0;
+    var norm2: f32 = 1e-4;
+    var k: usize = 0;
+    while (k < 14) : (k += 1) {
+        y_hat += nlms_w14[k] * nlms_x14[k];
+        norm2 += nlms_x14[k] * nlms_x14[k];
+    }
+    const err = target_signal - y_hat;
+    if (@abs(lr) > 1e-8) {
+        const gain = (lr * err) / norm2;
+        k = 0;
+        while (k < 14) : (k += 1) nlms_w14[k] = math.clamp(nlms_w14[k] + gain * nlms_x14[k], -2.0, 2.0);
+    }
+
+    var idx: usize = 0;
+    while (idx < 48) : (idx += 1) {
+        act48[idx] = fastTanh(0.72 * act48[idx] + 0.28 * drive48[idx] + 0.05 * y_hat);
+    }
+
+    if (@abs(lr) > 1e-8) {
+        e = 0;
+        while (e < 192) : (e += 1) {
+            const u: usize = edge_src192[e] % 48;
+            const v: usize = edge_dst192[e] % 48;
+            const post = act48[v];
+            const dw = lr * (post * act48[u] - post * post * edge_w192[e]);
+            edge_w192[e] = math.clamp(edge_w192[e] + dw, -1.5, 1.5);
+        }
+    }
+    return @abs(err);
+}
+
+inline fn kbnAccum(pool: *f64, delta: f64, comp: *f64) void {
+    const sum = pool.* + delta;
+    if (@abs(pool.*) >= @abs(delta)) {
+        comp.* += (pool.* - sum) + delta;
+    } else {
+        comp.* += (delta - sum) + pool.*;
+    }
+    pool.* = sum;
+}
+
+// (D) 11/11/2026 Errata A-03: Compensated FP64 Kahan-Babuška-Neumaier First-Law Ledger
+// Guarantees |E_total - E_initial| <= 1e-12 AND enforces Second-Law irreversibility (dissipated heat >= 0, never converted back to work!).
+export fn cqm2_first_law_kbn_step(
+    pools6: [*]f64, // [free_solar, chemical_biomass, kinetic_work, irreversible_heat_sink, kbn_comp, initial_total]
+    metabolic_work_req: f64,
+    xpbd_damping_loss: f64,
+    harvest_efficiency: f64,
+) callconv(.c) f64 {
+    const eff = math.clamp(harvest_efficiency, 0.0, 1.0);
+    const avail_solar = @max(0.0, pools6[0]);
+    const req = @max(0.0, metabolic_work_req);
+    const drawn = @min(avail_solar, req);
+    const to_chem = drawn * eff;
+    // Exact complement so drawn == to_chem + to_heat_harvest + exact_split_err
+    const to_heat_harvest = drawn - to_chem;
+    const split_residual = (drawn - to_heat_harvest) - to_chem;
+
+    const kin_avail = @max(0.0, pools6[2]);
+    const damp = @min(kin_avail, @max(0.0, xpbd_damping_loss));
+
+    kbnAccum(&pools6[0], -drawn, &pools6[4]);
+    kbnAccum(&pools6[1], to_chem, &pools6[4]);
+    kbnAccum(&pools6[2], -damp, &pools6[4]);
+    // Irreversible Second-Law heat sink (monotonically non-decreasing!) with KBN compensation
+    kbnAccum(&pools6[3], to_heat_harvest + damp, &pools6[4]);
+    pools6[4] += split_residual + ((to_heat_harvest + damp) - to_heat_harvest - damp) * -1.0;
+
+    // Exact compensated total across all 4 physical reservoirs
+    var total: f64 = 0.0;
+    var comp: f64 = pools6[4];
+    var i: usize = 0;
+    while (i < 4) : (i += 1) {
+        const t = total + pools6[i];
+        if (@abs(total) >= @abs(pools6[i])) {
+            comp += (total - t) + pools6[i];
+        } else {
+            comp += (pools6[i] - t) + total;
+        }
+        total = t;
+    }
+    const exact_total = total + comp;
+    if (pools6[5] <= 0.0) pools6[5] = exact_total;
+    return @abs(exact_total - pools6[5]);
+}
+
+// (E) 11/11/2026 Errata B-04 / NESTOR: Packed Sub-Byte Precision GEMV
+// Supports physical 2-bit BitNet b1.58 ternary (4 weights/byte: 00=0, 01=+1, 10=-1)
+// and 4-bit symmetric INT4 (2 weights/byte: signed nibble [-8..+7]).
+export fn cqm2_nested_bitnet_int4_gemv(
+    packed_weights: [*]const u8,
+    input_vec: [*]const f32,
+    scale_per_row: [*]const f32,
+    output_vec: [*]f32,
+    rows: usize,
+    cols: usize,
+    bits_mode: u32, // 2 = BitNet b1.58 ternary, 4 = INT4
+) callconv(.c) void {
+    if (rows == 0 or cols == 0) return;
+    if (bits_mode == 2) {
+        const row_bytes = (cols + 3) >> 2;
+        var r: usize = 0;
+        while (r < rows) : (r += 1) {
+            const rb = packed_weights + r * row_bytes;
+            var acc: f32 = 0.0;
+            var c: usize = 0;
+            while (c < cols) : (c += 1) {
+                const byte_v = rb[c >> 2];
+                const shift: u3 = @intCast((c & 3) << 1);
+                const code = (byte_v >> shift) & 0x3;
+                const x = input_vec[c];
+                if (code == 1) acc += x else if (code == 2) acc -= x;
+            }
+            output_vec[r] = fastTanh(acc * scale_per_row[r]);
+        }
+    } else {
+        const row_bytes = (cols + 1) >> 1;
+        var r: usize = 0;
+        while (r < rows) : (r += 1) {
+            const rb = packed_weights + r * row_bytes;
+            var acc: f32 = 0.0;
+            var c: usize = 0;
+            while (c < cols) : (c += 1) {
+                const byte_v = rb[c >> 1];
+                const nib: u8 = if ((c & 1) == 0) (byte_v & 0x0F) else ((byte_v >> 4) & 0x0F);
+                const signed_q: i8 = if (nib >= 8) @as(i8, @intCast(nib)) - 16 else @as(i8, @intCast(nib));
+                acc += @as(f32, @floatFromInt(signed_q)) * input_vec[c];
+            }
+            output_vec[r] = fastTanh(acc * scale_per_row[r]);
+        }
+    }
+}
+
+// ============================================================================
 // Native Zig Unit Tests (`zig build test`)
 // ============================================================================
 test "3-qubit Pauli isotropic census & Hoggar QGT hexagon = 63 violated lines" {
@@ -1527,5 +2344,50 @@ test "CSR PageRank + Louvain separates two connected cliques cleanly" {
     try std.testing.expect(st[0] > 0.3); // Modularity Q > 0.3
     try std.testing.expectEqual(comm[0], comm[1]);
     try std.testing.expectEqual(comm[3], comm[4]);
-    try std.testing.expect(comm[0] != comm[3]);
+    try std.testing.expectEqual(@as(bool, true), comm[0] != comm[3]);
+}
+
+test "Original CQM 18-kernel compatibility & v4.0.0 First-Law + BitNet/INT4 + 54k Mecha STDP" {
+    // 1. QWZ Chern number: m = -1.0 -> C = -1, m = +1.0 -> C = +1, m = 3.0 -> C = 0
+    try std.testing.expectEqual(@as(i32, -1), cqm_moonlab_qwz_chern_fhs(-1.0, 24));
+    try std.testing.expectEqual(@as(i32, 1), cqm_moonlab_qwz_chern_fhs(1.0, 24));
+    try std.testing.expectEqual(@as(i32, 0), cqm_moonlab_qwz_chern_fhs(3.0, 24));
+
+    // 2. Cyclotomic Z[zeta_8]: zeta_8^2 * zeta_8^2 = zeta_8^4 = -1
+    const z2 = [_]i64{ 0, 0, 1, 0 };
+    var prod: [4]i64 = undefined;
+    cqm_eshkol_cyclotomic8_mul(&z2, &z2, &prod);
+    try std.testing.expectEqual(@as(i64, -1), prod[0]);
+    try std.testing.expectEqual(@as(i64, 0), prod[1]);
+
+    // 3. Errata A-03 First-Law KBN closure <= 1e-12 over 1,000 steps + irreversible heat sink
+    var pools = [_]f64{ 1000.0, 250.0, 125.0, 0.0, 0.0, 1375.0 };
+    var prev_heat: f64 = 0.0;
+    var step: usize = 0;
+    while (step < 1000) : (step += 1) {
+        const drift = cqm2_first_law_kbn_step(&pools, 0.42, 0.07, 0.63);
+        try std.testing.expect(drift <= 1e-12);
+        try std.testing.expect(pools[3] >= prev_heat);
+        prev_heat = pools[3];
+    }
+
+    // 4. Errata B-04 Packed 2-bit BitNet b1.58 & 4-bit INT4 GEMV
+    // Byte 0b00_10_01_01 => codes [1(+1), 1(+1), 2(-1), 0(0)]
+    const pk2 = [_]u8{0b00_10_01_01};
+    const xin = [_]f32{ 1.0, 2.0, 0.5, 9.0 };
+    const scl = [_]f32{0.5};
+    var yout: [1]f32 = undefined;
+    cqm2_nested_bitnet_int4_gemv(&pk2, &xin, &scl, &yout, 1, 4, 2);
+    // acc = 1.0 + 2.0 - 0.5 + 0 = 2.5 => fastTanh(2.5 * 0.5) = fastTanh(1.25)
+    try std.testing.expectApproxEqAbs(fastTanh(1.25), yout[0], 1e-6);
+
+    // 5. Original CQM 70-param EntityBrain TD Actor-Critic + Lamarckian plasticity
+    var in6 = [_]f32{ 0.8, -0.4, 0.5, 0.2, -0.1, 0.9 };
+    var w70: [70]f32 = @splat(0.1);
+    var ph6: [6]f32 = @splat(0.0);
+    var pv1 = [_]f32{0.0};
+    var rew1 = [_]f32{0.75};
+    var out4: [4]f32 = @splat(0.0);
+    const td = cqm2_entity_brain_td_lamarck_batch(&in6, &w70, &ph6, &pv1, &rew1, &out4, 1, 0.05, 0.04);
+    try std.testing.expect(td > 0.0);
 }

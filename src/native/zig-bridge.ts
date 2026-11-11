@@ -128,6 +128,117 @@ export interface ZigWasmExports extends WebAssembly.Exports {
     outXyzPtr: number,
     maxPoints: number,
   ): number;
+  // Original CQM v0.23.0 18-kernel exports
+  cqm_gray_scott_step(
+    uPtr: number,
+    vPtr: number,
+    uNextPtr: number,
+    vNextPtr: number,
+    n: number,
+    feed: number,
+    kill: number,
+    du: number,
+    dv: number,
+    dt: number,
+  ): void;
+  cqm_gray_scott_step_rgba_f32(
+    srcRgbaPtr: number,
+    dstRgbaPtr: number,
+    n: number,
+    feed: number,
+    kill: number,
+    du: number,
+    dv: number,
+    dt: number,
+    fSpatial: number,
+  ): void;
+  cqm_tdse_step(rePtr: number, imPtr: number, potPtr: number, n: number, dt: number, dx2Inv: number): number;
+  cqm_qgt_fubini_study(psiRePtr: number, psiImPtr: number, dpsiRePtr: number, dpsiImPtr: number, dim: number): number;
+  cqm_qgtl_full_tensor_2d(
+    psiRePtr: number,
+    psiImPtr: number,
+    dxRePtr: number,
+    dxImPtr: number,
+    dyRePtr: number,
+    dyImPtr: number,
+    dim: number,
+    out4Ptr: number,
+  ): void;
+  cqm_moonlab_ising_anneal(
+    spinsPtr: number,
+    couplingsPtr: number,
+    fieldsPtr: number,
+    n: number,
+    sweeps: number,
+    gammaStart: number,
+    gammaEnd: number,
+    seedIn: bigint,
+  ): number;
+  cqm_qrng_quantum_chaos_step(stateInOutPtr: number, outFloatsPtr: number, count: number, rLogistic: number): void;
+  cqm_eshkol_taylor_diff(polyCoeffsPtr: number, degree: number, x: number, out3Ptr: number): void;
+  cqm_entity_brain_batch_forward(inputsPtr: number, weightsPtr: number, outputsPtr: number, count: number): void;
+  cqm_glyph_hebbian_step(actPtr: number, weights4Ptr: number, drivePtr: number, lr: number): number;
+  cqm_rosette_fnv1a64(bytesPtr: number, len: number): bigint;
+  cqm_pq_wire_bytes(level: number, out3Ptr: number): number;
+  cqm_georefine_verify_frame(bf16WordsPtr: number, count: number, expectedFnv: bigint): number;
+  cqm_eshkol_dbsp_delta_gemm(
+    prevOutPtr: number,
+    deltaAPtr: number,
+    bMatPtr: number,
+    m: number,
+    n: number,
+    kDim: number,
+  ): number;
+  cqm_eshkol_cyclotomic8_mul(a4Ptr: number, b4Ptr: number, out4Ptr: number): void;
+  cqm_moonlab_qwz_chern_fhs(massM: number, gridN: number): number;
+  cqm_libirrep_bdg_skyrmion_mzm(mu: number, deltaSc: number, zeemanVz: number, outGapWindingPtr: number): number;
+  cqm_sbnn_minsr_step(spinsPtr: number, adjJPtr: number, n: number, pumpP: number, dt: number): number;
+  // v4.0.0 Neuroscience & 11/11/2026 Errata exports
+  cqm2_entity_brain_td_lamarck_batch(
+    inputsPtr: number,
+    weightsPtr: number,
+    prevHidPtr: number,
+    prevValPtr: number,
+    rewardsPtr: number,
+    outputsPtr: number,
+    count: number,
+    tdLr: number,
+    lamarckLr: number,
+  ): number;
+  cqm2_mecha_brain_54k_stdp_step(
+    shellInputs90Ptr: number,
+    params54048Ptr: number,
+    preTrace64Ptr: number,
+    postTrace64Ptr: number,
+    out64Ptr: number,
+    stdpLr: number,
+  ): number;
+  cqm2_xylos_poincare_oja_step(
+    fociUv96Ptr: number,
+    act48Ptr: number,
+    edgeSrc192Ptr: number,
+    edgeDst192Ptr: number,
+    edgeW192Ptr: number,
+    nlmsW14Ptr: number,
+    nlmsX14Ptr: number,
+    targetSignal: number,
+    lr: number,
+  ): number;
+  cqm2_first_law_kbn_step(
+    pools6Ptr: number,
+    metabolicWorkReq: number,
+    xpbdDampingLoss: number,
+    harvestEfficiency: number,
+  ): number;
+  cqm2_nested_bitnet_int4_gemv(
+    packedWeightsPtr: number,
+    inputVecPtr: number,
+    scalePerRowPtr: number,
+    outputVecPtr: number,
+    rows: number,
+    cols: number,
+    bitsMode: number,
+  ): void;
 }
 
 function decodeBase64Bytes(b64: string): Uint8Array {
@@ -597,6 +708,169 @@ export class ZigKernelBridge {
     const res = new Float32Array(count * 3);
     res.set(new Float32Array(this.exports.memory.buffer, outPtr, count * 3));
     return res;
+  }
+
+  public stepGrayScottRgbaF32(
+    srcRgba: Float32Array,
+    dstRgba: Float32Array,
+    n: number,
+    feed = 0.0367,
+    kill = 0.0649,
+    du = 0.2097,
+    dv = 0.105,
+    dt = 1.0,
+    fSpatial = 0.008,
+  ): void {
+    const len = n * n * 4;
+    if (n < 3 || srcRgba.length < len || dstRgba.length < len) return;
+    this.exports.cqm2_reset_heap();
+    const sPtr = this.allocF32(srcRgba.subarray(0, len));
+    const dPtr = this.allocF32Zero(len);
+    this.exports.cqm_gray_scott_step_rgba_f32(sPtr, dPtr, n >>> 0, feed, kill, du, dv, dt, fSpatial);
+    dstRgba.subarray(0, len).set(new Float32Array(this.exports.memory.buffer, dPtr, len));
+  }
+
+  public stepEntityBrainTdLamarckBatch(
+    inputs: Float32Array,
+    weights: Float32Array,
+    prevHid: Float32Array,
+    prevVal: Float32Array,
+    rewards: Float32Array,
+    outputs: Float32Array,
+    count: number,
+    tdLr = 0.025,
+    lamarckLr = 0.015,
+  ): number {
+    if (count <= 0) return 0;
+    this.exports.cqm2_reset_heap();
+    const inPtr = this.allocF32(inputs.subarray(0, count * 6));
+    const wPtr = this.allocF32(weights.subarray(0, count * 70));
+    const phPtr = this.allocF32(prevHid.subarray(0, count * 6));
+    const pvPtr = this.allocF32(prevVal.subarray(0, count));
+    const rPtr = this.allocF32(rewards.subarray(0, count));
+    const outPtr = this.allocF32Zero(count * 4);
+
+    const meanTd = this.exports.cqm2_entity_brain_td_lamarck_batch(
+      inPtr,
+      wPtr,
+      phPtr,
+      pvPtr,
+      rPtr,
+      outPtr,
+      count >>> 0,
+      tdLr,
+      lamarckLr,
+    );
+    const buf = this.exports.memory.buffer;
+    outputs.subarray(0, count * 4).set(new Float32Array(buf, outPtr, count * 4));
+    prevHid.subarray(0, count * 6).set(new Float32Array(buf, phPtr, count * 6));
+    prevVal.subarray(0, count).set(new Float32Array(buf, pvPtr, count));
+    if (Math.abs(tdLr) > 1e-8 || Math.abs(lamarckLr) > 1e-8) {
+      weights.subarray(0, count * 70).set(new Float32Array(buf, wPtr, count * 70));
+    }
+    return meanTd;
+  }
+
+  public stepMechaBrain54kStdp(
+    shellInputs90: Float32Array,
+    params54048: Float32Array,
+    preTrace64: Float32Array,
+    postTrace64: Float32Array,
+    out64: Float32Array,
+    stdpLr = 0.008,
+  ): number {
+    this.exports.cqm2_reset_heap();
+    const inPtr = this.allocF32(shellInputs90.subarray(0, 90));
+    const pPtr = this.allocF32(params54048.subarray(0, 54048));
+    const prePtr = this.allocF32(preTrace64.subarray(0, 64));
+    const postPtr = this.allocF32(postTrace64.subarray(0, 64));
+    const outPtr = this.allocF32Zero(64);
+
+    const energy = this.exports.cqm2_mecha_brain_54k_stdp_step(inPtr, pPtr, prePtr, postPtr, outPtr, stdpLr);
+    const buf = this.exports.memory.buffer;
+    params54048.subarray(0, 54048).set(new Float32Array(buf, pPtr, 54048));
+    preTrace64.subarray(0, 64).set(new Float32Array(buf, prePtr, 64));
+    postTrace64.subarray(0, 64).set(new Float32Array(buf, postPtr, 64));
+    out64.subarray(0, 64).set(new Float32Array(buf, outPtr, 64));
+    return energy;
+  }
+
+  public stepXylosPoincareOja(
+    fociUv96: Float32Array,
+    act48: Float32Array,
+    edgeSrc192: Uint16Array,
+    edgeDst192: Uint16Array,
+    edgeW192: Float32Array,
+    nlmsW14: Float32Array,
+    nlmsX14: Float32Array,
+    targetSignal: number,
+    lr = 0.015,
+  ): number {
+    this.exports.cqm2_reset_heap();
+    const uvPtr = this.allocF32(fociUv96.subarray(0, 96));
+    const aPtr = this.allocF32(act48.subarray(0, 48));
+    const esPtr = this.allocU16(edgeSrc192.subarray(0, 192));
+    const edPtr = this.allocU16(edgeDst192.subarray(0, 192));
+    const ewPtr = this.allocF32(edgeW192.subarray(0, 192));
+    const nwPtr = this.allocF32(nlmsW14.subarray(0, 14));
+    const nxPtr = this.allocF32(nlmsX14.subarray(0, 14));
+
+    const err = this.exports.cqm2_xylos_poincare_oja_step(
+      uvPtr,
+      aPtr,
+      esPtr,
+      edPtr,
+      ewPtr,
+      nwPtr,
+      nxPtr,
+      targetSignal,
+      lr,
+    );
+    const buf = this.exports.memory.buffer;
+    act48.subarray(0, 48).set(new Float32Array(buf, aPtr, 48));
+    if (Math.abs(lr) > 1e-8) {
+      edgeW192.subarray(0, 192).set(new Float32Array(buf, ewPtr, 192));
+      nlmsW14.subarray(0, 14).set(new Float32Array(buf, nwPtr, 14));
+    }
+    return err;
+  }
+
+  public stepFirstLawKbn(
+    pools6: Float64Array,
+    metabolicWorkReq: number,
+    xpbdDampingLoss: number,
+    harvestEfficiency: number,
+  ): number {
+    this.exports.cqm2_reset_heap();
+    const ptr = this.exports.cqm2_alloc(6 * 8);
+    new Float64Array(this.exports.memory.buffer, ptr, 6).set(pools6.subarray(0, 6));
+    const drift = this.exports.cqm2_first_law_kbn_step(ptr, metabolicWorkReq, xpbdDampingLoss, harvestEfficiency);
+    pools6.subarray(0, 6).set(new Float64Array(this.exports.memory.buffer, ptr, 6));
+    return drift;
+  }
+
+  public nestedBitNetInt4Gemv(
+    packedWeights: Uint8Array,
+    inputVec: Float32Array,
+    scalePerRow: Float32Array,
+    outputVec: Float32Array,
+    rows: number,
+    cols: number,
+    bitsMode: 2 | 4 = 2,
+  ): void {
+    if (rows <= 0 || cols <= 0) return;
+    this.exports.cqm2_reset_heap();
+    const pkPtr = this.exports.cqm2_alloc(Math.max(16, packedWeights.byteLength));
+    new Uint8Array(this.exports.memory.buffer, pkPtr, packedWeights.byteLength).set(packedWeights);
+    const inPtr = this.allocF32(inputVec.subarray(0, cols));
+    const scPtr = this.allocF32(scalePerRow.subarray(0, rows));
+    const outPtr = this.allocF32Zero(rows);
+    this.exports.cqm2_nested_bitnet_int4_gemv(pkPtr, inPtr, scPtr, outPtr, rows >>> 0, cols >>> 0, bitsMode);
+    outputVec.subarray(0, rows).set(new Float32Array(this.exports.memory.buffer, outPtr, rows));
+  }
+
+  public qwzChernFhs(massM: number, gridN = 24): number {
+    return this.exports.cqm_moonlab_qwz_chern_fhs(massM, gridN >>> 0);
   }
 }
 

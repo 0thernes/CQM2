@@ -7,14 +7,14 @@
       http-equiv="Content-Security-Policy"
       content="default-src 'self'; script-src 'self'; style-src 'self'; font-src 'self' data:; img-src 'self' data:; object-src 'none'; base-uri 'self'"
     />
-    <meta name="description" content="Download CQM2 v3.0.0 Local Quad-Silicon Workstation &amp; Universal Browser Releases, Native CQM2.exe Windows Launcher, OpenAPI 3.1 Spec, SBOM, Checksums, and Cosmogonic License." />
-    <meta property="og:title" content="CQM2 Downloads &amp; Releases — v3.0.0" />
-    <meta property="og:description" content="Official CQM2 v3.0.0 release archives, CQM2.exe Windows x64 Launcher, CycloneDX SBOM, SHA-256 manifests, and verbatim Cosmogonic License." />
+    <meta name="description" content="Download CQM2 v4.0.0 Standalone Local OpenGL 3.3 / Jolt 5.5 / Quad-Silicon CQM2.exe Workstation &amp; Universal Browser Releases, OpenAPI 3.1 Spec, SBOM, Checksums, and Cosmogonic License." />
+    <meta property="og:title" content="CQM2 Downloads &amp; Releases — v4.0.0" />
+    <meta property="og:description" content="Official CQM2 v4.0.0 release archives, Standalone C++20/OpenGL 3.3/Jolt 5.5 CQM2.exe Windows x64 Workstation, CycloneDX SBOM, SHA-256 manifests, and verbatim Cosmogonic License." />
     <meta property="og:type" content="website" />
     <meta property="og:url" content="https://0thernes.github.io/CQM2/downloads.html" />
     <meta property="og:image" content="https://0thernes.github.io/CQM2/og-card.svg" />
     <link rel="canonical" href="https://0thernes.github.io/CQM2/downloads.html" />
-    <title>CQM2 Downloads &amp; Releases — v3.0.0</title>
+    <title>CQM2 Downloads &amp; Releases — v4.0.0</title>
     <link rel="icon" type="image/svg+xml" href="favicon.svg" />
     <link rel="stylesheet" href="assets/tokens.css" />
   </head>
@@ -29,41 +29,42 @@
         <a href="lab/quantum-wildbeyond.html" class="btn">WildBeyond Lab</a>
         <a href="lab/consciousness.html" class="btn">Consciousness Lab</a>
         <a href="lab/sentience.html" class="btn">Sentience Lab</a>
-        <a href="alife/cqm-capability-profile.html" class="btn">ALife Profile</a>
+        <a href="alife/cqm-capability-profile.html" class="btn">CQM-25 Profile</a>
+        <a href="alife/cqm-alife-catalog.html" class="btn">150-Peer Catalog</a>
         <a href="glossary.html" class="btn">Glossary</a>
         <a href="downloads.html" class="btn" aria-current="page">Downloads &amp; License</a>
       </nav>
 
       <section class="panel-card mb-18">
-        <h1>Releases, Downloads &amp; Licensing — CQM2 v3.0.0</h1>
+        <h1>Releases, Downloads &amp; Licensing — CQM2 v4.0.0</h1>
         <p>
-          All official release archives, native Windows 11 <code>CQM2.exe</code> Quad-Silicon Workstation launcher, CycloneDX 1.5 SBOMs (<code>sbom.cdx.json</code>), and cryptographic SHA-256 manifests
+          All official release archives, the standalone native Windows 11 <code>CQM2.exe</code> OpenGL 3.3 / Jolt 5.5 / Dear ImGui 1.92.8 / Quad-Silicon Workstation executable (zero Bun or browser runtime dependency), CycloneDX 1.5 SBOMs (<code>sbom.cdx.json</code>), and cryptographic SHA-256 manifests
           (<code>SHA256SUMS.txt</code>) are published immutably on GitHub Releases:
         </p>
         <div class="flex-wrap-gap my-14">
-          <a href="https://github.com/0thernes/CQM2/releases/tag/v3.0.0" class="btn btn-primary" rel="noopener noreferrer">
-            Download CQM2 v3.0.0 Release Bundle &amp; CQM2.exe (Latest)
+          <a href="https://github.com/0thernes/CQM2/releases/tag/v4.0.0" class="btn btn-primary" rel="noopener noreferrer">
+            Download CQM2 v4.0.0 Release Bundle &amp; CQM2.exe (Latest)
           </a>
-          <a href="https://github.com/0thernes/CQM2/releases/download/v3.0.0/CQM2.exe" class="btn btn-gold" rel="noopener noreferrer">
-            Direct Download: CQM2.exe (Windows 11 x64 Launcher)
+          <a href="https://github.com/0thernes/CQM2/releases/download/v4.0.0/CQM2.exe" class="btn btn-gold" rel="noopener noreferrer">
+            Direct Download: Standalone CQM2.exe (OpenGL 3.3 + Jolt 5.5 + Quad-Silicon)
           </a>
-          <a href="https://github.com/0thernes/CQM2/releases/tag/v2.2.0" class="btn" rel="noopener noreferrer">
-            Archive: CQM2 v2.2.0 Release
+          <a href="https://github.com/0thernes/CQM2/releases/tag/v3.0.1" class="btn" rel="noopener noreferrer">
+            Archive: CQM2 v3.0.1 Release
           </a>
-          <a href="https://github.com/0thernes/CQM2/releases/tag/v2.1.0" class="btn" rel="noopener noreferrer">
-            Archive: CQM2 v2.1.0 Quad-Silicon Release
+          <a href="https://github.com/0thernes/CQM2/releases/tag/v3.0.0" class="btn" rel="noopener noreferrer">
+            Archive: CQM2 v3.0.0 Release
           </a>
           <a href="https://github.com/0thernes/CQM2" class="btn" rel="noopener noreferrer">
             View Source Repository (0thernes/CQM2)
           </a>
         </div>
-        <h3>Local Quad-Silicon Workstation Quickstart (Windows x64 / Linux / macOS)</h3>
+        <h3>Standalone Native Workstation &amp; Developer Build Quickstart</h3>
         <pre class="code-block mono">git clone https://github.com/0thernes/CQM2.git
 cd CQM2
 bun install
-bun run build:native   # Compiles Zig 0.17 AVX2+WASM, C17 RosettaWire, C++20 Moonlab/libirrep/Eshkol, CUDA/DirectML/LevelZero, Rust 1.94, Go 1.26 &amp; CQM2.exe
-bun run check          # Typecheck + Lint + Full Test Suite + Universal Production Build
-bun run start          # Starts Local Quad-Silicon Workstation Server on http://127.0.0.1:4200</pre>
+bun run build:native   # Compiles Standalone OpenGL 3.3/Jolt 5.5/ImGui CQM2.exe + Zig 0.17 + CUDA 12.9/LevelZero/DirectML + Moonlab/Eshkol/RosettaWire + Rust 1.94 + Go 1.26
+powershell -ExecutionPolicy Bypass -File scripts/install-windows-launcher.ps1   # Installs CQM2.exe on Desktop, Start Menu &amp; Taskbar
+.\native\bin\CQM2.exe  # Launches standalone native 4K OpenGL 3.3 workstation directly (zero Bun/browser needed!)</pre>
       </section>
 
       <section class="panel-card">
@@ -76,7 +77,7 @@ bun run start          # Starts Local Quad-Silicon Workstation Server on http://
       </section>
     </main>
     <footer class="cqm-footer" role="contentinfo">
-      <span>CQM2 v3.0.0 · Copyright (c) 2026 0thernes LLC · Cosmogonic Non-Commercial Research &amp; Play License</span>
+      <span>CQM2 v4.0.0 · Copyright (c) 2026 0thernes LLC · Cosmogonic Non-Commercial Research &amp; Play License</span>
       <span>
         <a href="https://github.com/0thernes/CQM2/blob/main/LICENSE" rel="noopener noreferrer">Verbatim LICENSE</a> ·
         <a href="https://github.com/0thernes/CQM2/blob/main/.github/SUPPORT.md" rel="noopener noreferrer">Support</a> ·

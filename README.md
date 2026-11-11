@@ -13,7 +13,9 @@
 
 ## What and why
 
-**CQM2 (`v3.0.0`)** is the complete ground-up polyglot & full-fidelity engineering refactor of [Cosmogonic Quantum Mechalogodrom](https://github.com/0thernes/cosmogonic-quantum-mechalogodrom). Where CQM v1 ran single-threaded JavaScript at `9 fps` (`p95 > 4,000 ms`, `782 MB` heap) with CPU-updated `THREE.Mesh` objects, **CQM2 v3.0.0** renders the entire full-bleed `100vw × 100vh` alien cosmogonic 3D world (`GodColossus` rainbow oil-slick manifold, `6D→3D` Elser-Sloane icosahedral quasicrystal shell, `101 Pantheons` crown, `64` live sorting-field pillars, `6,272` GPU-instanced flora across 49 groves, cantilevered brutalist megastructures, 3D compound voxel glitch-clusters, 24-ring woven geodesic sanctuary dome, 25 Sorting Fields, `HELTIBOR` lore, 20 Titans, 16-metric scrollable `TELEMETRY` + `ECONOMY`, 16-chart `OBSERVATORY`, `3 Live Brains`, `⛓ ACCESS` Roman Tally `SUPERHERO` HUD + 2nd Super Creature `Seraph-Prime`, `◈ STAGE II` `UwU` 3D `Monolith Temple`, `⟁ NHI` ballistic 3D probes, and 9 procedural songs) at **4K `60–240+ FPS` (`< 28 MB` JS heap)** using **Simultaneous Quad-Silicon + Native Tsotchke C/C++/Zig Execution** (`NVIDIA RTX 5070 Ti` CUDA `cublasSgemmStridedBatched_v2` + `Intel(R) AI Boost` NPU action-conditioned RSSM + `Intel(R) Graphics` iGPU 2D Gray-Scott diffusion & DirectML + `Intel Core Ultra 9 275HX` Zig 0.17 AVX2 / C17 `RosettaWire` / C++20 `Moonlab` `libquantumsim.dll` + `liblibirrep.dll` + `eshkol-run.exe` / x86-64 ASM / Rust 1.94 / Go 1.26 + native Windows 11 `CQM2.exe` GUI launcher) while preserving instant zero-install universal browser execution via **WebGL2 GPU Instancing + WebGPU Compute (`WGSL`) + Zig WASM SIMD128 + IndexedDB**.
+**CQM2 (`v4.0.0`)** is the complete ground-up polyglot, standalone local native workstation, and universal browser engineering refactor of [Cosmogonic Quantum Mechalogodrom](https://github.com/0thernes/cosmogonic-quantum-mechalogodrom). Where CQM v1 ran single-threaded JavaScript at `9 fps` (`p95 > 4,000 ms`, `782 MB` heap) with CPU-updated `THREE.Mesh` objects, **CQM2 v4.0.0** delivers:
+1. **Standalone Local Native Workstation (`CQM2.exe`, Zero Bun / Zero Browser Runtime Dependency)**: Compiled directly in **C++20 + C17 + x86-64 AVX2/FMA3 ASM + Zig 0.17 + OpenGL 3.3 Core + GLFW 3.4 + GLM 1.0.3 + Jolt Physics v5.5.0 + Dear ImGui 1.92.8 + WinMM 44.1 kHz Audio** and bound simultaneously to **NVIDIA GeForce RTX 5070 Ti CUDA 12.9 (`cublasSgemmStridedBatched_v2`) + Intel(R) AI Boost NPU (`LevelZero`) + Intel(R) Graphics iGPU (`DirectML`) + Moonlab (`libquantumsim.dll`) + libirrep (`liblibirrep.dll`) + Eshkol v1.3.6 + RosettaWire C17 + Rust 1.94 Merkle/KBN Ledger**.
+2. **Universal Zero-Install Browser & Full-Stack ERP Edition**: Full-bleed `100vw × 100vh` 4K `60+ FPS` WebGL2 GPU Instancing + WebGPU Compute + Zig WASM SIMD128 + 10-table 3NF SQLite WAL ERP, enforcing **CQM-25 v1.0.0 (`ADR-0018`, `aggregation: "prohibited"`)**, the **Monolith-Megalith Art-Direction Law** (`GodColossus` sole chromatic monolith; `Stage II MonolithTemple` strictly `r == g == b`; untethered `Xenomimics` & dome sightlines), and the **11/11/2026 ALife Framework v2.0 Errata (`A-01..D-02`)**.
 
 CQM2 unifies:
 - **Creature #1 (`Asmodenius v42`) & Creature #2 (`Seraph-Prime`)**: 14-region Dale 80/20 spiking CNS + Enteric Nervous System, astrocyte `Ca2+`, Larkum 2-compartment NMDA coincidence gating, Global Neuronal Workspace (`GNW`), CEMI local-field phase-locking, Attention Schema (`AST-1R`), non-oracle `CalibHead` `HOT-3` confidence, Frazier Knowledge-Gradient `VOI`, `D1/D2` striatal gating, `PAG`, 4 neuropeptides, `N13` somatic Free-Won't veto, non-destructive `Casali PCI` TMS perturbation (`WAKE` / `NREM` / `PROPOFOL`), and a 15-pool First-Law conserved metabolic ledger (`drift < 1e-12`).
@@ -35,7 +37,8 @@ CQM2 unifies:
   - Interactive Quantum WildBeyond & Chaos Lab: [`/lab/quantum-wildbeyond.html`](https://0thernes.github.io/CQM2/lab/quantum-wildbeyond.html)
   - Butlin-14 Consciousness Indicator Laboratory: [`/lab/consciousness.html`](https://0thernes.github.io/CQM2/lab/consciousness.html)
   - Sentience Falsification & PCI Perturbation Lab: [`/lab/sentience.html`](https://0thernes.github.io/CQM2/lab/sentience.html)
-  - CQM-25 Artificial Life Capability Profile: [`/alife/cqm-capability-profile.html`](https://0thernes.github.io/CQM2/alife/cqm-capability-profile.html)
+  - CQM-25 Canonical Capability Profile (v1.0.0): [`/alife/cqm-capability-profile.html`](https://0thernes.github.io/CQM2/alife/cqm-capability-profile.html)
+  - 150-Peer Artificial Life Comparative Catalog: [`/alife/cqm-alife-catalog.html`](https://0thernes.github.io/CQM2/alife/cqm-alife-catalog.html)
   - Canonical Scientific Glossary: [`/glossary.html`](https://0thernes.github.io/CQM2/glossary.html)
   - Offline Bundles & Native `CQM2.exe` Downloads: [`/downloads.html`](https://0thernes.github.io/CQM2/downloads.html) or [GitHub Releases](https://github.com/0thernes/CQM2/releases)
 
@@ -82,8 +85,8 @@ bun run check
 
 ## Usage
 
-### 1. Launch Native Windows 11 Workstation (`CQM2.exe`) or Full-Stack Server
-Double-click **`CQM2.exe`** (from `native/bin/CQM2.exe`, Desktop, Start Menu, or Taskbar after running `scripts/install-windows-launcher.ps1`) to auto-start the local Quad-Silicon server and open a chromeless GPU-accelerated app window, or run from terminal:
+### 1. Launch Standalone Native Windows 11 Workstation (`CQM2.exe`) or Browser Server
+Double-click **`CQM2.exe`** (from `native/bin/CQM2.exe`, Desktop, Start Menu, or Taskbar after running `scripts/install-windows-launcher.ps1`) to launch the **standalone 4K OpenGL 3.3 + Jolt Physics 5.5.0 + Dear ImGui + Quad-Silicon workstation directly** (zero `bun` or browser runtime required!). To optionally run the Universal Browser / OpenAPI v1 HTTP server:
 ```bash
 bun run start
 ```
@@ -135,7 +138,7 @@ Executes unit, property, conservation (`< 1e-12`), 12-benchmark causal lesion (`
 
 ## Version and releases
 
-Synchronized at **`3.0.0`** across [`VERSION`](VERSION), [`package.json`](package.json), [`rust/Cargo.toml`](rust/Cargo.toml), [`CITATION.cff`](CITATION.cff), [`CHANGELOG.md`](CHANGELOG.md), and [`docs/REPORT.md`](docs/REPORT.md). Published `vX.Y.Z` Git tags (`v2.0.0`, `v2.1.0`, `v2.2.0`, `v3.0.0`) are strictly immutable.
+Synchronized at **`4.0.0`** across [`VERSION`](VERSION), [`package.json`](package.json), [`rust/Cargo.toml`](rust/Cargo.toml), [`CITATION.cff`](CITATION.cff), [`CHANGELOG.md`](CHANGELOG.md), and [`docs/REPORT.md`](docs/REPORT.md). Published `vX.Y.Z` Git tags (`v2.0.0`, `v2.1.0`, `v2.2.0`, `v3.0.0`, `v3.0.1`) are strictly immutable.
 
 - **Changelog**: [CHANGELOG.md](CHANGELOG.md)
 - **Releases, SBOM & SHA-256 Checksums**: [GitHub Releases](https://github.com/0thernes/CQM2/releases) and [`/downloads.html`](https://0thernes.github.io/CQM2/downloads.html)

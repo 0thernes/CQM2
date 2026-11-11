@@ -25,6 +25,9 @@ const required = [
   'lab/consciousness.html',
   'lab/sentience.html',
   'alife/cqm-capability-profile.html',
+  'alife/cqm-alife-catalog.html',
+  'reports/assets/alife-capability-profile-25.svg',
+  'reports/assets/organism-intelligence-v4-cross-being-forest.svg',
   'favicon.svg',
   'og-card.svg',
   'robots.txt',
@@ -35,6 +38,7 @@ const required = [
   'fonts/jetbrains-mono-latin-700-normal.woff2',
   'assets/workstation.js',
   'assets/wildbeyond-lab.js',
+  'assets/alife-catalog.js',
   'assets/tokens.css',
   'assets/manifest.json',
 ];

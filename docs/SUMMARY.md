@@ -1,12 +1,13 @@
-# Executive & Technical Summary — Cosmogonic Quantum Mechalogodrom 2 (`CQM2 v2.2.0`)
+# Executive & Technical Summary — Cosmogonic Quantum Mechalogodrom 2 (`CQM2 v4.0.0`)
 
-**Cosmogonic Quantum Mechalogodrom 2 (`CQM2` `v2.2.0`)** is a local-first quad-silicon and universal-browser full-stack observatory for embodied artificial life, compensatory neuroplasticity, symplectic quantum contextuality, and relativistic morphogenesis developed by **0thernes LLC**.
+**Cosmogonic Quantum Mechalogodrom 2 (`CQM2` `v4.0.0`)** is a standalone native C++20 / OpenGL 3.3 / Jolt Physics 5.5 / Dear ImGui / Quad-Silicon Windows x64 workstation (`CQM2.exe`) and universal-browser full-stack observatory for embodied artificial life, compensatory neuroplasticity, symplectic quantum contextuality, and relativistic morphogenesis developed by **0thernes LLC**.
 
-## Core Engineering & Scientific Achievements (`v2.2.0`)
+## Core Engineering & Scientific Achievements (`v4.0.0`)
 
-1. **Genuine Quad-Silicon Execution (`dGPU + NPU + iGPU + CPU`, Zero Dummy Buffers)**:
-   - Simultaneously orchestrates discrete **dGPU** (`NVIDIA GeForce RTX 5070 Ti` CUDA `cublasSgemmStridedBatched_v2` per-organism 126-float cortex evaluation & browser `WebGPU` WGSL), physical **NPU** (`Intel(R) AI Boost` action-conditioned `[32, 64]` RSSM horizon rollouts via OpenVINO + Level Zero), **iGPU** (`Intel(R) Graphics` `[1, 2, 32, 32]` 2D Gray-Scott/pheromone habitat diffusion via OpenVINO `GPU.0` + persistent `DirectML`), and **CPU** (`Intel Core Ultra 9 275HX` via Zig `0.17` AVX2 `bun:ffi` DLL + WASM SIMD128, x86-64 `AVX2+FMA3+POPCNT` assembly, Rust `1.94` Merkle/Kahan/Lemire/BF16-XOR ledger, and Go `1.26` continuous 20 Hz UDP OSC bridge).
-   - Compiles to a standalone **Universal Web Edition (`site/`, `~838 KB` JS+CSS+WASM)** running cleanly from `320px` mobile to `3840×2160` Cinema-4K with `IndexedDB` persistence.
+1. **Standalone Native `CQM2.exe` Workstation & Quad-Silicon Execution (`dGPU + NPU + iGPU + CPU`, Zero Browser/Bun Overhead)**:
+   - Ships a self-contained native Windows x64 OpenGL 3.3 Core + GLFW 3.4 + GLM 1.0.3 + Jolt Physics 5.5.0 + Dear ImGui 1.92.8 + WinMM procedural audio workstation (`CQM2.exe`), installed directly to Desktop, Start Menu, and Windows 11 Taskbar.
+   - Simultaneously orchestrates discrete **dGPU** (`NVIDIA GeForce RTX 5070 Ti` CUDA 12.9 `cublasSgemmStridedBatched_v2` per-organism cortex evaluation), physical **NPU** (`Intel(R) AI Boost` LevelZero + OpenVINO `[32, 64]` RSSM rollouts), **iGPU** (`Intel(R) Graphics` DirectML + OpenVINO `[1, 2, 32, 32]` habitat diffusion), **Tsotchke Native Libraries** (`Moonlab` `libquantumsim.dll`, `libirrep` `liblibirrep.dll`, `Eshkol v1.3.6` dual-number AD, `RosettaWire` C17 RSC1/RSW1), and **CPU** (`Intel Core Ultra 9 275HX` via Zig `0.17` 43-kernel AVX2 DLL + WASM SIMD128, x86-64 `AVX2+FMA3+POPCNT` assembly, Rust `1.94` Merkle/Kahan First-Law ledger, and Go `1.26` 20 Hz UDP OSC bridge).
+   - Also compiles to a standalone **Universal Web Edition (`site/`, `< 1 MB` JS+CSS+WASM)** running cleanly from `320px` mobile to `3840×2160` Cinema-4K with strict **CQM-25 v1.0.0** (`ADR-0018`, `aggregation: "prohibited"`, `score: null`) and **150-Peer Artificial Life Catalog** scholarly back-rooms.
 
 2. **Normalized 10-Entity `ERP` + Reversible SQLite Migrations & Append-Only Audit Ledger**:
    - Foreign-key-constrained Structure-of-Arrays (`SoA`) tables backed by `SharedArrayBuffer` and mirrored in **3NF SQLite WAL** (`migrations/001..002`), with opaque `public_uid` IDs, `version_rev` optimistic concurrency, trigger-protected immutable `audit_events`, verified `VACUUM INTO` backups (`RTO = 14 ms`), and bit-exact `N01` snapshot rollback.
