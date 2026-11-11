@@ -6,7 +6,7 @@ const math = std.math;
 // Targets: wasm32-freestanding (+simd128) AND x86_64/aarch64 Native FFI DLL
 // ============================================================================
 
-const HEAP_SIZE: usize = 8 * 1024 * 1024; // 8 MiB deterministic arena
+const HEAP_SIZE: usize = 16 * 1024 * 1024; // 16 MiB deterministic linear arena
 var static_heap: [HEAP_SIZE]u8 align(16) = undefined;
 var heap_offset: usize = 0;
 
@@ -1004,6 +1004,438 @@ export fn cqm2_reactive_skin_step(
     return mean_pattern / @as(f32, @floatFromInt(w * h));
 }
 
+// ----------------------------------------------------------------------------
+// 11. Fast Walsh-Hadamard Stabilizer Rényi-2 Quantum Magic M_2(|psi>)
+// Computes exact M_2 = -log2(2^{-n} sum_{P in P_n} <psi|P|psi>^4) in O(n * 4^n)
+// ----------------------------------------------------------------------------
+export fn cqm2_fwht_quantum_magic_m2(
+    psi_re: [*]const f64,
+    psi_im: [*]const f64,
+    n_qubits: u32,
+) callconv(.c) f64 {
+    if (n_qubits == 0 or n_qubits > 8) return 0.0;
+    const nq: math.Log2Int(usize) = @intCast(n_qubits);
+    const dim: usize = @as(usize, 1) << nq;
+
+    var norm2: f64 = 0.0;
+    var i: usize = 0;
+    while (i < dim) : (i += 1) {
+        norm2 += psi_re[i] * psi_re[i] + psi_im[i] * psi_im[i];
+    }
+    if (norm2 < 1e-18) return 0.0;
+    const inv_norm = 1.0 / @sqrt(norm2);
+
+    var r: [256]f64 = undefined;
+    var m: [256]f64 = undefined;
+    i = 0;
+    while (i < dim) : (i += 1) {
+        r[i] = psi_re[i] * inv_norm;
+        m[i] = psi_im[i] * inv_norm;
+    }
+
+    var vec_re: [256]f64 = undefined;
+    var vec_im: [256]f64 = undefined;
+    var sum_fourth: f64 = 0.0;
+
+    var a: usize = 0;
+    while (a < dim) : (a += 1) {
+        var z: usize = 0;
+        while (z < dim) : (z += 1) {
+            const za = z ^ a;
+            vec_re[z] = r[z] * r[za] + m[z] * m[za];
+            vec_im[z] = r[z] * m[za] - m[z] * r[za];
+        }
+
+        var len: usize = 1;
+        while (len < dim) : (len <<= 1) {
+            var base: usize = 0;
+            while (base < dim) : (base += (len << 1)) {
+                var j: usize = 0;
+                while (j < len) : (j += 1) {
+                    const ur = vec_re[base + j];
+                    const vr = vec_re[base + j + len];
+                    const ui = vec_im[base + j];
+                    const vi = vec_im[base + j + len];
+                    vec_re[base + j] = ur + vr;
+                    vec_re[base + j + len] = ur - vr;
+                    vec_im[base + j] = ui + vi;
+                    vec_im[base + j + len] = ui - vi;
+                }
+            }
+        }
+
+        var b: usize = 0;
+        while (b < dim) : (b += 1) {
+            const mag2 = vec_re[b] * vec_re[b] + vec_im[b] * vec_im[b];
+            sum_fourth += mag2 * mag2;
+        }
+    }
+
+    const xi = sum_fourth / @as(f64, @floatFromInt(dim));
+    if (xi <= 1e-18) return 0.0;
+    const m2 = -math.log2(xi);
+    return if (m2 < 0.0) 0.0 else m2;
+}
+
+// ----------------------------------------------------------------------------
+// 12. Batched 32x32 Recurrent GlyphBrain Step (100 Alphabet Pantheon Glyphs)
+// ----------------------------------------------------------------------------
+export fn cqm2_glyph_brain_batch_step(
+    states: [*]f32, // [num_glyphs * 1024]
+    lateral_w: [*]f32, // [num_glyphs * 4]
+    drive: [*]const f32, // [num_glyphs * 4]
+    num_glyphs: usize,
+    lr: f32,
+) callconv(.c) f32 {
+    if (num_glyphs == 0) return 0.0;
+    var total_energy: f64 = 0.0;
+    var buf: [1024]f32 = undefined;
+
+    var g: usize = 0;
+    while (g < num_glyphs) : (g += 1) {
+        const s = states + g * 1024;
+        const w = lateral_w + g * 4;
+        const drv = drive + g * 4;
+        const wn = w[0];
+        const ws = w[1];
+        const we = w[2];
+        const ww = w[3];
+        var corr_n: f32 = 0.0;
+        var corr_s: f32 = 0.0;
+        var corr_e: f32 = 0.0;
+        var corr_w: f32 = 0.0;
+
+        var y: usize = 0;
+        while (y < 32) : (y += 1) {
+            const yn = (y + 31) & 31;
+            const ys = (y + 1) & 31;
+            const qy: usize = if (y >= 16) 2 else 0;
+            var x: usize = 0;
+            while (x < 32) : (x += 1) {
+                const xw = (x + 31) & 31;
+                const xe = (x + 1) & 31;
+                const idx = (y << 5) | x;
+                const quad = qy | (if (x >= 16) @as(usize, 1) else @as(usize, 0));
+
+                const sn = s[(yn << 5) | x];
+                const ss = s[(ys << 5) | x];
+                const se = s[(y << 5) | xe];
+                const sw = s[(y << 5) | xw];
+                const cur = s[idx];
+
+                const net = 0.72 * cur + wn * sn + ws * ss + we * se + ww * sw + 0.25 * drv[quad];
+                const nxt = fastTanh(net);
+                buf[idx] = nxt;
+
+                corr_n += nxt * sn;
+                corr_s += nxt * ss;
+                corr_e += nxt * se;
+                corr_w += nxt * sw;
+                total_energy += @as(f64, @abs(nxt));
+            }
+        }
+
+        var k: usize = 0;
+        while (k < 1024) : (k += 1) {
+            s[k] = buf[k];
+        }
+
+        if (@abs(lr) > 1e-7) {
+            const scale = lr * (1.0 / 1024.0);
+            w[0] = math.clamp(wn + scale * (corr_n - 1024.0 * wn * wn * wn), -0.45, 0.45);
+            w[1] = math.clamp(ws + scale * (corr_s - 1024.0 * ws * ws * ws), -0.45, 0.45);
+            w[2] = math.clamp(we + scale * (corr_e - 1024.0 * we * we * we), -0.45, 0.45);
+            w[3] = math.clamp(ww + scale * (corr_w - 1024.0 * ww * ww * ww), -0.45, 0.45);
+        }
+    }
+    return @floatCast(total_energy / @as(f64, @floatFromInt(num_glyphs * 1024)));
+}
+
+// ----------------------------------------------------------------------------
+// 13. Zero-GC CSR Connectome Graph Analytics (PageRank + Louvain Modularity Q)
+// Uses pre-allocated scratch buffers so wasm32-freestanding needs zero malloc!
+// ----------------------------------------------------------------------------
+export fn cqm2_csr_pagerank_louvain_arena(
+    num_nodes: u32,
+    edge_u: [*]const u32,
+    edge_v: [*]const u32,
+    num_edges: u32,
+    row_ptr: [*]u32, // [num_nodes + 1]
+    col_idx: [*]u32, // [2 * num_edges]
+    deg: [*]u32, // [num_nodes]
+    cursor: [*]u32, // [num_nodes + 1]
+    next_pr: [*]f32, // [num_nodes]
+    comm_vol: [*]f64, // [num_nodes]
+    pagerank_out: [*]f32, // [num_nodes]
+    community_out: [*]u32, // [num_nodes]
+    stats_out4: [*]f64, // [modularity_Q, degree_entropy_bits, max_pr, comm_count]
+) callconv(.c) i32 {
+    if (num_nodes == 0) return -1;
+    const n: usize = @intCast(num_nodes);
+    const e_cnt: usize = @intCast(num_edges);
+
+    var i: usize = 0;
+    while (i < n) : (i += 1) {
+        deg[i] = 0;
+    }
+
+    var valid_edges: u32 = 0;
+    var e: usize = 0;
+    while (e < e_cnt) : (e += 1) {
+        const u = edge_u[e];
+        const v = edge_v[e];
+        if (u < num_nodes and v < num_nodes and u != v) {
+            deg[u] += 1;
+            deg[v] += 1;
+            valid_edges += 1;
+        }
+    }
+
+    row_ptr[0] = 0;
+    i = 0;
+    while (i < n) : (i += 1) {
+        row_ptr[i + 1] = row_ptr[i] + deg[i];
+        cursor[i] = row_ptr[i];
+    }
+
+    e = 0;
+    while (e < e_cnt) : (e += 1) {
+        const u = edge_u[e];
+        const v = edge_v[e];
+        if (u < num_nodes and v < num_nodes and u != v) {
+            col_idx[cursor[u]] = v;
+            cursor[u] += 1;
+            col_idx[cursor[v]] = u;
+            cursor[v] += 1;
+        }
+    }
+
+    // 12-iteration Power-Iteration PageRank
+    const inv_n: f32 = 1.0 / @as(f32, @floatFromInt(num_nodes));
+    const alpha: f32 = 0.85;
+    i = 0;
+    while (i < n) : (i += 1) {
+        pagerank_out[i] = inv_n;
+    }
+
+    var iter: usize = 0;
+    while (iter < 12) : (iter += 1) {
+        var dangling_sum: f32 = 0.0;
+        i = 0;
+        while (i < n) : (i += 1) {
+            if (deg[i] == 0) dangling_sum += pagerank_out[i];
+        }
+        const base = (1.0 - alpha + alpha * dangling_sum) * inv_n;
+        i = 0;
+        while (i < n) : (i += 1) {
+            next_pr[i] = base;
+        }
+        i = 0;
+        while (i < n) : (i += 1) {
+            const du = deg[i];
+            if (du == 0) continue;
+            const share = alpha * pagerank_out[i] / @as(f32, @floatFromInt(du));
+            var k: usize = row_ptr[i];
+            const end_k: usize = row_ptr[i + 1];
+            while (k < end_k) : (k += 1) {
+                next_pr[col_idx[k]] += share;
+            }
+        }
+        i = 0;
+        while (i < n) : (i += 1) {
+            pagerank_out[i] = next_pr[i];
+        }
+    }
+
+    // Greedy Modularity Label Propagation (reuse `cursor` as comm_hits scratch!)
+    const two_m: f64 = @max(1.0, 2.0 * @as(f64, @floatFromInt(valid_edges)));
+    i = 0;
+    while (i < n) : (i += 1) {
+        community_out[i] = @intCast(i);
+        comm_vol[i] = @floatFromInt(deg[i]);
+        cursor[i] = 0;
+    }
+
+    var sweep: usize = 0;
+    while (sweep < 8) : (sweep += 1) {
+        var changed = false;
+        i = 0;
+        while (i < n) : (i += 1) {
+            const start_k: usize = row_ptr[i];
+            const end_k: usize = row_ptr[i + 1];
+            if (start_k == end_k) continue;
+
+            const cur_c = community_out[i];
+            const ku: f64 = @floatFromInt(deg[i]);
+            comm_vol[cur_c] -= ku;
+
+            var k: usize = start_k;
+            while (k < end_k) : (k += 1) {
+                const c = community_out[col_idx[k]];
+                cursor[c] += 1;
+            }
+
+            var best_c = cur_c;
+            var best_gain: f64 = @as(f64, @floatFromInt(cursor[cur_c])) - (comm_vol[cur_c] * ku) / two_m;
+
+            k = start_k;
+            while (k < end_k) : (k += 1) {
+                const c = community_out[col_idx[k]];
+                const hits = cursor[c];
+                if (hits > 0) {
+                    const gain = @as(f64, @floatFromInt(hits)) - (comm_vol[c] * ku) / two_m;
+                    if (gain > best_gain + 1e-12 or (@abs(gain - best_gain) <= 1e-12 and c < best_c)) {
+                        best_gain = gain;
+                        best_c = c;
+                    }
+                    cursor[c] = 0;
+                }
+            }
+            cursor[cur_c] = 0;
+
+            community_out[i] = best_c;
+            comm_vol[best_c] += ku;
+            if (best_c != cur_c) changed = true;
+        }
+        if (!changed) break;
+    }
+
+    var internal_2e: f64 = 0.0;
+    var max_pr: f32 = 0.0;
+    i = 0;
+    while (i < n) : (i += 1) {
+        if (pagerank_out[i] > max_pr) max_pr = pagerank_out[i];
+        const cu = community_out[i];
+        var k: usize = row_ptr[i];
+        const end_k: usize = row_ptr[i + 1];
+        while (k < end_k) : (k += 1) {
+            if (community_out[col_idx[k]] == cu) internal_2e += 1.0;
+        }
+    }
+
+    var sum_vol_sq: f64 = 0.0;
+    var active_comms: u32 = 0;
+    i = 0;
+    while (i < n) : (i += 1) cursor[i] = 0;
+    i = 0;
+    while (i < n) : (i += 1) {
+        const cu = community_out[i];
+        if (cursor[cu] == 0) {
+            cursor[cu] = 1;
+            active_comms += 1;
+            const v = comm_vol[cu] / two_m;
+            sum_vol_sq += v * v;
+        }
+    }
+    const modularity_q = if (valid_edges > 0) (internal_2e / two_m - sum_vol_sq) else 0.0;
+
+    // Degree entropy over 64-bin capped histogram
+    var hist: [64]u32 = @splat(0);
+    i = 0;
+    while (i < n) : (i += 1) {
+        const bin: usize = @min(@as(usize, deg[i]), 63);
+        hist[bin] += 1;
+    }
+    var ent: f64 = 0.0;
+    var b: usize = 0;
+    while (b < 64) : (b += 1) {
+        if (hist[b] > 0) {
+            const p = @as(f64, @floatFromInt(hist[b])) / @as(f64, @floatFromInt(num_nodes));
+            ent -= p * math.log2(p);
+        }
+    }
+
+    stats_out4[0] = modularity_q;
+    stats_out4[1] = ent;
+    stats_out4[2] = @as(f64, max_pr);
+    stats_out4[3] = @as(f64, @floatFromInt(active_comms));
+    return 0;
+}
+
+// ----------------------------------------------------------------------------
+// 14. 6D->3D Icosahedral Quasicrystal Projector (`GodColossus` boot kernel)
+// ----------------------------------------------------------------------------
+export fn cqm2_quasicrystal_icosa_shell(
+    grid_extent: i32,
+    perp_cutoff: f32,
+    r_min: f32,
+    r_max: f32,
+    out_xyz: [*]f32,
+    max_points: u32,
+) callconv(.c) u32 {
+    if (max_points == 0) return 0;
+    const tau: f32 = 1.61803398875;
+    const nrm: f32 = 1.0 / @sqrt(2.0 * (2.0 + tau));
+    const par = [3][6]f32{
+        .{ nrm * 1.0, nrm * tau, 0.0, -nrm * 1.0, nrm * tau, 0.0 },
+        .{ nrm * tau, 0.0, nrm * 1.0, nrm * tau, 0.0, -nrm * 1.0 },
+        .{ 0.0, nrm * 1.0, nrm * tau, 0.0, -nrm * 1.0, nrm * tau },
+    };
+    const perp = [3][6]f32{
+        .{ -nrm * tau, nrm * 1.0, 0.0, nrm * tau, nrm * 1.0, 0.0 },
+        .{ nrm * 1.0, 0.0, -nrm * tau, nrm * 1.0, 0.0, nrm * tau },
+        .{ 0.0, -nrm * tau, nrm * 1.0, 0.0, nrm * tau, nrm * 1.0 },
+    };
+
+    const E: i32 = math.clamp(grid_extent, 1, 4);
+    const perp2_max = perp_cutoff * perp_cutoff;
+    const r2_min = r_min * r_min;
+    const r2_max = r_max * r_max;
+    var written: u32 = 0;
+
+    var n0: i32 = -E;
+    while (n0 <= E and written < max_points) : (n0 += 1) {
+        var n1: i32 = -E;
+        while (n1 <= E and written < max_points) : (n1 += 1) {
+            var n2: i32 = -E;
+            while (n2 <= E and written < max_points) : (n2 += 1) {
+                var n3: i32 = -E;
+                while (n3 <= E and written < max_points) : (n3 += 1) {
+                    var n4: i32 = -E;
+                    while (n4 <= E and written < max_points) : (n4 += 1) {
+                        var n5: i32 = -E;
+                        while (n5 <= E and written < max_points) : (n5 += 1) {
+                            const coords = [6]f32{
+                                @floatFromInt(n0), @floatFromInt(n1), @floatFromInt(n2),
+                                @floatFromInt(n3), @floatFromInt(n4), @floatFromInt(n5),
+                            };
+                            var qx: f32 = 0.0;
+                            var qy: f32 = 0.0;
+                            var qz: f32 = 0.0;
+                            var k: usize = 0;
+                            while (k < 6) : (k += 1) {
+                                qx += perp[0][k] * coords[k];
+                                qy += perp[1][k] * coords[k];
+                                qz += perp[2][k] * coords[k];
+                            }
+                            if (qx * qx + qy * qy + qz * qz > perp2_max) continue;
+
+                            var px: f32 = 0.0;
+                            var py: f32 = 0.0;
+                            var pz: f32 = 0.0;
+                            k = 0;
+                            while (k < 6) : (k += 1) {
+                                px += par[0][k] * coords[k];
+                                py += par[1][k] * coords[k];
+                                pz += par[2][k] * coords[k];
+                            }
+                            const r2 = px * px + py * py + pz * pz;
+                            if (r2 < r2_min or r2 > r2_max) continue;
+
+                            const base = @as(usize, written) * 3;
+                            out_xyz[base] = px;
+                            out_xyz[base + 1] = py;
+                            out_xyz[base + 2] = pz;
+                            written += 1;
+                        }
+                    }
+                }
+            }
+        }
+    }
+    return written;
+}
+
 // ============================================================================
 // Native Zig Unit Tests (`zig build test`)
 // ============================================================================
@@ -1058,4 +1490,42 @@ test "3D Kerr Mino geodesic capture asymmetry & Eshkol Vandermonde exact polynom
     const conf = cqm2_eshkol_vandermonde_jet4(&hist, &jet);
     try std.testing.expectApproxEqAbs(@as(f32, 1.0), conf, 1e-5);
     try std.testing.expectApproxEqAbs(@as(f32, 5.0), jet[3], 1e-4);
+}
+
+test "FWHT stabilizer Rényi-2 magic M_2 = 0 for stabilizer GHZ and log2(4/3) for |T> state" {
+    // 3-qubit GHZ = (|000> + |111>)/sqrt(2) -> pure stabilizer state -> M_2 = 0!
+    var ghz_re: [8]f64 = @splat(0.0);
+    var ghz_im: [8]f64 = @splat(0.0);
+    ghz_re[0] = 1.0 / @sqrt(2.0);
+    ghz_re[7] = 1.0 / @sqrt(2.0);
+    const m2_ghz = cqm2_fwht_quantum_magic_m2(&ghz_re, &ghz_im, 3);
+    try std.testing.expectApproxEqAbs(@as(f64, 0.0), m2_ghz, 1e-10);
+
+    // 1-qubit |T> = (|0> + e^{i pi/4}|1>)/sqrt(2) -> M_2 = -log2((1 + 0 + 1/2 + 1/2)/2 ? Wait: <X>=1/sqrt2, <Y>=1/sqrt2, <Z>=0 -> (1 + 1/4 + 1/4 + 0)/2 = 3/4 -> -log2(3/4) = log2(4/3)!)
+    const t_re = [_]f64{ 1.0 / @sqrt(2.0), 0.5 };
+    const t_im = [_]f64{ 0.0, 0.5 };
+    const m2_t = cqm2_fwht_quantum_magic_m2(&t_re, &t_im, 1);
+    try std.testing.expectApproxEqAbs(math.log2(4.0 / 3.0), m2_t, 1e-9);
+}
+
+test "CSR PageRank + Louvain separates two connected cliques cleanly" {
+    // Clique A: {0,1,2}, Clique B: {3,4,5}, single bridge (2,3)
+    const eu = [_]u32{ 0, 1, 0, 3, 4, 3, 2 };
+    const ev = [_]u32{ 1, 2, 2, 4, 5, 5, 3 };
+    var rp: [7]u32 = undefined;
+    var ci: [14]u32 = undefined;
+    var deg: [6]u32 = undefined;
+    var cur: [7]u32 = undefined;
+    var npr: [6]f32 = undefined;
+    var cvol: [6]f64 = undefined;
+    var pr: [6]f32 = undefined;
+    var comm: [6]u32 = undefined;
+    var st: [4]f64 = undefined;
+
+    const rc = cqm2_csr_pagerank_louvain_arena(6, &eu, &ev, 7, &rp, &ci, &deg, &cur, &npr, &cvol, &pr, &comm, &st);
+    try std.testing.expectEqual(@as(i32, 0), rc);
+    try std.testing.expect(st[0] > 0.3); // Modularity Q > 0.3
+    try std.testing.expectEqual(comm[0], comm[1]);
+    try std.testing.expectEqual(comm[3], comm[4]);
+    try std.testing.expect(comm[0] != comm[3]);
 }

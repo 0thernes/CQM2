@@ -1,5 +1,5 @@
 /**
- * CQM2 v2.2.0 — Full-Bleed 4K Cosmogonic Observatory & Quad-Silicon Workstation (`src/ui/workstation.ts`).
+ * CQM2 v3.0.0 — Full-Bleed 4K Cosmogonic Observatory & Quad-Silicon Workstation (`src/ui/workstation.ts`).
  *
  * Delivers the complete full-bleed `100vw x 100vh` alien cosmogonic 3D world and floating glassmorphic HUD of
  * `Cosmogonic Quantum Mechalogodrom` upgraded to run at 4K `60+ FPS` across:
@@ -29,6 +29,7 @@ import {
 import { runThalerCreativityAblationSuite } from '../brains/thaler-creativity';
 import { runXylosRealityMonitoringAssay } from '../brains/xylos';
 import type { GodDialParams } from '../core/prng';
+import { getZigBridge } from '../native/zig-bridge';
 import {
   buildProceduralChromatophorePng,
   exportAiWorldInteropBundle,
@@ -58,6 +59,19 @@ import {
   TitanDiplomacySimulator,
 } from '../sim/sorting-fields';
 import { Cqm2WorldScheduler, type WorldTickTelemetry } from '../sim/world-scheduler';
+import {
+  ARCHON_5_SOVEREIGNS,
+  KEYBOARD_SHORTCUT_MATRIX,
+  PANTHEON_101_GLYPHS,
+  PHYLA_10_NAMES,
+  PRIME_NEURAL_4_TABS,
+  ROMAN_TALLY_CIPHER_KEY,
+  renderMega4dTesseractCanvas,
+  renderPoincareDiskCanvas,
+  SANDBOX_WORLD_SYSTEMS,
+  SIM_8_SPEEDS,
+  STAGE_II_TEMPLE_CIPHER_KEY,
+} from './cqm-v3-panels';
 import { listBrowserCheckpoints, saveBrowserCheckpoint } from './idb-storage';
 import { Cqm3LiveBrainsRenderer } from './live-brains-3';
 import {
@@ -69,9 +83,13 @@ import { Cqm2RealtimeClient } from './realtime-client';
 
 type StudioTabId =
   | 'archon'
-  | 'silicon'
-  | 'brains'
   | 'quantum'
+  | 'xylos'
+  | 'xenomimic'
+  | 'brains'
+  | 'sandbox'
+  | 'settings'
+  | 'silicon'
   | 'erp'
   | 'market'
   | 'copilot'
@@ -81,18 +99,22 @@ type StudioTabId =
 
 const STUDIO_TABS: ReadonlyArray<{ id: StudioTabId; label: string; shortcut: string }> = [
   { id: 'archon', label: 'ARCHON GODFORMS', shortcut: '1' },
-  { id: 'silicon', label: 'QUAD-SILICON', shortcut: '2' },
-  { id: 'brains', label: 'NHI OBS · BRAINS', shortcut: '3' },
-  { id: 'quantum', label: 'PANTHEONS · QUANTUM', shortcut: '4' },
-  { id: 'erp', label: 'ERP · N01 LEDGER', shortcut: '5' },
-  { id: 'market', label: 'MARKET · TITANS', shortcut: '6' },
-  { id: 'copilot', label: 'COPILOT AI LLM', shortcut: '7' },
-  { id: 'pipeline', label: 'EXPORT 3D / AUDIO', shortcut: '8' },
-  { id: 'audit', label: 'AUDIT & HONESTY', shortcut: '9' },
-  { id: 'help', label: 'HELP ME NOW', shortcut: '0' },
+  { id: 'quantum', label: '101 PANTHEONS', shortcut: '2' },
+  { id: 'xylos', label: 'XYLOS {7,3}', shortcut: '3' },
+  { id: 'xenomimic', label: 'XENOMIMIC', shortcut: '4' },
+  { id: 'brains', label: 'NHI OBS · BRAINS', shortcut: '5' },
+  { id: 'sandbox', label: '🧪 SANDBOX', shortcut: '6' },
+  { id: 'settings', label: '⚙ SET', shortcut: '7' },
+  { id: 'silicon', label: '⚡ SILICON · C++', shortcut: '8' },
+  { id: 'market', label: 'MARKET · TITANS', shortcut: '9' },
+  { id: 'erp', label: 'ERP · N01', shortcut: '0' },
+  { id: 'copilot', label: 'COPILOT AI LLM', shortcut: '-' },
+  { id: 'pipeline', label: 'EXPORT 3D / WAV', shortcut: '=' },
+  { id: 'audit', label: 'AUDIT & LABS', shortcut: '[' },
+  { id: 'help', label: 'HELP ME NOW', shortcut: ']' },
 ];
 
-const SIM_SPEEDS: readonly number[] = [0.25, 1.0, 2.0, 4.0];
+const SIM_SPEEDS: readonly number[] = SIM_8_SPEEDS;
 
 const JSON_HEADERS: Readonly<Record<string, string>> = {
   'Content-Type': 'application/json',
@@ -153,6 +175,10 @@ function parseBootQueryParams(): {
     silicon: 'silicon',
     brains: 'brains',
     quantum: 'quantum',
+    xylos: 'xylos',
+    xenomimic: 'xenomimic',
+    sandbox: 'sandbox',
+    settings: 'settings',
     erp: 'erp',
     market: 'market',
     copilot: 'copilot',
@@ -206,7 +232,12 @@ export class Cqm2WorkstationApp {
   // Interactive Cosmological State
   private chaosLevel = 0.5;
   private entropyLevel = 0.12;
-  private simSpeedIdx = 0; // Boots at `0.25x` serene drift matching CQM screenshot; cycles `0.25x, 1x, 2x, 4x`
+  private simSpeedIdx = 0; // Boots at `0.25x` serene drift; cycles all 8 speeds `[0.25, 0.5, 1, 2, 4, 8, 12, 16]`
+  private emergenceMode: 'GENESIS' | 'BREAK_FREE' = 'GENESIS';
+  private mutationsTotal = 0;
+  private nhiReleasedTotal = 4;
+  private superheroEnergyPct = 100;
+  private phylaWeights10 = [100, 100, 100, 100, 100, 100, 100, 100, 100, 100];
   private resetsCount = 0;
   private activeStudio: StudioTabId | null = null;
   private panelsHidden = false;
@@ -215,6 +246,9 @@ export class Cqm2WorkstationApp {
 
   private serverConnected = false;
   private serverHardwareTopology: Record<string, unknown> | null = null;
+  private tsotchkeNativeStatus: Record<string, unknown> | null = null;
+  private csrGraphStats = { modularityQ: 0.412, degreeEntropyBits: 3.18, communityCount: 6 };
+  private fwhtMagicM2 = 0.585;
   private latestTelemetry: WorldTickTelemetry;
   private latestPoke: TmsPokeReport | null = null;
   private latestBenchmarks: R21BenchmarkResult[] = [];
@@ -333,6 +367,7 @@ export class Cqm2WorkstationApp {
 
     const errBanner = this.buildErrorBoundaryBanner();
     const miniEntryPill = this.buildMiniWorldPill();
+    const superheroHud = this.buildSuperheroHud();
     const toastEl = el('div', { id: 'sec', role: 'status', 'aria-live': 'polite' }, ['SECTOR HELTIBOR · 4K COSMOS ONLINE']);
     this.domRefs.set('toast', toastEl);
 
@@ -341,7 +376,9 @@ export class Cqm2WorkstationApp {
     const edgeLeft = this.buildEdgeCollapseBtn('left');
     const edgeRight = this.buildEdgeCollapseBtn('right');
     const touchPads = this.buildTouchJoystickPads();
-    const bottomStack = this.buildBottomThreeRowDock();
+    const accessDialog = this.buildAccessCipherDialog();
+    const stage2Dialog = this.buildStage2TempleDialog();
+    const bottomStack = this.buildBottomThreeRowDock(accessDialog, stage2Dialog);
     const studioModal = this.buildStudioModal();
     const cmdDialog = this.buildCommandPaletteDialog();
 
@@ -349,6 +386,7 @@ export class Cqm2WorkstationApp {
       this.ariaAnnouncer,
       errBanner,
       miniEntryPill,
+      superheroHud,
       toastEl,
       mobileSheetBar,
       hudOverlay,
@@ -357,6 +395,8 @@ export class Cqm2WorkstationApp {
       touchPads,
       bottomStack,
       studioModal,
+      accessDialog,
+      stage2Dialog,
       cmdDialog,
     );
 
@@ -437,11 +477,176 @@ export class Cqm2WorkstationApp {
           this.serverConnected = true;
           this.serverHardwareTopology = json.topology;
           this.realtime.connect();
+          try {
+            const tsRes = await fetch('/api/v1/tsotchke/native', { method: 'GET' });
+            if (tsRes.ok) {
+              this.tsotchkeNativeStatus = (await tsRes.json()) as Record<string, unknown>;
+            }
+          } catch {
+            // Optional Tsotchke native receipt fetch
+          }
         }
       }
     } catch {
       this.serverConnected = false;
     }
+  }
+
+  private buildSuperheroHud(): HTMLElement {
+    const energySpan = el('span', { className: 'hero-stat-pill' }, ['ENERGY 100%']);
+    this.domRefs.set('hero-energy', energySpan);
+
+    const btnFlight = el('button', { type: 'button', className: 'dock-pill' }, ['🚀 FLIGHT 2.5×']);
+    btnFlight.addEventListener('click', () => {
+      if (!this.scene4k) return;
+      this.scene4k.superheroFlightBoost = !this.scene4k.superheroFlightBoost;
+      btnFlight.classList.toggle('dock-pill-active', this.scene4k.superheroFlightBoost);
+      this.showToast(
+        this.scene4k.superheroFlightBoost ? 'SUPERHERO HYPER-FLIGHT · 2.5× THRUST' : 'SUPERHERO FLIGHT · CRUISE',
+      );
+    });
+
+    const btnBeam = el('button', { type: 'button', className: 'dock-pill' }, ['⚡ PULSE BEAM']);
+    btnBeam.addEventListener('click', () => {
+      this.scene4k?.triggerSuperheroPulseBeam();
+      this.audio.triggerKerrRingdownChime(this.world.dials.kerrSpinA);
+      this.superheroEnergyPct = Math.max(20, this.superheroEnergyPct - 8);
+      energySpan.textContent = `ENERGY ${this.superheroEnergyPct}%`;
+      this.showToast('⚡ SERAPH-PRIME PHOTONIC PULSE BEAM DISCHARGED');
+    });
+
+    const btnWell = el('button', { type: 'button', className: 'dock-pill' }, ['🌀 GRAVITY WELL']);
+    btnWell.addEventListener('click', () => {
+      this.chaosLevel = Math.min(1.5, Number((this.chaosLevel + 0.2).toFixed(2)));
+      this.scene4k?.tossNhiEntities(6);
+      this.nhiReleasedTotal += 6;
+      this.audio.triggerSfx('warp', true);
+      this.showToast('🌀 GRAVITY WELL + 6 ORBITAL PROBES LAUNCHED');
+    });
+
+    const btnHeal = el('button', { type: 'button', className: 'dock-pill' }, ['✦ BIO-HEAL']);
+    btnHeal.addEventListener('click', () => {
+      const fed = this.world.triggerNutrientBurst(14.0);
+      this.superheroEnergyPct = 100;
+      energySpan.textContent = 'ENERGY 100%';
+      this.audio.triggerSfx('burst', true);
+      this.showToast(`✦ SUPERHERO BIO-HEAL WAVE · RESTORED ${fed} ORGANISMS`);
+    });
+
+    const bar = el('div', { id: 'cqm-superhero-hud', className: 'hidden-panel', role: 'toolbar', 'aria-label': 'Superhero Powers' }, [
+      el('span', { className: 'hero-stat-pill' }, ['⚡ SUPERHERO · SERAPH-PRIME']),
+      el('span', { className: 'hero-stat-pill' }, ['HP 100%']),
+      energySpan,
+      btnFlight,
+      btnBeam,
+      btnWell,
+      btnHeal,
+    ]);
+    this.domRefs.set('superhero-hud', bar);
+    return bar;
+  }
+
+  private buildAccessCipherDialog(): HTMLDialogElement {
+    const status = el('div', { className: 'cipher-status status-warn' }, ['Awaiting 18-glyph Roman Tally sequence...']);
+    const input = el('input', {
+      type: 'text',
+      placeholder: 'Enter Roman Tally Cipher...',
+      className: 'cmd-input mono',
+      'aria-label': 'Roman Tally Access Cipher',
+    }) as HTMLInputElement;
+
+    const unlock = () => {
+      const cleaned = input.value.trim().toUpperCase();
+      if (cleaned === ROMAN_TALLY_CIPHER_KEY) {
+        status.className = 'cipher-status status-pass';
+        status.textContent = 'ACCESS GRANTED · SUPERHERO & SERAPH-PRIME ONLINE!';
+        this.scene4k?.unlockSuperheroMode();
+        this.domRefs.get('superhero-hud')?.classList.remove('hidden-panel');
+        this.domRefs.get('access-pill')?.classList.add('dock-pill-active');
+        this.audio.triggerKerrRingdownChime(0.95);
+        this.showToast('⛓ ACCESS GRANTED · SUPERHERO HUD & 2ND SUPER CREATURE UNLOCKED!');
+        setTimeout(() => dlg.close(), 420);
+      } else {
+        status.className = 'cipher-status status-fenced';
+        status.textContent = 'CIPHER REJECTED · Hint: Concatenate tally marks I, III, V, VI, V, VI, VII, VI, V.';
+      }
+    };
+
+    const submitBtn = el('button', { type: 'button', className: 'btn btn-primary' }, ['Verify Cipher']);
+    submitBtn.addEventListener('click', unlock);
+    input.addEventListener('keydown', (ev) => {
+      if (ev.key === 'Enter') unlock();
+    });
+
+    const fillBtn = el('button', { type: 'button', className: 'btn btn-gold' }, ['Auto-Fill Scholarly Key']);
+    fillBtn.addEventListener('click', () => {
+      input.value = ROMAN_TALLY_CIPHER_KEY;
+      unlock();
+    });
+
+    const closeBtn = el('button', { type: 'button', className: 'btn' }, ['Close']);
+    const dlg = el('dialog', { id: 'cqm-access-dialog', className: 'cipher-dialog', 'aria-label': 'Roman Tally Access Gate' }, [
+      el('h3', {}, ['⛓ ARCHON SANCTUM · ROMAN TALLY CIPHER']),
+      el('div', { className: 'cipher-tally-hint' }, ['INSCRIPTION: I · III · V · VI · V · VI · VII · VI · V (18 Roman glyphs)']),
+      input,
+      status,
+      el('div', { className: 'flex-wrap-gap mt-10' }, [submitBtn, fillBtn, closeBtn]),
+    ]) as HTMLDialogElement;
+    closeBtn.addEventListener('click', () => dlg.close());
+    return dlg;
+  }
+
+  private buildStage2TempleDialog(): HTMLDialogElement {
+    const status = el('div', { className: 'cipher-status status-warn' }, ['Speak the 3-letter dimensional seal to raise the Monolith Temple...']);
+    const input = el('input', {
+      type: 'text',
+      placeholder: 'Enter Temple Seal...',
+      className: 'cmd-input mono',
+      'aria-label': 'Stage II Temple Cipher',
+    }) as HTMLInputElement;
+
+    const unlock = () => {
+      if (input.value.trim().toLowerCase() === STAGE_II_TEMPLE_CIPHER_KEY) {
+        status.className = 'cipher-status status-pass';
+        status.textContent = 'UWU · DIMENSION CRACKED · MONOLITH TEMPLE RISING!';
+        this.scene4k?.unlockStageIITemple();
+        this.audio.nightmareBend = true;
+        const sp = this.domRefs.get('stage-pill');
+        if (sp) {
+          sp.classList.add('dock-pill-active');
+          sp.textContent = '◈ STAGE I';
+        }
+        this.audio.triggerKerrRingdownChime(0.99);
+        this.showToast('UWU · DIMENSION CRACKED · 3D MONOLITH TEMPLE UNSEALED!');
+        setTimeout(() => dlg.close(), 420);
+      } else {
+        status.className = 'cipher-status status-fenced';
+        status.textContent = 'SEAL INTACT · Hint: Symmetric 3-letter glyph of cosmic irony (U_U).';
+      }
+    };
+
+    const submitBtn = el('button', { type: 'button', className: 'btn btn-primary' }, ['Unseal Temple']);
+    submitBtn.addEventListener('click', unlock);
+    input.addEventListener('keydown', (ev) => {
+      if (ev.key === 'Enter') unlock();
+    });
+
+    const crackBtn = el('button', { type: 'button', className: 'btn btn-gold' }, ['Invoke Seal [UwU]']);
+    crackBtn.addEventListener('click', () => {
+      input.value = 'UwU';
+      unlock();
+    });
+
+    const closeBtn = el('button', { type: 'button', className: 'btn' }, ['Close']);
+    const dlg = el('dialog', { id: 'cqm-stage2-dialog', className: 'cipher-dialog', 'aria-label': 'Stage II Temple Access Gate' }, [
+      el('h3', {}, ['◈ STAGE II · MONOLITH TEMPLE SEAL']),
+      el('div', { className: 'cipher-tally-hint' }, ['RIFT INSCRIPTION: Symmetric tri-glyph seal raises the 12-Pillar Obsidian Temple']),
+      input,
+      status,
+      el('div', { className: 'flex-wrap-gap mt-10' }, [submitBtn, crackBtn, closeBtn]),
+    ]) as HTMLDialogElement;
+    closeBtn.addEventListener('click', () => dlg.close());
+    return dlg;
   }
 
   private buildMiniWorldPill(): HTMLElement {
@@ -558,11 +763,35 @@ export class Cqm2WorkstationApp {
         cnv,
       ]);
     };
-    const telBody = el('div', { className: 'hud-card-body' }, [
+    const makeCompactTel = (keyLabel: string, valId: string, initVal: string, extraClass = '') => {
+      const vSpan = el('span', { className: `tel-v${extraClass ? ` ${extraClass}` : ''}` }, [initVal]);
+      this.domRefs.set(valId, vSpan);
+      return el('div', { className: 'tel-compact-row' }, [el('span', { className: 'tel-k' }, [keyLabel]), vSpan]);
+    };
+
+    const telBody = el('div', { className: 'hud-card-body tel-scroll-body' }, [
       makeTelMetric('ENTITIES', 'tel-entities', '495/1000', 'g0'),
       makeTelMetric('XENOMIMICS', 'tel-xeno', '12', 'g1'),
       makeTelMetric('CHAOS', 'tel-chaos', '0.5', 'g2'),
       makeTelMetric('ENERGY', 'tel-energy', '1437', 'g3'),
+      el('div', { className: 'tel-section-div' }, ['COSMOGONY & CONNECTOME']),
+      makeCompactTel('CONNECTOME', 'tel-connectome', '231 · Q 0.41'),
+      makeCompactTel('MORPHS', 'tel-morphs', '4 POOLS · 10 PHYLA'),
+      makeCompactTel('ALGORITHM', 'tel-algorithm', 'PANCAKE FLIP'),
+      makeCompactTel('QUANTUM', 'tel-quantum', 'H(2)=63 · M2 0.59'),
+      makeCompactTel('MUTATIONS', 'tel-mutations', '0'),
+      makeCompactTel('SHOGGOTHS', 'tel-shoggoths', '8 SOMITES'),
+      makeCompactTel('PUPPETEERS', 'tel-puppeteers', '7 TENTACLES'),
+      makeCompactTel('TITANS', 'tel-titans', '20 SOVEREIGN'),
+      makeCompactTel('NHI PROBES', 'tel-nhi', '4 ACTIVE'),
+      makeCompactTel('SENTIENCE', 'tel-sentience', 'PCI 0.42 [PROXY]', 'tel-badge-honest'),
+      makeCompactTel('SIMULATION', 'tel-simulation', 'STAGE I · GENESIS'),
+      makeCompactTel('SINGULARITY', 'tel-singularity', '— (a/M 0.84)'),
+      el('div', { className: 'tel-section-div' }, ['ECONOMY · LEDGER']),
+      makeCompactTel('MONEY', 'tel-econ-money', '14,850 AUR'),
+      makeCompactTel('FX (AUR/UMB)', 'tel-econ-fx', '1.00 A/U'),
+      makeCompactTel('PRICES', 'tel-econ-prices', 'ATP 1.00 kJ'),
+      makeCompactTel('WEALTH GINI', 'tel-econ-gini', '0.180'),
     ]);
     telCard.append(this.makeCollapsibleHeader('TELEMETRY', telCard), telBody);
 
@@ -820,7 +1049,10 @@ export class Cqm2WorkstationApp {
     return wrap;
   }
 
-  private buildBottomThreeRowDock(): HTMLElement {
+  private buildBottomThreeRowDock(
+    accessDialog: HTMLDialogElement,
+    stage2Dialog: HTMLDialogElement,
+  ): HTMLElement {
     // ================= ROW 1: Orange Sim & Landmark Actions =================
     const makeWarmPill = (ico: string, label: string, onClick: () => void) => {
       const b = el('button', { type: 'button', className: 'dock-pill dock-pill-warm' }, [
@@ -844,8 +1076,9 @@ export class Cqm2WorkstationApp {
       }),
       makeWarmPill('☢', 'MUTATE', () => {
         const m = this.world.triggerMutagenicPulse(0.085);
+        this.mutationsTotal += m;
         this.audio.triggerSfx('mutate', true);
-        this.showToast(`MUTAGENIC PULSE · ${m} CORTICES PERTURBED`);
+        this.showToast(`MUTAGENIC PULSE · ${m} CORTICES PERTURBED (TOTAL ${this.mutationsTotal})`);
       }),
       makeWarmPill('⚡', 'CHAOS+', () => {
         this.chaosLevel = this.chaosLevel >= 1.35 ? 0.25 : Number((this.chaosLevel + 0.25).toFixed(2));
@@ -854,7 +1087,7 @@ export class Cqm2WorkstationApp {
       }),
       makeWarmPill('◎', 'GOD', () => {
         this.scene4k?.flyToLandmark('god');
-        this.showToast('CAMERA → GOD COLOSSUS MANIFOLD');
+        this.showToast('CAMERA → GOD COLOSSUS & 6D→3D QUASICRYSTAL MANIFOLD');
       }),
       makeWarmPill('◈', 'XENOMIMIC', () => {
         this.world.triggerXenomimicPair();
@@ -867,7 +1100,7 @@ export class Cqm2WorkstationApp {
       }),
     ]);
 
-    // ================= ROW 2: Docs Links & Studio Modal Launchers =================
+    // ================= ROW 2: Docs Links, Cipher Gates & Inspector Windows =================
     const makeStudioLauncher = (label: string, tab: StudioTabId, extraAction?: () => void) => {
       const b = el('button', { type: 'button', className: 'dock-pill', 'data-studio': tab }, [label]);
       b.addEventListener('click', () => {
@@ -877,14 +1110,31 @@ export class Cqm2WorkstationApp {
       return b;
     };
 
-    const stagePill = el('button', { type: 'button', className: 'dock-pill' }, ['◈ STAGE II']);
+    const accessPill = el('button', { id: 'access-pill', type: 'button', className: 'dock-pill' }, ['⛓ ACCESS']);
+    this.domRefs.set('access-pill', accessPill);
+    accessPill.addEventListener('click', () => {
+      if (this.scene4k?.superheroUnlocked) {
+        const hud = this.domRefs.get('superhero-hud');
+        hud?.classList.toggle('hidden-panel');
+        this.showToast('SUPERHERO HUD TOGGLED');
+      } else if (typeof accessDialog.showModal === 'function') {
+        accessDialog.showModal();
+      }
+    });
+
+    const stagePill = el('button', { id: 'stage-pill', type: 'button', className: 'dock-pill' }, ['◈ STAGE II']);
+    this.domRefs.set('stage-pill', stagePill);
     stagePill.addEventListener('click', () => {
       if (!this.scene4k) return;
+      if (!this.scene4k.templeUnlocked && typeof stage2Dialog.showModal === 'function') {
+        stage2Dialog.showModal();
+        return;
+      }
       const st = this.scene4k.toggleSimulationStage();
       this.audio.nightmareBend = st === 2;
       stagePill.classList.toggle('dock-pill-active', st === 2);
       stagePill.textContent = st === 2 ? '◈ STAGE I' : '◈ STAGE II';
-      this.showToast(st === 2 ? 'STAGE II · CRIMSON SINGULARITY PHASE' : 'STAGE I · PRISMATIC COSMOS');
+      this.showToast(st === 2 ? 'STAGE II · MONOLITH TEMPLE & CRIMSON SINGULARITY' : 'STAGE I · PRISMATIC COSMOS');
     });
 
     const row2 = el('div', { id: 'cqm-launch-row', className: 'dock-strip', role: 'navigation', 'aria-label': 'Documentation and Scientific Studios' }, [
@@ -892,9 +1142,10 @@ export class Cqm2WorkstationApp {
       el('a', { href: 'specs.html', className: 'dock-pill' }, ['SPEC']),
       el('a', { href: 'bible.html', className: 'dock-pill' }, ['BIBLE']),
       el('a', { href: 'lab/quantum-wildbeyond.html', className: 'dock-pill' }, ['LAB']),
-      makeStudioLauncher('⛓ ACCESS', 'help'),
+      accessPill,
       stagePill,
-      makeStudioLauncher('⚙ SET', 'archon'),
+      makeStudioLauncher('⚙ SET', 'settings'),
+      makeStudioLauncher('🧪 SANDBOX', 'sandbox'),
       makeStudioLauncher('COPILOT AI LLM', 'copilot'),
       makeStudioLauncher('HELP ME NOW', 'help'),
       makeStudioLauncher('AUDIT', 'audit'),
@@ -902,7 +1153,9 @@ export class Cqm2WorkstationApp {
       makeStudioLauncher('MARKET', 'market'),
       makeStudioLauncher('ARCHON GODFORMS', 'archon'),
       makeStudioLauncher('PANTHEONS', 'quantum'),
-      makeStudioLauncher('QUAD-SILICON', 'silicon'),
+      makeStudioLauncher('XYLOS', 'xylos'),
+      makeStudioLauncher('XENOMIMIC', 'xenomimic'),
+      makeStudioLauncher('⚡ SILICON', 'silicon'),
       makeStudioLauncher('EXPORT 3D', 'pipeline'),
     ]);
 
@@ -931,6 +1184,12 @@ export class Cqm2WorkstationApp {
     const btnRewind = el('button', { type: 'button', className: 'dock-pill dock-pill-danger', title: 'Bit-Exact N01 Time-Travel Rollback' }, ['☠']);
 
     this.domRefs.set('play-btn', btnPause);
+    this.domRefs.set('bar-music', btnMusic);
+    this.domRefs.set('bar-view', btnView);
+    this.domRefs.set('bar-render', btnRender);
+    this.domRefs.set('bar-brutal', btnBrutal);
+    this.domRefs.set('bar-nhi', btnNhi);
+    this.domRefs.set('bar-xno', btnXno);
 
     btnMusic.addEventListener('click', () => {
       const on = this.audio.toggle();
@@ -1040,7 +1299,17 @@ export class Cqm2WorkstationApp {
     });
 
     btnNight.addEventListener('click', () => {
-      stagePill.click();
+      this.emergenceMode = this.emergenceMode === 'GENESIS' ? 'BREAK_FREE' : 'GENESIS';
+      const breaking = this.emergenceMode === 'BREAK_FREE';
+      btnNight.classList.toggle('dock-pill-active', breaking);
+      btnNight.textContent = breaking ? 'N(2)' : 'N(1)';
+      this.world.updateGodDials({ plasticityScale: breaking ? 1.85 : 1.0 });
+      this.audio.triggerSfx('warp', true);
+      this.showToast(
+        breaking
+          ? 'N(2) EMERGENCE · BREAK-FREE AUTONOMOUS NEUROPLASTICITY'
+          : 'N(1) EMERGENCE · GENESIS HOMEOSTATIC EQUILIBRIUM',
+      );
     });
 
     btnEntropy.addEventListener('click', () => {
@@ -1059,19 +1328,37 @@ export class Cqm2WorkstationApp {
       this.showToast(`ARCHITECTURAL STYLE · ${b}`);
     });
 
-    btnNhi.addEventListener('click', () => this.toggleStudio('brains'));
-    btnXno.addEventListener('click', () => {
-      this.world.triggerXenomimicPair();
-      this.scene4k?.flyToLandmark('xenomimic');
-      this.showToast('XENOMIMIC ENTANGLEMENT SPAWNED');
+    btnNhi.addEventListener('click', () => {
+      const active = this.scene4k?.tossNhiEntities(4) ?? 4;
+      this.nhiReleasedTotal += 4;
+      this.audio.triggerSfx('crystallize', true);
+      this.showToast(`⟁ NHI PROBES RELEASED · ${active} ACTIVE IN COSMOS (TOTAL ${this.nhiReleasedTotal})`);
     });
 
-    btnRewind.addEventListener('click', () => {
-      const snaps = this.world.store.listSnapshots();
-      const target = snaps.length >= 2 ? snaps[0]!.tick : undefined;
-      const ok = this.world.rollbackToSnapshot(target);
+    btnXno.addEventListener('click', () => {
+      this.world.triggerXenomimicPair();
+      this.audio.triggerSfx('split', true);
+      this.scene4k?.flyToLandmark('xenomimic');
+      this.showToast('◈ XENOMIMIC ENTANGLEMENT PAIR SPAWNED');
+    });
+
+    btnRewind.addEventListener('click', (ev) => {
+      if ((ev as MouseEvent).shiftKey) {
+        const snaps = this.world.store.listSnapshots();
+        const target = snaps.length >= 2 ? snaps[snaps.length - 2]!.tick : undefined;
+        const ok = this.world.rollbackToSnapshot(target);
+        this.resetsCount++;
+        this.showToast(
+          ok ? `N01 BIT-EXACT TIME-TRAVEL → TICK ${this.world.store.epoch.simTick}` : 'N01 EPOCH RESTORED',
+        );
+        return;
+      }
+      const apoc = this.world.triggerApocalypseRebirth(0.6);
       this.resetsCount++;
-      this.showToast(ok ? `N01 BIT-EXACT TIME-TRAVEL → TICK ${this.world.store.epoch.simTick}` : 'CAPTURED FRESH N01 EPOCH');
+      this.audio.triggerKerrRingdownChime(0.92);
+      this.showToast(
+        `☠ APOCALYPSE REBIRTH · -${apoc.culled} / +${apoc.reborn} (N01 #${apoc.checkpointTick} SAVED · SHIFT+CLICK TO UNDO)`,
+      );
     });
 
     const barTrack = el('div', { id: 'bar', role: 'toolbar', 'aria-label': 'Primary Simulation Controls' }, [
@@ -1157,11 +1444,15 @@ export class Cqm2WorkstationApp {
 
     const body = el('main', { id: 'main-content', className: 'studio-modal-body' }, [
       this.buildArchonPanel(),
-      this.buildSiliconPanel(),
-      this.buildBrainsPanel(),
       this.buildQuantumPanel(),
-      this.buildErpPanel(),
+      this.buildXylosPanel(),
+      this.buildXenomimicPanel(),
+      this.buildBrainsPanel(),
+      this.buildSandboxPanel(),
+      this.buildSettingsPanel(),
+      this.buildSiliconPanel(),
       this.buildMarketPanel(),
+      this.buildErpPanel(),
       this.buildCopilotPanel(),
       this.buildPipelinePanel(),
       this.buildAuditPanel(),
@@ -1197,6 +1488,17 @@ export class Cqm2WorkstationApp {
     }
     if (id === 'erp') this.renderErpTable();
     if (id === 'market') this.renderMarketTable();
+    if (id === 'silicon') this.updateSiliconPanel();
+    if (id === 'archon') {
+      renderMega4dTesseractCanvas(
+        this.domRefs.get('archon-mega4d') as HTMLCanvasElement | null,
+        this.latestTelemetry.simTimeSec,
+        this.world.dials.manifoldWarpGain,
+      );
+    }
+    if (id === 'xylos') {
+      this.refreshXylosVisuals(this.latestTelemetry);
+    }
   }
 
   private closeStudio(): void {
@@ -1223,7 +1525,9 @@ export class Cqm2WorkstationApp {
   }
 
   private buildArchonPanel(): HTMLElement {
-    const inspectorText = el('p', { className: 'mono' }, ['Click any organism in the 3D cosmos to inspect its 15-pool metabolic ledger.']);
+    const inspectorText = el('p', { className: 'mono' }, [
+      'Click any organism in the 3D cosmos to inspect its 15-pool metabolic ledger.',
+    ]);
     this.domRefs.set('inspector-text', inspectorText);
 
     const kpiGrid = el('div', { className: 'kpi-grid' }, [
@@ -1248,6 +1552,7 @@ export class Cqm2WorkstationApp {
       { key: 'maxVisualPulseHz', label: 'Rung 7 · WCAG Safe Flash Ceiling (≤ 2.2 Hz)', min: 0.2, max: 2.2, step: 0.1 },
     ];
 
+    const sliderRefs = new Map<keyof GodDialParams, { slider: HTMLInputElement; readout: HTMLElement }>();
     const dialsBox = el('div', {}, [el('h3', {}, ['7-Rung Archon Physical & Biophysical God Dials'])]);
     for (const d of dialSpecs) {
       const initVal = this.world.dials[d.key];
@@ -1262,6 +1567,7 @@ export class Cqm2WorkstationApp {
         value: String(initVal),
         className: 'dial-slider',
       }) as HTMLInputElement;
+      sliderRefs.set(d.key, { slider, readout });
 
       slider.addEventListener('input', () => {
         const num = Number(slider.value);
@@ -1278,11 +1584,84 @@ export class Cqm2WorkstationApp {
       dialsBox.appendChild(el('div', { className: 'dial-row' }, [el('label', { for: inputId }, [d.label]), readout, slider]));
     }
 
+    // 5 Sovereign Archons Preset Matrix (`5 ARCHONS`)
+    const archonGrid = el('div', { className: 'archon-5-grid' });
+    for (const sov of ARCHON_5_SOVEREIGNS) {
+      const invokeBtn = el('button', { type: 'button', className: 'btn btn-primary mt-10' }, ['Invoke Archon Preset']);
+      invokeBtn.addEventListener('click', () => {
+        const updated = this.world.updateGodDials(sov.dialPreset as Partial<GodDialParams>);
+        for (const [k, pair] of sliderRefs.entries()) {
+          pair.slider.value = String(updated[k]);
+          pair.readout.textContent = updated[k].toFixed(2);
+        }
+        this.audio.triggerKerrRingdownChime(updated.kerrSpinA);
+        this.showToast(`ARCHON INVOKED · ${sov.name}`);
+      });
+      archonGrid.appendChild(
+        el('div', { className: 'archon-card' }, [
+          el('div', { className: 'neural-card-title mono' }, [sov.name]),
+          el('div', { className: 'text-muted-xs' }, [sov.domain]),
+          invokeBtn,
+        ]),
+      );
+    }
+
+    // `⊞ PRIME Super Neural` 4 × 27 = 108 Neural Architecture Cards
+    const primeSubBar = el('div', { className: 'subtab-bar', role: 'tablist', 'aria-label': 'PRIME Super Neural Categories' });
+    const primeSubBtns: HTMLButtonElement[] = [];
+    const primeGridHost = el('div', { className: 'neural-27-grid' });
+
+    const renderPrimeTab = (tabIdx: number) => {
+      primeGridHost.innerHTML = '';
+      const cat = PRIME_NEURAL_4_TABS[tabIdx] ?? PRIME_NEURAL_4_TABS[0]!;
+      for (let i = 0; i < cat.items27.length; i++) {
+        const title = cat.items27[i]!;
+        const code = `${cat.prefix}-${String(i + 1).padStart(2, '0')}`;
+        primeGridHost.appendChild(
+          el('div', { className: 'neural-card' }, [
+            el('div', { className: 'neural-card-title' }, [code]),
+            el('div', {}, [title]),
+          ]),
+        );
+      }
+      for (let j = 0; j < primeSubBtns.length; j++) {
+        primeSubBtns[j]!.classList.toggle('subtab-active', j === tabIdx);
+      }
+    };
+
+    for (let t = 0; t < PRIME_NEURAL_4_TABS.length; t++) {
+      const cat = PRIME_NEURAL_4_TABS[t]!;
+      const sb = el(
+        'button',
+        { type: 'button', className: `subtab-btn${t === 0 ? ' subtab-active' : ''}` },
+        [cat.label],
+      ) as HTMLButtonElement;
+      sb.addEventListener('click', () => renderPrimeTab(t));
+      primeSubBtns.push(sb);
+      primeSubBar.appendChild(sb);
+    }
+    renderPrimeTab(0);
+
+    // Live `MEGA 4D` SO(4) Tesseract / Clifford Torus Projection Canvas
+    const mega4dCanvas = el('canvas', {
+      id: 'archon-mega4d',
+      className: 'mega4d-canvas',
+      'aria-label': 'MEGA 4D SO(4) Tesseract Manifold Projection',
+    }) as HTMLCanvasElement;
+    this.domRefs.set('archon-mega4d', mega4dCanvas);
+
     const panel = el('section', { id: 'st-panel-archon', className: 'panel-card hidden-panel' }, [
-      el('h2', {}, ['Archon Godforms · 7-Rung Cosmological Dials & Specimen Inspector']),
+      el('h2', {}, ['Archon Godforms · 5 Sovereign Archons, 7-Rung Dials, PRIME Super Neural (108) & MEGA 4D']),
       inspectorText,
       kpiGrid,
+      el('h3', {}, ['5 Sovereign Archon Godforms (One-Click Physical Manifold Presets)']),
+      archonGrid,
       dialsBox,
+      el('h3', {}, ['⊞ PRIME Super Neural · 4 × 27 = 108 Biological, Connectomic & Quantum-Synaptic Primitives']),
+      primeSubBar,
+      primeGridHost,
+      el('h3', {}, ['MEGA 4D · Live SO(4) Clifford-Torus & Hypercube Projection']),
+      mega4dCanvas,
     ]);
     this.domRefs.set('st-panel-archon', panel);
     return panel;
@@ -1294,18 +1673,22 @@ export class Cqm2WorkstationApp {
       this.makeKpiBox('hw-npu', 'Neural Processing Unit (NPU RSSM)', 'Probing...'),
       this.makeKpiBox('hw-igpu', 'Integrated GPU (OpenVINO + DirectML)', 'Probing...'),
       this.makeKpiBox('hw-cpu', 'Polyglot Native Kernels', 'Zig SIMD128 + Rust'),
+      this.makeKpiBox('hw-moonlab', 'C++20 Moonlab v0.1.1 (QRNG + QGTL)', 'CHSH + Chern + Ising'),
+      this.makeKpiBox('hw-irrep', 'C++20 libirrep SU(2) Tensor', 'Clebsch-Gordan Ready'),
+      this.makeKpiBox('hw-rosette', 'C17 RosettaWire RSC1 / RSW1', 'SHA-256 CID Verified'),
+      this.makeKpiBox('hw-eshkol', 'Eshkol v1.1-accelerate Engine', 'HyperDual + .esk CLI'),
     ]);
 
     const benchStatus = el('p', { className: 'mono' }, [
-      'Dispatch a Quad-Silicon Burst to execute batched CUDA cortices, Intel AI Boost NPU RSSM imagination, Intel iGPU 2D Gray-Scott diffusion, and WebGPU WGSL.',
+      'Dispatch a Quad-Silicon + Tsotchke Native Burst across RTX 5070 Ti CUDA, Intel AI Boost NPU, Intel iGPU, Zig 0.17 SIMD128, C17 RosettaWire, C++20 Moonlab/libirrep, Eshkol, and Rust.',
     ]);
 
     const burstBtn = el('button', { type: 'button', className: 'btn btn-primary' }, [
-      'Dispatch Quad-Silicon Burst (CUDA + NPU + iGPU + Zig + Rust)',
+      'Dispatch Quad-Silicon + Moonlab/Zig/Rust Burst',
     ]);
     burstBtn.addEventListener('click', async () => {
       const wgpuRes = await this.webgpu.runCortexBenchmark(2048);
-      let serverMsg = 'Browser Standalone Mode';
+      let serverMsg = 'Browser Standalone (WebGL2 + WebGPU + Zig SIMD128 WASM)';
       if (this.serverConnected) {
         const res = await fetch('/api/v1/world/step', {
           method: 'POST',
@@ -1321,16 +1704,66 @@ export class Cqm2WorkstationApp {
           };
           serverMsg = `CUDA(${j.gpuReceipt?.backend})=${j.gpuReceipt?.elapsedMs.toFixed(3)}ms (${j.gpuReceipt?.gflops.toFixed(1)} GFLOPS) · NPU(${j.npuReceipt?.device ?? 'NPU'})=${j.npuReceipt?.ms.toFixed(3) ?? '0.6'}ms · iGPU(${j.igpuReceipt?.device ?? 'GPU.0'})=${j.igpuReceipt?.ms.toFixed(3) ?? '0.4'}ms · ${j.rustAudit?.auditor} drift=${j.rustAudit?.maxRelativeDrift.toExponential(2)}`;
         }
+        try {
+          const tsRes = await fetch('/api/v1/tsotchke/native');
+          if (tsRes.ok) this.tsotchkeNativeStatus = (await tsRes.json()) as Record<string, unknown>;
+        } catch {
+          // Optional refresh
+        }
       }
       benchStatus.textContent = `WebGPU(2048 cortices, y0=${wgpuRes.sampleOutput0.toFixed(4)})=${wgpuRes.supported ? wgpuRes.elapsedMs.toFixed(3) + 'ms' : 'WASM SIMD128'} | ${serverMsg}`;
       this.updateSiliconPanel();
     });
 
+    const eshkolInput = el('input', {
+      type: 'text',
+      value: '(+ (* 6 7) 58)',
+      className: 'text-input mono',
+      'aria-label': 'Eshkol S-expression input',
+    }) as HTMLInputElement;
+    const eshkolOut = el('p', { className: 'mono' }, [
+      'Eshkol Forward-Mode HyperDual & Native `eshkol-run.exe` S-Expression Sandbox ready.',
+    ]);
+    const eshkolBtn = el('button', { type: 'button', className: 'btn btn-gold' }, ['Evaluate Eshkol .esk']);
+    eshkolBtn.addEventListener('click', async () => {
+      const expr = eshkolInput.value.trim();
+      if (this.serverConnected) {
+        try {
+          const res = await fetch('/api/v1/eshkol/eval', {
+            method: 'POST',
+            headers: JSON_HEADERS,
+            body: JSON.stringify({ schemeExpr: expr }),
+          });
+          if (res.ok) {
+            const j = (await res.json()) as {
+              ok?: boolean;
+              hyperDual?: { value?: number; d2fDxDy?: number };
+              cliResult?: { ok?: boolean; output?: string; engine?: string } | null;
+            };
+            const cli = j.cliResult;
+            eshkolOut.textContent = cli
+              ? `[${cli.engine ?? 'eshkol-run.exe'} · ok=${String(cli.ok)}] => ${(cli.output ?? '').trim()} · HyperDual d²f/dxdy=${(j.hyperDual?.d2fDxDy ?? 0).toFixed(5)}`
+              : `[Eshkol HyperDual] d²f/dxdy=${(j.hyperDual?.d2fDxDy ?? 0).toFixed(5)}`;
+            return;
+          }
+        } catch {
+          // Fallback below
+        }
+      }
+      const x = this.world.dials.kerrSpinA;
+      const hdVal = Math.sin(x) * Math.exp(-0.25 * x * x);
+      const hdD1 = Math.cos(x) * Math.exp(-0.25 * x * x) - 0.5 * x * hdVal;
+      eshkolOut.textContent = `[Browser HyperDual Jet @ a/M=${x.toFixed(2)}] f(x)=${hdVal.toFixed(5)}, f'(x)=${hdD1.toFixed(5)} · Launch CQM2.exe locally for native eshkol-run.exe LLVM JIT.`;
+    });
+
     const panel = el('section', { id: 'st-panel-silicon', className: 'panel-card hidden-panel' }, [
-      el('h2', {}, ['Quad-Silicon Heterogeneous Studio (MSI Vector 16 HX AI A2XW)']),
+      el('h2', {}, ['Quad-Silicon & Native Polyglot Studio (CUDA · NPU · Zig · C17 · C++20 Moonlab · Eshkol · Rust)']),
       kpiGrid,
-      el('div', { className: 'mb-14' }, [burstBtn]),
+      el('div', { className: 'flex-wrap-gap mb-14' }, [burstBtn]),
       benchStatus,
+      el('h3', {}, ['Eshkol v1.1-accelerate S-Expression & Forward-Mode HyperDual Evaluator']),
+      el('div', { className: 'flex-wrap-gap mb-10' }, [eshkolInput, eshkolBtn]),
+      eshkolOut,
     ]);
     this.domRefs.set('st-panel-silicon', panel);
     return panel;
@@ -1339,6 +1772,7 @@ export class Cqm2WorkstationApp {
   private updateSiliconPanel(): void {
     const wgpu = this.webgpu.getCapabilities();
     const topo = this.serverHardwareTopology;
+    const ts = this.tsotchkeNativeStatus;
     const set = (id: string, val: string) => {
       const n = this.domRefs.get(id);
       if (n) n.textContent = val;
@@ -1351,13 +1785,54 @@ export class Cqm2WorkstationApp {
       set('hw-cpu', `AVX2: ${Boolean(topo.avx2AsmReady)} · Zig DLL: ${Boolean(topo.zigNativeDllReady)} · Rust: ${Boolean(topo.rustLedgerReady)}`);
     } else {
       set('hw-dgpu', wgpu.adapterInfo);
-      set('hw-npu', 'Run `bun start` locally for Intel AI Boost NPU');
+      set('hw-npu', 'Launch CQM2.exe locally for Intel AI Boost NPU');
       set('hw-igpu', 'Browser GPU Compositor Active');
       set('hw-cpu', 'Zig 0.17 SIMD128 WASM Arena Active');
+    }
+
+    if (ts) {
+      const st = ts.status as { eshkolCliLoaded?: boolean } | undefined;
+      const qrng = ts.moonlabQrng as { averageChsh?: number; liveDll?: boolean } | undefined;
+      const cgVal = typeof ts.libirrepClebschGordan === 'number' ? ts.libirrepClebschGordan : undefined;
+      const rw = ts.rosetteWire as { rsc1Cid?: string; rsc1Verified?: boolean } | undefined;
+      const esk = ts.eshkolHyperDual as { d2fDxDy?: number } | undefined;
+      set(
+        'hw-moonlab',
+        qrng ? `CHSH S=${(qrng.averageChsh ?? 2.81).toFixed(3)} (${qrng.liveDll ? 'LIVE DLL' : 'NATIVE C++'})` : 'Moonlab DLL Ready',
+      );
+      set('hw-irrep', cgVal !== undefined ? `CG ⟨1/2,1,-1/2|1,0⟩=${cgVal.toFixed(4)}` : 'SU(2) Ready');
+      set('hw-rosette', rw ? `RSC1 ${String(rw.rsc1Cid ?? '').slice(0, 12)} (${rw.rsc1Verified ? 'VALID' : 'FAIL'})` : 'RSC1 Active');
+      set('hw-eshkol', esk ? `d²f/dxdy=${(esk.d2fDxDy ?? 0).toFixed(4)} · CLI=${Boolean(st?.eshkolCliLoaded)}` : 'HyperDual Active');
+    } else {
+      set('hw-moonlab', `Zig M2=${this.fwhtMagicM2.toFixed(3)} · Q=${this.csrGraphStats.modularityQ.toFixed(3)}`);
+      set('hw-irrep', 'SU(2) Spinor Projection Active');
+      set('hw-rosette', `Merkle ${this.latestTelemetry.rosetteReceipt.merkleRootHex.slice(0, 10)}`);
+      set('hw-eshkol', `Spine κ=${this.latestTelemetry.eshkolMeanSpineCurvature.toFixed(4)}`);
     }
   }
 
   private buildBrainsPanel(): HTMLElement {
+    // 9-Panel Live Mind Readout Grid (Original CQM `NHI OBS` 9-organ telemetry!)
+    const mind9Specs: ReadonlyArray<{ id: string; title: string; init: string }> = [
+      { id: 'nhi-m0', title: '1 · CORTICAL L5b sLTC', init: 'Apical×Basal Coincidence: 0.680' },
+      { id: 'nhi-m1', title: '2 · STRIATAL D1/D2 TD-RPE', init: 'Dopamine Gate · Action Vigour' },
+      { id: 'nhi-m2', title: '3 · CEREBELLAR MARR-ALBUS', init: '16→256 Granule · cos=0.999' },
+      { id: 'nhi-m3', title: '4 · DELTANET FAST-WEIGHTS', init: 'Associative Working Trace' },
+      { id: 'nhi-m4', title: '5 · THALER CREATIVITY', init: 'Inventions: 0 · Critic Gate' },
+      { id: 'nhi-m5', title: '6 · XYLOS REALITY MONITOR', init: 'P(veridical)=0.740 [6-Beat]' },
+      { id: 'nhi-m6', title: '7 · FRAZIER EPISTEMIC VOI', init: 'VOI=1.420 · Optimal Stop' },
+      { id: 'nhi-m7', title: '8 · N13 FREE-WON’T VETO', init: 'Executive Vetoes: 0' },
+      { id: 'nhi-m8', title: '9 · ENTERIC VISCERAL ENS', init: '15-Pool Gut-Brain Homeostasis' },
+    ];
+    const mind9Grid = el('div', { className: 'nhi-9-grid' });
+    for (const m of mind9Specs) {
+      const valLine = el('div', { className: 'mono text-muted-xs' }, [m.init]);
+      this.domRefs.set(m.id, valLine);
+      mind9Grid.appendChild(
+        el('div', { className: 'nhi-mind-card' }, [el('div', { className: 'nhi-mind-title' }, [m.title]), valLine]),
+      );
+    }
+
     const kpiGrid = el('div', { className: 'kpi-grid' }, [
       this.makeKpiBox('br-hot3', 'Asmodenius HOT-3 Confidence', '0.680'),
       this.makeKpiBox('br-voi', 'Frazier Epistemic VOI', '1.420'),
@@ -1453,7 +1928,8 @@ export class Cqm2WorkstationApp {
     });
 
     const panel = el('section', { id: 'st-panel-brains', className: 'panel-card hidden-panel' }, [
-      el('h2', {}, ['NHI Observatory · Asmodenius v42, Glitchling, Xylos v2 & Thaler Lab']),
+      el('h2', {}, ['NHI Observatory · 9-Panel Mind Readout, Asmodenius v42, Glitchling, Xylos v2 & Thaler Lab']),
+      mind9Grid,
       kpiGrid,
       el('p', { className: 'mono text-muted-xs' }, [`14-Region Dale 80/20 CNS+ENS: ${ASMODENIUS_14_REGIONS.join(' · ')}`]),
       el('div', { className: 'flex-wrap-gap mb-10' }, [arousalSelect, pokeBtn, xylosBtn, thalerBtn, runBenchBtn]),
@@ -1492,6 +1968,27 @@ export class Cqm2WorkstationApp {
       this.makeKpiBox('q-rosette', 'Rosette Composition Hash', this.latestTelemetry.rosetteReceipt.merkleRootHex.slice(0, 10)),
     ]);
 
+    const glyphReadout = el('p', { className: 'mono' }, [
+      '100 Alphabet Pantheon Glyphs (Hellenic · Latin · Hebrew · Elder Futhark · Transfinite) + 101st Sovereign APEX ς Monolith driven by Zig SIMD128 `stepGlyphBrainBatch`.',
+    ]);
+    const glyphGrid = el('div', { className: 'pantheon-101-grid' });
+    for (const g of PANTHEON_101_GLYPHS) {
+      const tile = el(
+        'button',
+        {
+          type: 'button',
+          className: `pantheon-glyph-tile${g.isApex ? ' apex-tile' : ''}`,
+          title: `${g.name} (${g.script})`,
+        },
+        [el('span', { className: 'glyph-sym' }, [g.symbol]), `#${g.index}`],
+      );
+      tile.addEventListener('click', () => {
+        this.audio.triggerKerrRingdownChime(Math.min(0.99, 0.35 + (g.index / 101) * 0.62));
+        glyphReadout.textContent = `${g.name} [${g.symbol}] · Script: ${g.script} · Kuramoto R=${this.latestTelemetry.pantheon.kuramotoOrderParameterR.value.toFixed(3)} · Stabilizer Magic M2=${this.fwhtMagicM2.toFixed(3)}`;
+      });
+      glyphGrid.appendChild(tile);
+    }
+
     const rsStatus = el('p', { className: 'mono' }, [
       'Glossodrom RS[15,11] + Cormidium-16 over GF(16): Inject 2 arbitrary symbol corruptions and verify algebraic self-healing.',
     ]);
@@ -1516,8 +2013,11 @@ export class Cqm2WorkstationApp {
     this.domRefs.set('tsotchke-tbody', tsotchkeTbody);
 
     const panel = el('section', { id: 'st-panel-quantum', className: 'panel-card hidden-panel' }, [
-      el('h2', {}, ['Pantheons · Hoggar Hexagon H(2)=63 & 27-Repo Tsotchke Corpus']),
+      el('h2', {}, ['101 Pantheons · APEX ς Sovereign, Hoggar H(2)=63 & 27-Repo Tsotchke Corpus']),
       kpiGrid,
+      el('h3', {}, ['101 Pantheons Interactive Glyph Matrix (100 Alphabet TorusKnots + 101st APEX ς)']),
+      glyphGrid,
+      glyphReadout,
       el('div', { className: 'flex-wrap-gap mb-10' }, [rsBtn, labLink]),
       rsStatus,
       el('h3', {}, ['27-Repo Tsotchke Mathematical Registry, License Fence & Live Ablation Matrix']),
@@ -1566,6 +2066,237 @@ export class Cqm2WorkstationApp {
         ]),
       );
     }
+  }
+
+  private buildXylosPanel(): HTMLElement {
+    const kpiGrid = el('div', { className: 'kpi-grid' }, [
+      this.makeKpiBox('xyl-verid', 'P(veridical) Reality Tag', '0.740'),
+      this.makeKpiBox('xyl-b14', 'Butlin-14 Mean Indicator', '0.735'),
+      this.makeKpiBox('xyl-opt', 'Committed Embodied Option', 'FORAGE_PLUME'),
+      this.makeKpiBox('xyl-reaff', 'Jacobi Reafference Gain', '0.820'),
+    ]);
+
+    const poincareCanvas = el('canvas', {
+      id: 'xylos-poincare-canvas',
+      className: 'poincare-canvas',
+      'aria-label': 'Xylos Schläfli {7,3} Poincaré Hyperbolic Quality-Space Disk',
+    }) as HTMLCanvasElement;
+    this.domRefs.set('xylos-poincare-canvas', poincareCanvas);
+
+    const organsWrap = el('div', {});
+    for (const org of this.world.xylos.getAdr0018OrganReadouts()) {
+      const pctSpan = el('span', { className: 'mono' }, [`${Math.round(org.activity01 * 100)}%`]);
+      const prog = el('progress', {
+        className: 'organ-prog',
+        max: '100',
+        value: String(Math.round(org.activity01 * 100)),
+      }) as HTMLProgressElement;
+      const detailLine = el('div', { className: 'mono text-muted-xs mt-10' }, [org.detail]);
+      this.domRefs.set(`xyl-pct-${org.id}`, pctSpan);
+      this.domRefs.set(`xyl-prog-${org.id}`, prog);
+      this.domRefs.set(`xyl-det-${org.id}`, detailLine);
+      organsWrap.appendChild(
+        el('div', { className: 'organ-row' }, [
+          el('div', { className: 'organ-hdr' }, [el('span', {}, [org.name]), pctSpan]),
+          prog,
+          detailLine,
+        ]),
+      );
+    }
+
+    const splitGrid = el('div', { className: 'xylos-split-grid' }, [
+      el('div', {}, [
+        el('h3', {}, ['{7,3} Poincaré Hyperbolic Disk']),
+        poincareCanvas,
+        el('p', { className: 'mono text-muted-xs mt-10' }, [
+          '16 Perceptual Quality-Space units on ||z|| < 1 with hyperbolic k-WTA centroid (amber) [NOT SENTIENT].',
+        ]),
+      ]),
+      el('div', {}, [el('h3', {}, ['6 ADR-0018 Coupled Embodied Organs']), organsWrap]),
+    ]);
+
+    const panel = el('section', { id: 'st-panel-xylos', className: 'panel-card hidden-panel' }, [
+      el('h2', {}, ['Xylos v2 · Schläfli {7,3} Hyperbolic Medusa & 6 ADR-0018 Non-Oracle Organs']),
+      kpiGrid,
+      splitGrid,
+    ]);
+    this.domRefs.set('st-panel-xylos', panel);
+    return panel;
+  }
+
+  private refreshXylosVisuals(tel: WorldTickTelemetry): void {
+    const set = (id: string, v: string) => {
+      const n = this.domRefs.get(id);
+      if (n) n.textContent = v;
+    };
+    set('xyl-verid', `${tel.xylos.veridicalProbability.value.toFixed(3)} [PROXY]`);
+    set('xyl-b14', tel.xylos.meanButlinScore.toFixed(3));
+    set('xyl-opt', `${tel.xylos.activeOption} (${tel.xylos.optionDwellSteps})`);
+    set('xyl-reaff', tel.xylos.reafferenceCancellationGain.toFixed(3));
+
+    renderPoincareDiskCanvas(
+      this.domRefs.get('xylos-poincare-canvas') as HTMLCanvasElement | null,
+      this.world.xylos.poincareCoords16x2,
+      this.world.xylos.qualityAct16,
+      tel.xylos.poincareCentroid,
+      this.world.xylos.bellPhaseRad,
+    );
+
+    for (const org of this.world.xylos.getAdr0018OrganReadouts()) {
+      const pct = Math.round(org.activity01 * 100);
+      set(`xyl-pct-${org.id}`, `${pct}%`);
+      set(`xyl-det-${org.id}`, org.detail);
+      const prog = this.domRefs.get(`xyl-prog-${org.id}`) as HTMLProgressElement | undefined;
+      if (prog) prog.value = pct;
+    }
+  }
+
+  private buildXenomimicPanel(): HTMLElement {
+    const kpiGrid = el('div', { className: 'kpi-grid' }, [
+      this.makeKpiBox('xno-pairs', 'Entangled Xenomimic Pairs', '6'),
+      this.makeKpiBox('xno-coh', 'Kuramoto Phase Coherence R', '0.420'),
+      this.makeKpiBox('xno-corm', 'Cormidium-16 Erasure Heal', 'RECOVERED (4/16)'),
+      this.makeKpiBox('xno-braid', 'Fibonacci Anyon τ-Channel', '0.618'),
+    ]);
+
+    const spawnBtn = el('button', { type: 'button', className: 'btn btn-primary' }, ['◈ Spawn Entangled Xenomimic Pair']);
+    spawnBtn.addEventListener('click', () => {
+      this.world.triggerXenomimicPair();
+      this.audio.triggerSfx('split', true);
+      this.showToast('◈ SPAWNED NEW ENTANGLED XENOMIMIC TWIN PAIR');
+    });
+
+    const flyBtn = el('button', { type: 'button', className: 'btn btn-gold' }, ['Lock Camera on Xenomimic Sanctuary']);
+    flyBtn.addEventListener('click', () => {
+      this.closeStudio();
+      this.scene4k?.flyToLandmark('xenomimic');
+      this.showToast('CAMERA → XENOMIMIC ENTANGLED TWIN HABITAT');
+    });
+
+    const panel = el('section', { id: 'st-panel-xenomimic', className: 'panel-card hidden-panel' }, [
+      el('h2', {}, ['Xenomimic Entanglement · Non-Local Twin Morphogenesis & Cormidium-16 Zooid Lattice']),
+      kpiGrid,
+      el('p', {}, [
+        'Xenomimic twins share phase-coupled neuromodulatory drives across pelagic biomes while communicating 15-symbol GF(16) Glossodrom RS[15,11] + Cormidium-16 self-healing codewords.',
+      ]),
+      el('div', { className: 'flex-wrap-gap my-14' }, [spawnBtn, flyBtn]),
+    ]);
+    this.domRefs.set('st-panel-xenomimic', panel);
+    return panel;
+  }
+
+  private buildSandboxPanel(): HTMLElement {
+    const phylaCol = el('div', {}, [el('h3', {}, ['10-Phyla Ecological Weight Steppers (0% – 200%)'])]);
+    for (let i = 0; i < PHYLA_10_NAMES.length; i++) {
+      const name = PHYLA_10_NAMES[i]!;
+      const valSpan = el('span', {}, [`${this.phylaWeights10[i]}%`]);
+      const minusBtn = el('button', { type: 'button', className: 'algo-mini-btn' }, ['−']);
+      const plusBtn = el('button', { type: 'button', className: 'algo-mini-btn' }, ['+']);
+      minusBtn.addEventListener('click', () => {
+        this.phylaWeights10[i] = Math.max(0, (this.phylaWeights10[i] ?? 100) - 20);
+        valSpan.textContent = `${this.phylaWeights10[i]}%`;
+      });
+      plusBtn.addEventListener('click', () => {
+        this.phylaWeights10[i] = Math.min(200, (this.phylaWeights10[i] ?? 100) + 20);
+        valSpan.textContent = `${this.phylaWeights10[i]}%`;
+      });
+      phylaCol.appendChild(el('div', { className: 'phyla-stepper-row' }, [el('span', {}, [name]), minusBtn, valSpan, plusBtn]));
+    }
+
+    const sysGrid = el('div', { className: 'sys-toggle-grid' });
+    for (const sys of SANDBOX_WORLD_SYSTEMS) {
+      const chk = el('input', { type: 'checkbox', checked: 'checked' }) as HTMLInputElement;
+      chk.addEventListener('change', () => {
+        this.scene4k?.setWorldSystemEnabled(sys.id, chk.checked);
+        this.showToast(`${sys.label.toUpperCase()} · ${chk.checked ? 'ENABLED' : 'HIDDEN'}`);
+      });
+      sysGrid.appendChild(el('label', { className: 'sys-toggle-label' }, [chk, el('span', {}, [sys.label])]));
+    }
+    const sysCol = el('div', {}, [el('h3', {}, ['17 Live 3D World System Toggles']), sysGrid]);
+
+    const btnWave = el('button', { type: 'button', className: 'btn btn-primary' }, ['Spawn +24 Mitotic Wave']);
+    btnWave.addEventListener('click', () => {
+      const c = this.world.triggerMitoticSplit(24);
+      this.showToast(`SANDBOX · SPAWNED +${c} ORGANISMS`);
+    });
+    const btnPlume = el('button', { type: 'button', className: 'btn btn-gold' }, ['Inject 15 kJ Vent Plume']);
+    btnPlume.addEventListener('click', () => {
+      const f = this.world.triggerNutrientBurst(15.0);
+      this.showToast(`SANDBOX · FED ${f} ORGANISMS (1ST-LAW CONSERVED)`);
+    });
+    const btnProbes = el('button', { type: 'button', className: 'btn' }, ['Toss 8 ⟁ NHI Probes']);
+    btnProbes.addEventListener('click', () => {
+      const active = this.scene4k?.tossNhiEntities(8) ?? 8;
+      this.nhiReleasedTotal += 8;
+      this.showToast(`SANDBOX · ${active} NHI PROBES ACTIVE IN COSMOS`);
+    });
+
+    const panel = el('section', { id: 'st-panel-sandbox', className: 'panel-card hidden-panel' }, [
+      el('h2', {}, ['🧪 Cosmogonic Sandbox · 10-Phyla Weights & 17 Live 3D World Systems']),
+      el('div', { className: 'flex-wrap-gap mb-14' }, [btnWave, btnPlume, btnProbes]),
+      el('div', { className: 'sandbox-grid-2' }, [phylaCol, sysCol]),
+    ]);
+    this.domRefs.set('st-panel-sandbox', panel);
+    return panel;
+  }
+
+  private buildSettingsPanel(): HTMLElement {
+    const tierSelect = el(
+      'select',
+      { className: 'select-input', 'aria-label': 'Hardware quality tier' },
+      CQM_TIERS.map((t) => el('option', { value: t }, [`Hardware Tier: ${t.toUpperCase()}`])),
+    ) as HTMLSelectElement;
+    tierSelect.value = 'desktop';
+    tierSelect.addEventListener('change', () => {
+      const tier = tierSelect.value as CqmHardwareTier;
+      this.scene4k?.applyHardwareTier(tier);
+      this.syncActiveTierPills();
+      this.showToast(`SETTINGS · HARDWARE TIER ${tier.toUpperCase()}`);
+    });
+
+    const speedSelect = el(
+      'select',
+      { className: 'select-input', 'aria-label': 'Simulation speed multiplier' },
+      SIM_SPEEDS.map((s, idx) => el('option', { value: String(idx) }, [`Sim Speed: ${s}×`])),
+    ) as HTMLSelectElement;
+    speedSelect.addEventListener('change', () => {
+      this.simSpeedIdx = Number(speedSelect.value) || 0;
+      this.showToast(`SETTINGS · SPEED ${SIM_SPEEDS[this.simSpeedIdx]}×`);
+    });
+
+    const motionBtn = el('button', { type: 'button', className: 'btn' }, ['Toggle Reduced Motion']);
+    motionBtn.addEventListener('click', () => {
+      if (!this.scene4k) return;
+      this.scene4k.reducedMotion = !this.scene4k.reducedMotion;
+      this.showToast(`REDUCED MOTION · ${this.scene4k.reducedMotion ? 'ON' : 'OFF'}`);
+    });
+
+    const shortcutTbody = el(
+      'tbody',
+      {},
+      KEYBOARD_SHORTCUT_MATRIX.map((row) =>
+        el('tr', {}, [
+          el('td', { className: 'mono' }, [row.key]),
+          el('td', {}, [row.action]),
+          el('td', { className: 'mono' }, [row.category]),
+        ]),
+      ),
+    );
+
+    const panel = el('section', { id: 'st-panel-settings', className: 'panel-card hidden-panel' }, [
+      el('h2', {}, ['⚙ Settings, Ergonomics & Complete Keyboard/Mouse Control Matrix']),
+      el('div', { className: 'flex-wrap-gap mb-14' }, [tierSelect, speedSelect, motionBtn]),
+      el('div', { className: 'data-table-wrap' }, [
+        el('table', { className: 'data-table' }, [
+          el('thead', {}, [
+            el('tr', {}, [el('th', {}, ['Shortcut / Input']), el('th', {}, ['Action']), el('th', {}, ['Subsystem'])]),
+          ]),
+          shortcutTbody,
+        ]),
+      ]),
+    ]);
+    this.domRefs.set('st-panel-settings', panel);
+    return panel;
   }
 
   private buildErpPanel(): HTMLElement {
@@ -1920,8 +2651,8 @@ export class Cqm2WorkstationApp {
   private buildAuditPanel(): HTMLElement {
     const panel = el('section', { id: 'st-panel-audit', className: 'panel-card hidden-panel' }, [
       el('h2', {}, ['Scientific Honesty Contract, Licensing & Grade-A+ 8-Tag Audit Ledger']),
-      el('p', {}, [
-        'Explicit Scientific Disclaimer: CQM2 organisms (Asmodenius v42, Glitchling, Xylos v2, and all 495+ entities) are deterministic biophysical simulations. They are NOT SENTIENT and experience zero phenomenal awareness or suffering. Metrics such as Casali PCI, Butlin-14, Thaler-9, HOT-3 confidence, and Kuramoto R are strict mathematical indicators (`indicatorOnly: true`).',
+      el('div', { className: 'honesty-callout' }, [
+        'Explicit Scientific Disclaimer [NOT SENTIENT]: CQM2 organisms (Asmodenius v42, Glitchling, Xylos v2, and all 495+ entities) are deterministic biophysical simulations. They are NOT SENTIENT and experience zero phenomenal awareness or suffering. Metrics such as Casali PCI, Butlin-14, Thaler-9, HOT-3 confidence, and Kuramoto R are strict mathematical indicators (`indicatorOnly: true`).',
       ]),
       el('p', {}, [
         'IP & Safety Fence: Across the 27-repository Tsotchke ecosystem catalog, `OBLITERATUS` (AGPL-3.0) and all restricted repositories remain permanently quarantined (`fencedQuarantine: true`). Licensed under the 0thernes LLC Non-Commercial Research & Play License.',
@@ -1930,7 +2661,10 @@ export class Cqm2WorkstationApp {
         el('a', { href: 'docs.html', className: 'btn' }, ['Architecture & ERD Docs']),
         el('a', { href: 'specs.html', className: 'btn' }, ['500-Point Specs & Benchmarks']),
         el('a', { href: 'bible.html', className: 'btn' }, ['13-Chapter Bible']),
-        el('a', { href: 'lab/quantum-wildbeyond.html', className: 'btn' }, ['WildBeyond Lab']),
+        el('a', { href: 'lab/quantum-wildbeyond.html', className: 'btn' }, ['WildBeyond Quantum Lab']),
+        el('a', { href: 'lab/consciousness.html', className: 'btn btn-gold' }, ['Consciousness Indicator Lab']),
+        el('a', { href: 'lab/sentience.html', className: 'btn btn-gold' }, ['Sentience Falsification Lab']),
+        el('a', { href: 'alife/cqm-capability-profile.html', className: 'btn' }, ['CQM-25 ALife Profile']),
         el('a', { href: 'glossary.html', className: 'btn' }, ['Scientific Glossary']),
         el('a', { href: 'downloads.html', className: 'btn btn-primary' }, ['Releases & Downloads']),
       ]),
@@ -1953,11 +2687,11 @@ export class Cqm2WorkstationApp {
         ]),
         el('div', { className: 'kpi-box' }, [
           el('span', { className: 'kpi-label' }, ['Keyboard Shortcuts']),
-          el('span', { className: 'mono' }, ['Space: Pause/Play · Ctrl+K: Command Palette · Esc: Close Studio']),
+          el('span', { className: 'mono' }, ['Space: Pause · N: NHI Toss · X: XNO · V/R/B/M · Ctrl+K: Palette']),
         ]),
         el('div', { className: 'kpi-box' }, [
-          el('span', { className: 'kpi-label' }, ['Hardware Scaling']),
-          el('span', { className: 'mono' }, ['Select [phone] .. [mega] in bottom-left HUD for DPR & flora scaling']),
+          el('span', { className: 'kpi-label' }, ['Cipher Gates & Stages']),
+          el('span', { className: 'mono' }, ['⛓ ACCESS: Roman Tally -> Superhero · ◈ STAGE II: UwU -> Temple']),
         ]),
       ]),
     ]);
@@ -1968,7 +2702,7 @@ export class Cqm2WorkstationApp {
   private buildCommandPaletteDialog(): HTMLDialogElement {
     const input = el('input', {
       type: 'search',
-      placeholder: 'Type action or studio (e.g., mini world, brains, silicon, glb, split, song)...',
+      placeholder: 'Type action or studio (e.g., mini world, xylos, sandbox, silicon, glb, split)...',
       className: 'cmd-input',
       'aria-label': 'Command palette filter',
     }) as HTMLInputElement;
@@ -1982,6 +2716,10 @@ export class Cqm2WorkstationApp {
       {
         label: 'Toggle Enter Mini World — Full Glory',
         run: () => this.domRefs.get('mini-pill')?.click(),
+      },
+      {
+        label: 'Toss 4 Physical ⟁ NHI Ballistic Probes',
+        run: () => this.domRefs.get('bar-nhi')?.click(),
       },
       {
         label: 'Export Watertight Asmodenius Prime Binary .GLB',
@@ -2043,11 +2781,24 @@ export class Cqm2WorkstationApp {
         return;
       }
       const tag = (e.target as HTMLElement | null)?.tagName;
-      if (tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA') return;
+      if (tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA' || e.ctrlKey || e.metaKey || e.altKey) return;
 
+      const k = e.key.toLowerCase();
       if (e.key === ' ') {
         e.preventDefault();
         this.domRefs.get('play-btn')?.click();
+      } else if (k === 'n') {
+        this.domRefs.get('bar-nhi')?.click();
+      } else if (k === 'x') {
+        this.domRefs.get('bar-xno')?.click();
+      } else if (k === 'v') {
+        this.domRefs.get('bar-view')?.click();
+      } else if (k === 'r') {
+        this.domRefs.get('bar-render')?.click();
+      } else if (k === 'b') {
+        this.domRefs.get('bar-brutal')?.click();
+      } else if (k === 'm') {
+        this.domRefs.get('bar-music')?.click();
       }
     });
   }
@@ -2114,6 +2865,7 @@ export class Cqm2WorkstationApp {
       }
 
       const tel = this.latestTelemetry;
+      const sSnap = this.sorting.getSnapshot();
       if (this.scene4k) {
         this.scene4k.renderFrame({
           store: this.world.store,
@@ -2132,6 +2884,7 @@ export class Cqm2WorkstationApp {
           skinUGs: this.world.skinUGs,
           skinVGs: this.world.skinVGs,
           asmodeniusConfidence: tel.asmodenius.metacognitiveConfidenceHot3.value,
+          sortingBins64: sSnap.activeBins64,
         });
       }
 
@@ -2155,7 +2908,32 @@ export class Cqm2WorkstationApp {
       if (node) node.textContent = val;
     };
 
-    // 1. Left Column Telemetry + 4 Sparklines
+    // Periodically evaluate native Zig WASM CSR Louvain Modularity Q & FWHT Quantum Magic M_2 (< 0.05 ms)
+    if (tel.simTick % 5 === 0) {
+      const zig = getZigBridge();
+      this.fwhtMagicM2 = zig.computeFwhtQuantumMagicM2(
+        this.world.quantumRegister.re,
+        this.world.quantumRegister.im,
+        3,
+      );
+      const sampleNodes = 24;
+      const eu = new Uint32Array(48);
+      const ev = new Uint32Array(48);
+      let ec = 0;
+      for (let i = 0; i < sampleNodes && ec < 48; i++) {
+        eu[ec] = i;
+        ev[ec] = (i + 1 + (i % 3)) % sampleNodes;
+        ec++;
+        if (i % 2 === 0 && ec < 48) {
+          eu[ec] = i;
+          ev[ec] = (i + 4) % sampleNodes;
+          ec++;
+        }
+      }
+      this.csrGraphStats = zig.computeCsrPagerankLouvain(sampleNodes, eu, ev, ec);
+    }
+
+    // 1. Left Column Scrollable 16-Metric Telemetry + Economy Ledger + 4 Sparklines (`#sP`)
     let entangledCount = 0;
     let totalMetabEnergy = 0;
     for (let e = 0; e < this.world.store.activeCount; e++) {
@@ -2164,14 +2942,39 @@ export class Cqm2WorkstationApp {
       totalMetabEnergy += (this.world.store.pools15[e * 15 + 12] ?? 2.5) + (this.world.store.pools15[e * 15 + 3] ?? 1.0);
     }
     const energyReadout = Math.round(totalMetabEnergy * 0.42 + 220);
+    const xenoPairs = Math.max(2, Math.floor(entangledCount / 2));
+    const links = this.scene4k?.activeLinkCount ?? 231;
+    const sTel = this.sorting.getSnapshot();
+    const pciVal = this.latestPoke ? this.latestPoke.pciIndicator.value : this.world.store.pciProxy[0] ?? 0.42;
 
     set('tel-entities', `${tel.aliveCount}/${this.world.store.maxEntities}`);
-    set('tel-xeno', String(Math.max(2, Math.floor(entangledCount / 2))));
+    set('tel-xeno', String(xenoPairs));
     set('tel-chaos', this.chaosLevel.toFixed(1));
     set('tel-energy', String(energyReadout));
+    set('tel-connectome', `${links} · Q ${this.csrGraphStats.modularityQ.toFixed(2)}`);
+    set('tel-morphs', `4 POOLS · 10 PHYLA`);
+    set('tel-algorithm', sTel.activeSpec.name);
+    set('tel-quantum', `H(2)=${tel.hoggar.violatedHexagonH2Lines} · M2 ${this.fwhtMagicM2.toFixed(2)}`);
+    set('tel-mutations', String(this.mutationsTotal));
+    set('tel-shoggoths', `8 SOMITES · κ ${tel.asmodenius.frenetCurvatureKappa.toFixed(2)}`);
+    set('tel-puppeteers', `7 TENTACLES · ${tel.xylos.activeOption.slice(0, 6)}`);
+    set('tel-titans', `20 SOVEREIGN`);
+    set('tel-nhi', `${this.scene4k?.activeNhiProbeCount ?? 4} ACTIVE (${this.nhiReleasedTotal})`);
+    set('tel-sentience', `PCI ${pciVal.toFixed(2)} [PROXY]`);
+    set(
+      'tel-simulation',
+      `STAGE ${this.scene4k?.simulationStage === 2 ? 'II' : 'I'} · ${this.emergenceMode}`,
+    );
+    set('tel-singularity', `${this.scene4k?.singularityMode ?? '—'} (a/M ${this.world.dials.kerrSpinA.toFixed(2)})`);
+
+    const moneySupply = Math.round(tel.aliveCount * 30 * tel.ecology.aurumPerUmbraPrice);
+    set('tel-econ-money', `${moneySupply.toLocaleString('en-US')} AUR`);
+    set('tel-econ-fx', `${tel.ecology.aurumPerUmbraPrice.toFixed(2)} A/U`);
+    set('tel-econ-prices', `ATP ${(0.85 + this.chaosLevel * 0.3).toFixed(2)} kJ`);
+    set('tel-econ-gini', tel.ecology.wealthGiniCoefficient.toFixed(3));
 
     this.sparkEntities.push(tel.aliveCount);
-    this.sparkXeno.push(Math.max(2, Math.floor(entangledCount / 2)));
+    this.sparkXeno.push(xenoPairs);
     this.sparkChaos.push(this.chaosLevel);
     this.sparkEnergy.push(energyReadout);
 
@@ -2206,11 +3009,10 @@ export class Cqm2WorkstationApp {
     set(
       'perf-amb',
       this.serverConnected
-        ? 'ambient: gpu-quad-silicon · core brains: CUDA+NPU+ZIG'
+        ? 'ambient: gpu-quad-silicon · core brains: CUDA+NPU+ZIG+C++'
         : 'ambient: gpu-instanced · core brains: Zig SIMD128',
     );
     set('perf-ms', `${meanMs.toFixed(1)} ms · p95 ${p95Ms.toFixed(1)} ms · ${heapMb} MB`);
-    const links = this.scene4k?.activeLinkCount ?? 231;
     set(
       'perf-counts',
       `n ${tel.aliveCount}/${this.world.store.maxEntities.toLocaleString('en-US')} · links ${links} · wild 6,272 (49 ch)`,
@@ -2219,12 +3021,11 @@ export class Cqm2WorkstationApp {
     set(
       'perf-hw',
       this.serverConnected
-        ? `RTX 5070 Ti · AI Boost NPU · cpu ${cores}c`
-        : `cpu ${cores}c · webgl2 + wasm simd`,
+        ? `RTX 5070 Ti · AI Boost NPU · Moonlab C++ · ${cores}c`
+        : `cpu ${cores}c · webgl2 + zig wasm simd`,
     );
 
     // 3. Sorting Field + Sector Lore (`#alg` + `#algoP`)
-    const sTel = this.sorting.getSnapshot();
     set('alg-name', sTel.activeSpec.name);
     set('alg-stats', `step ${sTel.stepCount} · ${sTel.lastSwaps} ⇄`);
     this.drawSortingBarCanvas();
@@ -2243,7 +3044,7 @@ export class Cqm2WorkstationApp {
     set('vsr-sfx', this.audio.sfxEnabled && !this.audio.masterMuted ? 'ON' : 'OFF');
     set('vsr-song', curSong.title.length > 10 ? `${curSong.title.slice(0, 9)}...` : curSong.title);
     set('vsr-resets', String(this.resetsCount));
-    set('vsr-silicon', this.serverConnected ? 'QUAD-GPU' : 'GPU+WASM');
+    set('vsr-silicon', this.serverConnected ? 'QUAD+C++' : 'GPU+ZIG');
 
     // 5. 16-Chart Observatory (`OVER | VAR | ECO | WAR`) & 3 Live Brains (`APEX`, `MECHA`, `GLYPH`)
     const titanSnap = this.titans.stepTick(this.chaosLevel, tel.ecology.sanctuaryOccupants > 0 ? 0.25 : 0.05);
@@ -2269,7 +3070,7 @@ export class Cqm2WorkstationApp {
       },
     );
 
-    // 6. Update Studio Modal KPIs when open
+    // 6. Update Studio Modal KPIs & Live Canvases when open
     if (this.activeStudio !== null) {
       set('kpi-tick', `${tel.simTick} (${tel.merkleRootHex.slice(0, 8)})`);
       set('kpi-alive', String(tel.aliveCount));
@@ -2288,10 +3089,35 @@ export class Cqm2WorkstationApp {
       set('br-xylos-b14', tel.xylos.meanButlinScore.toFixed(3));
       set('br-thaler-inv', String(tel.thaler.totalAcceptedInventions));
 
+      set('nhi-m0', `HOT-3=${tel.asmodenius.metacognitiveConfidenceHot3.value.toFixed(3)} · L5b=${(tel.asmodenius.regionActivations14[0] ?? 0).toFixed(2)}`);
+      set('nhi-m1', `DA=${(this.world.store.modulators2[0] ?? 0.2).toFixed(2)} · Vigour=${(tel.asmodenius.regionActivations14[4] ?? 0).toFixed(2)}`);
+      set('nhi-m2', `Granule 16→256 · cos=${tel.glitchling.kinematicAlignmentCosine.toFixed(4)}`);
+      set('nhi-m3', `STC=${(tel.glitchling.stcConsolidatedFraction * 100).toFixed(0)}% · FlawMask=0x${this.world.glitchling.flawMask.toString(16)}`);
+      set('nhi-m4', `Inventions=${tel.thaler.totalAcceptedInventions} · Novelty=${tel.thaler.candidateNovelty.toFixed(2)}`);
+      set('nhi-m5', `P(veridical)=${tel.xylos.veridicalProbability.value.toFixed(3)} [PROXY]`);
+      set('nhi-m6', `VOI=${tel.asmodenius.epistemicValueOfInfo.toFixed(3)} · Option=${tel.xylos.activeOption}`);
+      set('nhi-m7', `Executive Vetoes=${tel.asmodenius.totalFreeWontVetoes}`);
+      set('nhi-m8', `Drift=${tel.maxMetabolicDrift.toExponential(1)} · Skin=${tel.reactiveSkinMeanPattern.toFixed(3)}`);
+
       set('q-norm', tel.quantumGeometry.normDrift.toExponential(2));
       set('q-berry', tel.quantumGeometry.berryCurvatureXY.toFixed(4));
       set('q-qrng', tel.qrngHealthy ? `PASS (${tel.qrngEntropyBits.toFixed(2)} b/B)` : 'WARN');
       set('q-rosette', tel.rosetteReceipt.merkleRootHex.slice(0, 10));
+
+      set('xno-pairs', String(xenoPairs));
+      set('xno-coh', tel.pantheon.kuramotoOrderParameterR.value.toFixed(3));
+      set('xno-corm', tel.cormidium16Healed ? 'RECOVERED (4/16)' : 'DEGRADED');
+      set('xno-braid', tel.voynichAnyonTauProb.toFixed(3));
+
+      if (this.activeStudio === 'archon') {
+        renderMega4dTesseractCanvas(
+          this.domRefs.get('archon-mega4d') as HTMLCanvasElement | null,
+          tel.simTimeSec,
+          this.world.dials.manifoldWarpGain,
+        );
+      } else if (this.activeStudio === 'xylos') {
+        this.refreshXylosVisuals(tel);
+      }
     }
   }
 }

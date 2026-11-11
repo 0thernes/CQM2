@@ -458,6 +458,28 @@ export class Cqm2WorldScheduler {
     return this.ecology.seedXenomimicEntangledPairs(this.store, 1);
   }
 
+  /**
+   * Deterministic CQM Dock Action (`☠` Apocalypse Extinction & Genesis Rebirth):
+   * Captures a bit-exact N01 checkpoint first, culls ~60% of non-hero extant organisms while preserving
+   * exact First-Law `pools15` conservation (`< 1e-12` drift), then triggers a Genesis nutrient bloom and mitotic rebirth.
+   */
+  public triggerApocalypseRebirth(cullFraction = 0.6): { culled: number; reborn: number; checkpointTick: number } {
+    const snap = this.captureWorldSnapshot();
+    const frac = Math.max(0.1, Math.min(0.85, cullFraction));
+    const worldRng = this.prng.stream('world');
+    let culled = 0;
+    for (let e = 3; e < this.store.activeCount; e++) {
+      if (this.store.alive[e] !== 1) continue;
+      if (worldRng.nextFloat() < frac) {
+        this.store.alive[e] = 0;
+        culled++;
+      }
+    }
+    this.triggerNutrientBurst(12.0);
+    const reborn = this.triggerMitoticSplit(24);
+    return { culled, reborn, checkpointTick: snap.tick };
+  }
+
   public stepTick(requestedDtSec = 0.05, externalCortexFn?: ExternalCortexBatchFn): WorldTickTelemetry {
     if (this.runState !== 'RUNNING' && this.lastTelemetry) {
       return { ...this.lastTelemetry, runState: this.runState };

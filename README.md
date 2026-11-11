@@ -13,12 +13,12 @@
 
 ## What and why
 
-**CQM2 (`v2.2.0`)** is the complete ground-up engineering refactor of [Cosmogonic Quantum Mechalogodrom](https://github.com/0thernes/cosmogonic-quantum-mechalogodrom). Where CQM v1 ran single-threaded JavaScript at `9 fps` (`p95 > 4,000 ms`, `782 MB` heap) with CPU-updated `THREE.Mesh` objects, **CQM2** renders the entire full-bleed `100vw × 100vh` alien cosmogonic 3D world (`GodColossus` rainbow oil-slick manifold, `6,272` GPU-instanced flora across 49 groves, cantilevered brutalist megastructures, 3D compound voxel glitch-clusters, 24-ring woven geodesic sanctuary dome, 25 Sorting Fields, `HELTIBOR` lore, 20 Titans, 16-chart `OBSERVATORY`, `3 Live Brains`, and 9 procedural songs) at **4K `60–240+ FPS` (`< 28 MB` JS heap)** using **Simultaneous Quad-Silicon Local Execution** (`NVIDIA RTX 5070 Ti` CUDA `cublasSgemmStridedBatched_v2` + `Intel(R) AI Boost` NPU action-conditioned RSSM + `Intel(R) Graphics` iGPU 2D Gray-Scott diffusion & DirectML + `Intel Core Ultra 9 275HX` Zig 0.17 AVX2 / C++20 / x86-64 ASM / Rust 1.94 / Go 1.26) while preserving instant zero-install universal browser execution via **WebGL2 GPU Instancing + WebGPU Compute (`WGSL`) + Zig WASM SIMD128 + IndexedDB**.
+**CQM2 (`v3.0.0`)** is the complete ground-up polyglot & full-fidelity engineering refactor of [Cosmogonic Quantum Mechalogodrom](https://github.com/0thernes/cosmogonic-quantum-mechalogodrom). Where CQM v1 ran single-threaded JavaScript at `9 fps` (`p95 > 4,000 ms`, `782 MB` heap) with CPU-updated `THREE.Mesh` objects, **CQM2 v3.0.0** renders the entire full-bleed `100vw × 100vh` alien cosmogonic 3D world (`GodColossus` rainbow oil-slick manifold, `6D→3D` Elser-Sloane icosahedral quasicrystal shell, `101 Pantheons` crown, `64` live sorting-field pillars, `6,272` GPU-instanced flora across 49 groves, cantilevered brutalist megastructures, 3D compound voxel glitch-clusters, 24-ring woven geodesic sanctuary dome, 25 Sorting Fields, `HELTIBOR` lore, 20 Titans, 16-metric scrollable `TELEMETRY` + `ECONOMY`, 16-chart `OBSERVATORY`, `3 Live Brains`, `⛓ ACCESS` Roman Tally `SUPERHERO` HUD + 2nd Super Creature `Seraph-Prime`, `◈ STAGE II` `UwU` 3D `Monolith Temple`, `⟁ NHI` ballistic 3D probes, and 9 procedural songs) at **4K `60–240+ FPS` (`< 28 MB` JS heap)** using **Simultaneous Quad-Silicon + Native Tsotchke C/C++/Zig Execution** (`NVIDIA RTX 5070 Ti` CUDA `cublasSgemmStridedBatched_v2` + `Intel(R) AI Boost` NPU action-conditioned RSSM + `Intel(R) Graphics` iGPU 2D Gray-Scott diffusion & DirectML + `Intel Core Ultra 9 275HX` Zig 0.17 AVX2 / C17 `RosettaWire` / C++20 `Moonlab` `libquantumsim.dll` + `liblibirrep.dll` + `eshkol-run.exe` / x86-64 ASM / Rust 1.94 / Go 1.26 + native Windows 11 `CQM2.exe` GUI launcher) while preserving instant zero-install universal browser execution via **WebGL2 GPU Instancing + WebGPU Compute (`WGSL`) + Zig WASM SIMD128 + IndexedDB**.
 
 CQM2 unifies:
-- **Creature #1 (`Asmodenius v42`)**: 14-region Dale 80/20 spiking CNS + Enteric Nervous System, astrocyte `Ca2+`, Larkum 2-compartment NMDA coincidence gating, Global Neuronal Workspace (`GNW`), CEMI local-field phase-locking, Attention Schema (`AST-1R`), non-oracle `CalibHead` `HOT-3` confidence, Frazier Knowledge-Gradient `VOI`, `D1/D2` striatal gating, `PAG`, 4 neuropeptides, `N13` somatic Free-Won't veto, non-destructive `Casali PCI` TMS perturbation (`WAKE` / `NREM` / `PROPOFOL`), and a 15-pool First-Law conserved metabolic ledger (`drift < 1e-12`).
-- **Glitchling, Xylos v2 & Stephen Thaler Creativity Engine**: Four toggleable congenital deficits (`scramble`, `leaky`, `backwards`, `misfire`) cured online via Gated-DeltaNet, Frey-Morris STC, and non-oracle Marr-Albus cerebellar adaptation; **Xylos v2** hyperbolic `{7,3}` medusa evaluating all **14 Butlin indicators** + non-oracle reality monitoring; **Thaler Creativity Machine** (`9` novelty/value markers + `4` falsification ablations); and a **12-Benchmark Causal Lesion Suite** (`Cohen's d >= 0.8`).
-- **27-Repo Tsotchke Stack, 3D Kerr Relativity & Diploid Ecology**: Complete catalog of all 27 `(Tsotchke)` repositories (with strict quarantine of `OBLITERATUS` and non-permissive repos), 3D Boyer-Lindquist Mino-time Kerr geodesics (`Carter Q drift < 1e-12`), Bardeen asymmetric D-shadow, Hoggar `H(2)=63` & Cabello `KS-18` contextuality, 4-qubit Ising VQE, Glossodrom `RS[15,11]` + `Cormidium-16`, `Voynich-Khôra` Fibonacci anyon braids, `r=14` Big Tree Crystal Sanctuary, diploid BDM speciation, and AURUM/UMBRA economy.
+- **Creature #1 (`Asmodenius v42`) & Creature #2 (`Seraph-Prime`)**: 14-region Dale 80/20 spiking CNS + Enteric Nervous System, astrocyte `Ca2+`, Larkum 2-compartment NMDA coincidence gating, Global Neuronal Workspace (`GNW`), CEMI local-field phase-locking, Attention Schema (`AST-1R`), non-oracle `CalibHead` `HOT-3` confidence, Frazier Knowledge-Gradient `VOI`, `D1/D2` striatal gating, `PAG`, 4 neuropeptides, `N13` somatic Free-Won't veto, non-destructive `Casali PCI` TMS perturbation (`WAKE` / `NREM` / `PROPOFOL`), and a 15-pool First-Law conserved metabolic ledger (`drift < 1e-12`).
+- **Glitchling, Xylos v2 (6 ADR-0018 Organs) & Stephen Thaler Creativity Engine**: Four toggleable congenital deficits (`scramble`, `leaky`, `backwards`, `misfire`) cured online via Gated-DeltaNet, Frey-Morris STC, and non-oracle Marr-Albus cerebellar adaptation; **Xylos v2** Poincaré `{7,3}` hyperbolic disk + 6 ADR-0018 Embodied Organs (`COROLLARY DISCHARGE`, `INTEROCEPTIVE VISCERA`, `NOCICEPTIVE REFLEX`, `METACOGNITIVE CALIB`, `REALITY TAGGER`, `EPISODIC SWR REPLAY`) evaluating all **14 Butlin indicators**; **Thaler Creativity Machine** (`9` novelty/value markers + `4` falsification ablations); `ARCHON GODFORMS` (`5 Sovereign Archons` + `PRIME Super Neural` `4×27 = 108` cards + `MEGA 4D` `SO(4)` tesseract); and a **12-Benchmark Causal Lesion Suite** (`Cohen's d >= 0.8`).
+- **Native C17/C++20/Zig Tsotchke Stack, 3D Kerr Relativity & Diploid Ecology**: Live native bindings (`cqm2_tsotchke_native.dll`) to **Moonlab** (`QRNG` Bell CHSH, `QGTL` QWZ Chern/Fubini-Study metric, `Ising` annealer), **libirrep** (exact `SU(2)` Clebsch-Gordan), **Eshkol** (`eshkol-run.exe` + exact 2nd-order HyperDual mixed partials), **RosettaWire** (`RSC1` + fail-closed `RSW1` stream + canonical decimal JSON), Zero-GC CSR PageRank + Louvain modularity `Q`, FWHT Stabilizer Rényi-2 Quantum Magic `M_2`, complete catalog of all 27 `(Tsotchke)` repositories (with strict quarantine of `OBLITERATUS` and non-permissive repos), 3D Boyer-Lindquist Mino-time Kerr geodesics (`Carter Q drift < 1e-12`), Hoggar `H(2)=63` & Cabello `KS-18` contextuality, Glossodrom `RS[15,11]` + `Cormidium-16`, `Voynich-Khôra` Fibonacci anyon braids, `r=14` Big Tree Crystal Sanctuary, diploid BDM speciation, and AURUM/UMBRA economy.
 - **3D DCC, Audio & Fenced Free-AI Studio**: Watertight 2-manifold Bishop-frame binary **`.glb`** (`0x46546C67`, `Euler V - E + F = 2`), Khronos `.gltf`, `.obj`, **Blender 4.x** Cycles rig, **Unity 6** C# & **TouchDesigner** Python 20 Hz OSC bridges, procedural `.png` & `.wav` stems, and a fenced local `llama3.2:3b` scholarly narrator (`NOT_SENTIENT`, zero creature-brain coupling).
 
 > **Scientific Honesty Contract (`NOT SENTIENT / indicatorOnly`)**: All cognitive, global-workspace, complexity (`Casali PCI`), reality-monitoring (`Butlin-14`), creativity (`Thaler-9`), and metacognitive (`HOT-3`) readouts in CQM2 are strictly deterministic mathematical proxies — never phenomenal consciousness or subjective sentience.
@@ -33,8 +33,11 @@ CQM2 unifies:
   - 500-Point Specifications & 12 Causal Gates: [`/specs.html`](https://0thernes.github.io/CQM2/specs.html)
   - 13-Chapter Architectural & Scientific Bible: [`/bible.html`](https://0thernes.github.io/CQM2/bible.html)
   - Interactive Quantum WildBeyond & Chaos Lab: [`/lab/quantum-wildbeyond.html`](https://0thernes.github.io/CQM2/lab/quantum-wildbeyond.html)
+  - Butlin-14 Consciousness Indicator Laboratory: [`/lab/consciousness.html`](https://0thernes.github.io/CQM2/lab/consciousness.html)
+  - Sentience Falsification & PCI Perturbation Lab: [`/lab/sentience.html`](https://0thernes.github.io/CQM2/lab/sentience.html)
+  - CQM-25 Artificial Life Capability Profile: [`/alife/cqm-capability-profile.html`](https://0thernes.github.io/CQM2/alife/cqm-capability-profile.html)
   - Canonical Scientific Glossary: [`/glossary.html`](https://0thernes.github.io/CQM2/glossary.html)
-  - Offline Bundles & Native Downloads: [`/downloads.html`](https://0thernes.github.io/CQM2/downloads.html) or [GitHub Releases](https://github.com/0thernes/CQM2/releases)
+  - Offline Bundles & Native `CQM2.exe` Downloads: [`/downloads.html`](https://0thernes.github.io/CQM2/downloads.html) or [GitHub Releases](https://github.com/0thernes/CQM2/releases)
 
 ---
 
@@ -79,7 +82,8 @@ bun run check
 
 ## Usage
 
-### 1. Start the Full-Stack Local Quad-Silicon Workstation Server
+### 1. Launch Native Windows 11 Workstation (`CQM2.exe`) or Full-Stack Server
+Double-click **`CQM2.exe`** (from `native/bin/CQM2.exe`, Desktop, Start Menu, or Taskbar after running `scripts/install-windows-launcher.ps1`) to auto-start the local Quad-Silicon server and open a chromeless GPU-accelerated app window, or run from terminal:
 ```bash
 bun run start
 ```
@@ -131,7 +135,7 @@ Executes unit, property, conservation (`< 1e-12`), 12-benchmark causal lesion (`
 
 ## Version and releases
 
-Synchronized at **`2.2.0`** across [`VERSION`](VERSION), [`package.json`](package.json), [`rust/Cargo.toml`](rust/Cargo.toml), [`CITATION.cff`](CITATION.cff), [`CHANGELOG.md`](CHANGELOG.md), and [`docs/REPORT.md`](docs/REPORT.md). Published `vX.Y.Z` Git tags (`v2.0.0`, `v2.1.0`, `v2.2.0`) are strictly immutable.
+Synchronized at **`3.0.0`** across [`VERSION`](VERSION), [`package.json`](package.json), [`rust/Cargo.toml`](rust/Cargo.toml), [`CITATION.cff`](CITATION.cff), [`CHANGELOG.md`](CHANGELOG.md), and [`docs/REPORT.md`](docs/REPORT.md). Published `vX.Y.Z` Git tags (`v2.0.0`, `v2.1.0`, `v2.2.0`, `v3.0.0`) are strictly immutable.
 
 - **Changelog**: [CHANGELOG.md](CHANGELOG.md)
 - **Releases, SBOM & SHA-256 Checksums**: [GitHub Releases](https://github.com/0thernes/CQM2/releases) and [`/downloads.html`](https://0thernes.github.io/CQM2/downloads.html)
@@ -170,4 +174,4 @@ Licensed under the **Cosmogonic License — Non-Commercial Research & Play** (`C
 
 ---
 
-Documentation Index: [docs/INDEX.md](docs/INDEX.md) · OpenAPI: [docs/openapi.json](docs/openapi.json) · Glossary: [docs/GLOSSARY.md](docs/GLOSSARY.md) · Summary: [docs/SUMMARY.md](docs/SUMMARY.md) · Last verified: 2026-11-10
+Documentation Index: [docs/INDEX.md](docs/INDEX.md) · OpenAPI: [docs/openapi.json](docs/openapi.json) · Glossary: [docs/GLOSSARY.md](docs/GLOSSARY.md) · Summary: [docs/SUMMARY.md](docs/SUMMARY.md) · Last verified: 2026-11-11

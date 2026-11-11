@@ -185,6 +185,74 @@ export class XylosMedusaBrain {
     this.bellPhaseRad = snap.bellPhaseRad;
   }
 
+  /**
+   * Projects live internal organ states onto the 6 `cqm-xylos-v2` ADR-0018 Embodied Organs
+   * (`Affective Core`, `Sensorimotor Map`, `Memory Loom`, `Social Mirror`, `Metacognitive Monitor`, `Morphogenetic Skin`).
+   * Strictly computational architecture indicators (`NOT_SENTIENT`).
+   */
+  public getAdr0018OrganReadouts(): ReadonlyArray<{ id: string; name: string; activity01: number; detail: string }> {
+    let r1Rms = 0;
+    for (let i = 0; i < 8; i++) r1Rms += this.r1[i]! * this.r1[i]!;
+    r1Rms = Math.sqrt(r1Rms / 8);
+
+    let fwdNorm = 0;
+    for (let i = 0; i < 28; i++) fwdNorm += Math.abs(this.fwdWeights[i] ?? 0);
+    fwdNorm = clamp(fwdNorm / 14, 0, 1);
+
+    let memSalience = 0;
+    for (let s = 0; s < 4; s++) memSalience += this.landmarks4x4[s * 4 + 2] ?? 0;
+    memSalience = clamp(memSalience / 2.2, 0, 1);
+
+    let broadcastRms = 0;
+    for (let k = 0; k < 8; k++) broadcastRms += this.broadcast8[k]! * this.broadcast8[k]!;
+    broadcastRms = clamp(Math.sqrt(broadcastRms / 8) * 1.4, 0, 1);
+
+    let monMean = 0;
+    for (let b = 0; b < 6; b++) monMean += this.monitorRing6[b]!;
+    monMean = clamp(monMean / 6, 0, 1);
+
+    const bellAct = 0.5 + 0.5 * Math.sin(this.bellPhaseRad);
+
+    return [
+      {
+        id: 'affective-core',
+        name: 'Affective Core',
+        activity01: clamp(0.35 + 0.65 * Math.abs(this.broadcast8[3] ?? 0.4), 0.08, 1),
+        detail: `Homeostatic valence · Option=${XYLOS_OPTIONS[this.activeOptionIdx]} (dwell ${this.optionDwell})`,
+      },
+      {
+        id: 'sensorimotor-map',
+        name: 'Sensorimotor Map',
+        activity01: clamp(0.28 + 0.72 * fwdNorm, 0.1, 1),
+        detail: `Jacobi LMS forward model (8×14) · L1 RMS=${r1Rms.toFixed(3)}`,
+      },
+      {
+        id: 'memory-loom',
+        name: 'Memory Loom',
+        activity01: Math.max(0.18, memSalience),
+        detail: `4 Reality-gated allocentric landmarks (HOT-4 P(veridical)>0.55)`,
+      },
+      {
+        id: 'social-mirror',
+        name: 'Social Mirror',
+        activity01: Math.max(0.2, broadcastRms),
+        detail: `AST-1 Attention Schema 5-coalition tracker + GWT-3 broadcast`,
+      },
+      {
+        id: 'metacognitive-monitor',
+        name: 'Metacognitive Monitor',
+        activity01: Math.max(0.15, monMean),
+        detail: `6-beat non-oracle reality tagger ring=${monMean.toFixed(3)}`,
+      },
+      {
+        id: 'morphogenetic-skin',
+        name: 'Morphogenetic Skin',
+        activity01: clamp(bellAct, 0.12, 1),
+        detail: `Schläfli {7,3} bell phase=${this.bellPhaseRad.toFixed(2)} rad · 16 Poincaré units`,
+      },
+    ];
+  }
+
   public stepXylos(params: {
     sensory8: ArrayLike<number>;
     posX: number;

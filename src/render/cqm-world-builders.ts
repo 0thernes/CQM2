@@ -12,6 +12,7 @@
  *   7. `6,272` GPU-Instanced Bioluminescent Wild Alien Flora across `49` organic groves (`4` draw calls, `0` CPU loop).
  */
 import * as THREE from 'three';
+import { getZigBridge } from '../native/zig-bridge';
 import {
   ALIEN_FLORA_FRAGMENT_SHADER,
   ALIEN_FLORA_VERTEX_SHADER,
@@ -763,4 +764,317 @@ export function buildWildAlienFloraInstanced(
   }
 
   return { group, pools, totalInstances: placed, chunkCount: 49 };
+}
+
+/**
+ * Projects a 6D -> 3D icosahedral Penrose quasicrystal shell via Zig SIMD128 WASM (`cqm2_quasicrystal_icosa_shell`)
+ * and renders up to 224 golden-ratio lattice nodes orbiting `GodColossus` in 1 GPU draw call.
+ */
+export function buildQuasicrystalLatticeShell(): { group: THREE.Group; mesh: THREE.InstancedMesh; nodeCount: number } {
+  const group = new THREE.Group();
+  group.position.set(-8, 138, -185);
+
+  const pts = getZigBridge().projectQuasicrystalIcosaShell(3, 1.58, 1.35, 3.25, 224);
+  const count = Math.max(1, Math.floor(pts.length / 3));
+
+  const geo = new THREE.OctahedronGeometry(2.35, 0);
+  const mat = new THREE.MeshStandardMaterial({
+    color: 0xffffff,
+    emissive: 0x38bdf8,
+    emissiveIntensity: 0.72,
+    metalness: 0.75,
+    roughness: 0.18,
+  });
+  const mesh = new THREE.InstancedMesh(geo, mat, count);
+  const dummy = new THREE.Object3D();
+  const col = new THREE.Color();
+
+  for (let i = 0; i < count; i++) {
+    const px = (pts[i * 3] ?? 1) * 44.0;
+    const py = (pts[i * 3 + 1] ?? 0) * 44.0;
+    const pz = (pts[i * 3 + 2] ?? 0) * 44.0;
+    dummy.position.set(px, py, pz);
+    dummy.rotation.set(i * 0.37, i * 0.618, i * 0.23);
+    dummy.scale.setScalar(0.85 + (i % 5) * 0.16);
+    dummy.updateMatrix();
+    mesh.setMatrixAt(i, dummy.matrix);
+    col.setHSL(((i * 0.6180339887) % 1 + 1) % 1, 0.88, 0.64);
+    mesh.setColorAt(i, col);
+  }
+  mesh.instanceMatrix.needsUpdate = true;
+  if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
+  group.add(mesh);
+  return { group, mesh, nodeCount: count };
+}
+
+/**
+ * Builds the 100 Alphabet Pantheon TorusKnot Glyphs (`5` shared `InstancedMesh` pools × `20` instances = 100 glyphs)
+ * plus the 101st `APEX ς` Sovereign Obsidian-Gold Monolith hovering above the Sanctuary Valley.
+ */
+export function buildPantheon101Ring(): {
+  group: THREE.Group;
+  glyphPools5: THREE.InstancedMesh[];
+  apexMonolith: THREE.Group;
+} {
+  const group = new THREE.Group();
+  const knotPairs: ReadonlyArray<[number, number]> = [
+    [2, 3],
+    [3, 4],
+    [3, 5],
+    [4, 5],
+    [2, 5],
+  ];
+  const glyphPools5: THREE.InstancedMesh[] = [];
+  const dummy = new THREE.Object3D();
+  const col = new THREE.Color();
+
+  for (let p = 0; p < 5; p++) {
+    const [kp, kq] = knotPairs[p]!;
+    const geo = new THREE.TorusKnotGeometry(1.42, 0.36, 36, 7, kp, kq);
+    const mat = new THREE.MeshStandardMaterial({
+      color: 0xffffff,
+      emissive: 0x3b0764,
+      emissiveIntensity: 0.68,
+      metalness: 0.62,
+      roughness: 0.22,
+    });
+    const inst = new THREE.InstancedMesh(geo, mat, 20);
+    inst.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+
+    for (let j = 0; j < 20; j++) {
+      const idx100 = p * 20 + j;
+      const ang = (idx100 / 100) * Math.PI * 2;
+      const r = 136 + (idx100 % 2) * 16;
+      const y = 94 + Math.sin(ang * 3) * 14;
+      dummy.position.set(Math.cos(ang) * r, y, Math.sin(ang) * r - 34);
+      dummy.rotation.set(ang, idx100 * 0.2, 0);
+      dummy.scale.setScalar(1.0);
+      dummy.updateMatrix();
+      inst.setMatrixAt(j, dummy.matrix);
+      col.setHSL((idx100 / 100) % 1, 0.9, 0.6);
+      inst.setColorAt(j, col);
+    }
+    inst.instanceMatrix.needsUpdate = true;
+    if (inst.instanceColor) inst.instanceColor.needsUpdate = true;
+    glyphPools5.push(inst);
+    group.add(inst);
+  }
+
+  // 101st `APEX ς` Obsidian-Gold Sovereign Monolith
+  const apexMonolith = new THREE.Group();
+  apexMonolith.position.set(24, 56, 124);
+
+  const obelisk = new THREE.Mesh(
+    new THREE.CylinderGeometry(1.4, 3.6, 22, 6),
+    new THREE.MeshStandardMaterial({
+      color: 0x05070d,
+      emissive: 0x451a03,
+      emissiveIntensity: 0.55,
+      metalness: 0.92,
+      roughness: 0.14,
+    }),
+  );
+  const crown = new THREE.Mesh(
+    new THREE.TorusKnotGeometry(3.1, 0.62, 56, 8, 5, 7),
+    new THREE.MeshStandardMaterial({
+      color: 0xfbbf24,
+      emissive: 0xd97706,
+      emissiveIntensity: 0.95,
+      metalness: 0.88,
+      roughness: 0.16,
+    }),
+  );
+  crown.position.y = 14.5;
+
+  const halo = new THREE.Mesh(
+    new THREE.RingGeometry(5.6, 6.8, 32),
+    new THREE.MeshBasicMaterial({
+      color: 0x38bdf8,
+      side: THREE.DoubleSide,
+      transparent: true,
+      opacity: 0.62,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+    }),
+  );
+  halo.rotation.x = Math.PI / 2;
+  halo.position.y = 14.5;
+
+  apexMonolith.add(obelisk, crown, halo);
+  group.add(apexMonolith);
+
+  return { group, glyphPools5, apexMonolith };
+}
+
+/**
+ * Builds 64 GPU-Instanced 3D Sorting Field Pillars arranged in a semicircle around the Sanctuary Plaza,
+ * driven live every frame by `SortingFieldsEngine.getSnapshot().activeBins64`.
+ */
+export function buildSortingPillars64(): { group: THREE.Group; mesh: THREE.InstancedMesh } {
+  const group = new THREE.Group();
+  const geo = new THREE.BoxGeometry(1.55, 1.0, 1.55);
+  geo.translate(0, 0.5, 0); // Anchor pillar base at y = 0 so scaling Y grows upward cleanly
+  const mat = new THREE.MeshStandardMaterial({
+    color: 0xffffff,
+    emissive: 0x0f172a,
+    emissiveIntensity: 0.55,
+    metalness: 0.55,
+    roughness: 0.22,
+  });
+  const mesh = new THREE.InstancedMesh(geo, mat, 64);
+  mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+
+  const dummy = new THREE.Object3D();
+  const col = new THREE.Color();
+  for (let i = 0; i < 64; i++) {
+    const frac = i / 63;
+    const ang = Math.PI * 0.12 + frac * Math.PI * 0.76;
+    const x = 24 + Math.cos(ang) * 44;
+    const z = 124 - Math.sin(ang) * 44;
+    const gy = sampleCqmTerrainHeight(x, z);
+    dummy.position.set(x, gy, z);
+    dummy.scale.set(1, 6 + frac * 14, 1);
+    dummy.updateMatrix();
+    mesh.setMatrixAt(i, dummy.matrix);
+    col.setHSL(0.5 + frac * 0.38, 0.88, 0.58);
+    mesh.setColorAt(i, col);
+  }
+  mesh.instanceMatrix.needsUpdate = true;
+  if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
+  group.add(mesh);
+  return { group, mesh };
+}
+
+/**
+ * Builds the 64-slot GPU-Instanced `⟁ NHI` Tossed Probe Pool (glowing crystalline octa-probes with equatorial rings).
+ */
+export function buildNhiTossedProbePool(maxProbes = 64): THREE.InstancedMesh {
+  const core = new THREE.OctahedronGeometry(1.65, 1);
+  const ring = new THREE.TorusGeometry(2.25, 0.18, 6, 18);
+  ring.rotateX(Math.PI / 2);
+  const merged = mergeSubGeometriesWithColor([
+    { geo: core, color: new THREE.Color(0x67e8f9) },
+    { geo: ring, color: new THREE.Color(0xf472b6) },
+  ]);
+  const mat = new THREE.MeshStandardMaterial({
+    color: 0xffffff,
+    vertexColors: true,
+    emissive: 0x22d3ee,
+    emissiveIntensity: 0.92,
+    metalness: 0.45,
+    roughness: 0.18,
+  });
+  const mesh = new THREE.InstancedMesh(merged, mat, maxProbes);
+  mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+  mesh.count = 0;
+  return mesh;
+}
+
+/**
+ * Builds the `◈ STAGE II` (`UwU`) Obsidian-Rune `Monolith Temple` that rises smoothly from beneath the central seabed.
+ */
+export function buildStageIIMonolithTemple(): THREE.Group {
+  const temple = new THREE.Group();
+  const baseGround = sampleCqmTerrainHeight(0, 58);
+  temple.position.set(0, baseGround - 95, 58);
+  temple.visible = false;
+
+  const obsidianMat = new THREE.MeshStandardMaterial({
+    color: 0x07040e,
+    emissive: 0x4c0519,
+    emissiveIntensity: 0.62,
+    metalness: 0.88,
+    roughness: 0.18,
+  });
+  const runeMat = new THREE.MeshStandardMaterial({
+    color: 0xf43f5e,
+    emissive: 0xe11d48,
+    emissiveIntensity: 1.15,
+    metalness: 0.35,
+    roughness: 0.2,
+  });
+
+  // 4-stepped obsidian ziggurat plinth
+  for (let s = 0; s < 4; s++) {
+    const w = 44 - s * 8.5;
+    const stepMesh = new THREE.Mesh(new THREE.BoxGeometry(w, 3.2, w), obsidianMat);
+    stepMesh.position.y = s * 3.2 + 1.6;
+    temple.add(stepMesh);
+  }
+
+  // 12 perimeter rune obelisks
+  const pillarGeo = new THREE.CylinderGeometry(0.9, 1.35, 22, 6);
+  for (let i = 0; i < 12; i++) {
+    const a = (i / 12) * Math.PI * 2;
+    const px = Math.cos(a) * 19.5;
+    const pz = Math.sin(a) * 19.5;
+    const pMesh = new THREE.Mesh(pillarGeo, i % 2 === 0 ? obsidianMat : runeMat);
+    pMesh.position.set(px, 12.8 + 11, pz);
+    temple.add(pMesh);
+  }
+
+  // Twin portal rings + zenith dimensional rift spire
+  const portalOuter = new THREE.Mesh(
+    new THREE.TorusGeometry(11.5, 0.55, 10, 48),
+    new THREE.MeshBasicMaterial({ color: 0xf43f5e }),
+  );
+  portalOuter.position.y = 32;
+  const portalInner = new THREE.Mesh(
+    new THREE.TorusGeometry(8.2, 0.42, 10, 40),
+    new THREE.MeshBasicMaterial({ color: 0x22d3ee }),
+  );
+  portalInner.position.y = 32;
+  portalInner.rotation.y = Math.PI / 4;
+
+  const beacon = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.6, 2.4, 96, 8),
+    new THREE.MeshBasicMaterial({
+      color: 0xf43f5e,
+      transparent: true,
+      opacity: 0.36,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+    }),
+  );
+  beacon.position.y = 58;
+
+  temple.add(portalOuter, portalInner, beacon);
+  return temple;
+}
+
+/**
+ * Builds the 2nd Super Creature (`Seraph-Prime`) unlocked via the `⛓ ACCESS` Roman Tally puzzle (`SUPERHERO` mode).
+ */
+export function buildSecondSuperCreatureGroup(): THREE.Group {
+  const group = new THREE.Group();
+  group.visible = false;
+
+  const core = new THREE.Mesh(
+    new THREE.TorusKnotGeometry(2.6, 0.58, 64, 10, 3, 7),
+    new THREE.MeshStandardMaterial({
+      color: 0xfef08a,
+      emissive: 0xf59e0b,
+      emissiveIntensity: 1.05,
+      metalness: 0.82,
+      roughness: 0.14,
+    }),
+  );
+  group.add(core);
+
+  const wingMat = new THREE.MeshBasicMaterial({
+    color: 0x38bdf8,
+    wireframe: true,
+    transparent: true,
+    opacity: 0.72,
+    blending: THREE.AdditiveBlending,
+  });
+  for (let w = 0; w < 6; w++) {
+    const sign = w % 2 === 0 ? 1 : -1;
+    const tier = Math.floor(w / 2);
+    const wing = new THREE.Mesh(new THREE.ConeGeometry(1.4, 9.5 - tier * 1.8, 5), wingMat);
+    wing.position.set(sign * (4.2 + tier * 2.1), 1.2 - tier * 0.9, -0.8 * tier);
+    wing.rotation.z = -sign * (0.95 + tier * 0.22);
+    group.add(wing);
+  }
+  return group;
 }

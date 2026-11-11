@@ -1,7 +1,7 @@
 {
   "name": "cqm2",
-  "version": "2.2.0",
-  "description": "Cosmogonic Quantum Mechalogodrom 2 (CQM2) — Local-first NPU+GPU+CPU accelerated 4K artificial life, embodied synthetic cognition, quantum contextuality, and procedural morphogenesis workstation.",
+  "version": "3.0.0",
+  "description": "Cosmogonic Quantum Mechalogodrom 2 (CQM2) — Local-first Quad-Silicon (CUDA+NPU+iGPU+Zig+C17+C++20 Moonlab/Eshkol/RosettaWire+Rust) & Universal Browser 4K 60+ FPS artificial life, embodied cognition, and quantum contextuality cosmos.",
   "license": "SEE LICENSE IN LICENSE",
   "author": "0thernes LLC <0_0@0thernes.art> (https://0thernes.art)",
   "homepage": "https://0thernes.github.io/CQM2/",

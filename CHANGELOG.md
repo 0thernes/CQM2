@@ -6,6 +6,22 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
+## [3.0.0] - 2026-11-11
+
+### Added
+- **Native Polyglot Tsotchke Engine (`native/tsotchke/cqm2_tsotchke_native.c`, `native/tsotchke/cqm2_moonlab_eshkol.cpp`, `src/native/tsotchke-bridge.ts`)**:
+  - Real C17 RosettaWire `RSC1` SHA-256 content-addressed binary envelopes + `RSW1` fail-closed watchdogs.
+  - Live runtime bindings to local `Moonlab v0.1.1` (`libquantumsim.dll`: Pironio-Toeplitz CHSH Bell QRNG `S ≈ 2.828`, QWZ 2D topological Chern number, and transverse-field Quantum Ising annealer), `libirrep` (`liblibirrep.dll`: SU(2) Clebsch-Gordan & Wigner 3j tensors), and `Eshkol v1.1-accelerate` (`eshkol-run.exe` LLVM CLI + native C++20 2nd-order Forward-Mode `HyperDual` automatic differentiation).
+- **Expanded Zig 0.17 SIMD128 Native & WASM Kernels (`zig/src/root.zig`, `src/native/zig-bridge.ts`)**:
+  - `cqm2_fwht_quantum_magic_m2` (Fast Walsh-Hadamard Transform Stabilizer Rényi Magic $M_2$), `cqm2_glyph_brain_batch_step` (`@Vector(4, f32)` SIMD128 3-layer MLP + Oja plasticity for 100 Pantheon Glyphs), `cqm2_csr_pagerank_louvain_arena` (zero-GC CSR PageRank + Louvain modularity $Q$ + Shannon degree entropy), and `cqm2_quasicrystal_icosa_shell` (6D → 3D icosahedral cut-and-project quasicrystal lattice).
+- **Native Win32 Desktop / Start Menu / Taskbar Launcher (`native/launcher/cqm2_launcher.cpp`, `native/launcher/cqm2.ico`, `scripts/install-windows-launcher.ps1`)**:
+  - Zero-console Win32 GUI executable (`CQM2.exe`) with embedded multi-resolution cosmic icon (`16/32/48/256 px`), single-instance mutex, health-checked background Quad-Silicon server startup (`127.0.0.1:4320`), automatic Edge/Chrome `--app=` window launch, and `--smoke` CI verification mode.
+- **Complete Original-CQM World, Ciphers, Telemetry & Inspector Parity (`src/render/cqm-world-builders.ts`, `src/render/scene-4k.ts`, `src/ui/workstation.ts`, `src/ui/cqm-v3-panels.ts`)**:
+  - 3D `6D→3D` Quasicrystal Shell around `GodColossus`, `100 Alphabet Pantheon Glyphs` + `101st APEX ς` Sovereign Monolith, 64 GPU-instanced 3D Sorting Field Pillars, physical ballistic `⟁ NHI` tossed probes, `◈ STAGE II` (`UwU`) rising 12-Pillar Obsidian `Monolith Temple`, and `⛓ ACCESS` (`IIIIVVVIVVVIVIIVIV` Roman Tally) `SUPERHERO` HUD + 2nd Super Creature (`Seraph-Prime`).
+  - Scrollable 16-metric + 4-item `ECONOMY` `#sP` Telemetry panel; dedicated `XYLOS {7,3}` Poincaré Hyperbolic Disk + 6 ADR-0018 Organs studio; `ARCHON GODFORMS` (`5 Sovereign Archons` + `PRIME Super Neural` `4×27 = 108` cards + `MEGA 4D` `SO(4)` tesseract); `101 PANTHEONS` glyph matrix; `NHI OBS` 9-panel Mind Readout; `🧪 SANDBOX` (`10-Phyla %` + `17` live 3D world toggles); `⚙ SET` shortcut matrix; 8-speed `[0.25..16]×` stepper; `N(1/2)` `GENESIS` ↔ `BREAK_FREE`; and First-Law-conserving `☠` Apocalypse Rebirth (with `Shift+Click` N01 rollback).
+- **Three Scholarly Satellite Laboratories (`public/lab/consciousness.html`, `public/lab/sentience.html`, `public/alife/cqm-capability-profile.html`)**:
+  - Complete Butlin-14 Metric Braid, Ablation Waterfall, Casali PCI arousal falsification, and `CQM-25` capability radar under strict `style-src 'self'` CSP and explicit `[NOT SENTIENT]` scientific honesty callouts.
+
 ## [2.2.0] - 2026-11-11
 
 ### Added

@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Cosmogonic Quantum Mechalogodrom 2 (CQM2) Local Quad-Silicon Workstation API",
-    "version": "2.2.0",
+    "version": "3.0.0",
     "summary": "Local-first polyglot artificial-life, quantum contextuality, 3NF SQLite ERP, and 3D/AI studio REST API",
     "description": "Serves real-time 5-phase artificial-life simulation ticks, CUDA/NPU/iGPU/Zig/Rust hardware dispatch receipts, 12-benchmark causal lesion suites, 3NF SQLite cursor-paginated ERP queries, fenced local AI scholarly narration, and watertight .glb/Blender/Unity/TouchDesigner/WAV exports.",
     "license": {
@@ -326,6 +326,27 @@
           }
         ],
         "responses": { "200": { "description": "Exported artifact stream" }, "404": { "description": "Unknown format" } }
+      }
+    },
+    "/api/v1/tsotchke/native": {
+      "get": {
+        "operationId": "getTsotchkeNativeStatus",
+        "summary": "Retrieve live C17 RosettaWire RSC1/RSW1, C++20 Moonlab QRNG/QGTL/Ising, libirrep SU(2), and Eshkol HyperDual status",
+        "responses": { "200": { "description": "Native polyglot telemetry receipt" } }
+      }
+    },
+    "/api/v1/connectome/csr": {
+      "post": {
+        "operationId": "postConnectomeCsr",
+        "summary": "Compute native CSR PageRank, Louvain modularity Q, and Shannon degree entropy",
+        "responses": { "200": { "description": "CSR graph metrics" } }
+      }
+    },
+    "/api/v1/eshkol/eval": {
+      "post": {
+        "operationId": "postEshkolEval",
+        "summary": "Evaluate pure arithmetic/scientific S-expression via native eshkol-run.exe sandbox",
+        "responses": { "200": { "description": "Evaluated S-expression output" }, "400": { "description": "Forbidden token or malformed expression" } }
       }
     }
   }

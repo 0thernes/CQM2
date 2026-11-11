@@ -245,6 +245,12 @@ const KNOWN_ROUTE_METHODS: Readonly<Record<string, ReadonlyArray<string>>> = {
   '/api/openapi.json': ['GET'],
   '/api/hardware': ['GET'],
   '/api/telemetry/gpu': ['GET'],
+  '/api/tsotchke/native': ['GET'],
+  '/api/connectome/csr': ['POST'],
+  '/api/eshkol/eval': ['POST'],
+  '/api/audit': ['GET'],
+  '/api/consciousness-lab': ['GET'],
+  '/api/sentience-lab': ['GET'],
   '/api/world/state': ['GET'],
   '/api/world/step': ['POST'],
   '/api/world/dials': ['POST'],
@@ -259,6 +265,9 @@ const KNOWN_ROUTE_METHODS: Readonly<Record<string, ReadonlyArray<string>>> = {
   '/api/erp/organisms': ['GET'],
   '/api/erp/biomes': ['GET', 'POST'],
   '/api/ai/ollama': ['POST'],
+  '/api/ai/narrate': ['POST'],
+  '/api/copilot': ['POST'],
+  '/api/chat': ['POST'],
   '/api/ai/texture': ['GET'],
   '/api/ai/mesh3d': ['POST'],
   '/api/jobs/retention': ['POST'],
@@ -276,7 +285,7 @@ export async function createCqm2Server(options: {
   seed?: number;
 } = {}): Promise<Cqm2ServerHandle> {
   const hostname = options.hostname ?? process.env.CQM2_HOST ?? '127.0.0.1';
-  const requestedPort = options.port ?? Number(process.env.CQM2_PORT ?? 4200);
+  const requestedPort = options.port ?? Number(process.env.CQM2_PORT ?? process.env.PORT ?? 4200);
   const dbPath = options.dbPath ?? process.env.CQM2_DB_PATH ?? join(ROOT_DIR, 'data', 'cqm2_local.sqlite');
   const rateLimitMax = options.rateLimitPerMinute ?? 600;
   const aiRateLimitMax = options.aiRateLimitPerMinute ?? 30;
@@ -525,10 +534,10 @@ export async function createCqm2Server(options: {
     websocket: {
       open(ws) {
         wsClients.add(ws);
-        ws.send(
+          ws.send(
           JSON.stringify({
             type: 'welcome',
-            version: '2.2.0',
+            version: '3.0.0',
             hardware: triEngine.getTopology(),
             epoch: world.store.epoch,
           }),
@@ -882,11 +891,12 @@ export async function createCqm2Server(options: {
           return sendJson({
             ok: true,
             service: 'cqm2-workstation',
-            version: '2.2.0',
+            version: '3.0.0',
             simTick: world.store.epoch.simTick,
             runState: world.runState,
             databaseHealthy: true,
             sharedMemoryActive: world.store.sharedMemoryActive,
+            tsotchkeNative: triEngine.tsotchke.getStatus(),
           });
         }
 
@@ -910,6 +920,138 @@ export async function createCqm2Server(options: {
             ok: true,
             topology: triEngine.getTopology(),
             recentReceipts: world.store.dispatchReceipts.slice(-16),
+          });
+        }
+
+        // --- GET /api/v1/tsotchke/native (Moonlab + libirrep + Eshkol + RosettaWire + CSR + FWHT Live Attestation) ---
+        if (apiPath === '/api/tsotchke/native' && req.method === 'GET') {
+          const ts = triEngine.tsotchke;
+          const qrng = ts.drawMoonlabQrng(32);
+          const qgtl = ts.sampleQgtlQwzGeometry(1.0, 0.45, -0.35, 24);
+          const hVec = new Float64Array([0.1, -0.1, 0.05]);
+          const jMat = new Float64Array([0, -1, 0, -1, 0, -1, 0, -1, 0]);
+          const ising = ts.annealMoonlabIsing(3, hVec, jMat, BigInt(world.store.epoch.simTick + 42));
+          const cgHalf = ts.clebschGordan(1, 1, 1, -1, 2, 0);
+          const rsc1 = ts.encodeAndVerifyRsc1('cqm2/tick', 'application/octet-stream', qrng.bytes);
+          const rsw1 = ts.testRsw1FailClosedStream(11);
+          const hd = ts.eshkolHyperDualPotential(0.7, 0.4, 0.5);
+          const apexHashes = ts.computeApexGoldenHashes(world.prng.masterSeed);
+
+          // 1-qubit |T> = (|0> + e^{i pi/4}|1>)/sqrt(2) -> exact M_2(|T>) = log2(4/3) ≈ 0.4150375
+          const invSqrt2 = Math.SQRT1_2;
+          const psiRe = new Float64Array([invSqrt2, invSqrt2 * Math.SQRT1_2]);
+          const psiIm = new Float64Array([0, invSqrt2 * Math.SQRT1_2]);
+          const magicM2 = ts.computeFwhtQuantumMagicM2(psiRe, psiIm, 1);
+
+          return sendJson({
+            ok: true,
+            status: ts.getStatus(),
+            moonlabQrng: {
+              sampleHex: Buffer.from(qrng.bytes.subarray(0, 16)).toString('hex'),
+              averageChsh: qrng.averageChsh,
+              capabilitiesHex: '0x' + qrng.capabilities.toString(16),
+              liveDll: qrng.liveDll,
+            },
+            moonlabQgtl: qgtl,
+            moonlabIsing: {
+              bestBitstring: '0b' + ising.bestBitstring.toString(2).padStart(3, '0'),
+              bestEnergy: ising.bestEnergy,
+              groundEnergy: ising.groundEnergy,
+              successProbability: ising.successProbability,
+              problemGap: ising.problemGap,
+              source: ising.source,
+            },
+            libirrepClebschGordan: cgHalf,
+            rosetteWire: {
+              rsc1Cid: rsc1.cid,
+              rsc1Verified: rsc1.verified,
+              rsw1FailClosed: rsw1,
+              canonicalPiJson: ts.canonicalRosetteFloatJson(Math.PI),
+            },
+            eshkolHyperDual: hd,
+            apexGoldenHashes: apexHashes,
+            fwhtStabilizerMagicM2: magicM2,
+          });
+        }
+
+        // --- POST /api/v1/connectome/csr (Zero-GC Native C++20 CSR PageRank + Louvain Modularity) ---
+        if (apiPath === '/api/connectome/csr' && req.method === 'POST') {
+          const parsed = await parseMutatingBody(['numNodes', 'edgeU', 'edgeV']);
+          if (!parsed.ok) return parsed.response;
+          const nNodes = parseStrictFiniteNumber(parsed.data.numNodes);
+          if (nNodes === null || !Number.isInteger(nNodes) || nNodes < 1 || nNodes > 4096) {
+            return sendError(400, 'VALIDATION_FAILED', 'numNodes must be an integer in [1, 4096]');
+          }
+          if (!Array.isArray(parsed.data.edgeU) || !Array.isArray(parsed.data.edgeV)) {
+            return sendError(400, 'VALIDATION_FAILED', 'edgeU and edgeV must be integer arrays');
+          }
+          const eLen = Math.min(parsed.data.edgeU.length, parsed.data.edgeV.length, 32768);
+          const uArr = new Uint32Array(eLen);
+          const vArr = new Uint32Array(eLen);
+          for (let i = 0; i < eLen; i++) {
+            uArr[i] = Math.max(0, Math.min(nNodes - 1, Math.trunc(Number(parsed.data.edgeU[i]) || 0)));
+            vArr[i] = Math.max(0, Math.min(nNodes - 1, Math.trunc(Number(parsed.data.edgeV[i]) || 0)));
+          }
+          const receipt = triEngine.tsotchke.computeCsrPagerankLouvain(nNodes, uArr, vArr, eLen);
+          return sendIdempotentJson(parsed.idempKey, parsed.rawText, {
+            ok: true,
+            backend: receipt.backend,
+            elapsedMs: receipt.elapsedMs,
+            numNodes: receipt.numNodes,
+            numEdges: receipt.numEdges,
+            modularityQ: receipt.modularityQ,
+            degreeEntropyBits: receipt.degreeEntropyBits,
+            maxPagerank: receipt.maxPagerank,
+            communityCount: receipt.communityCount,
+            pagerankSample: Array.from(receipt.pagerank.subarray(0, 32)),
+            communitySample: Array.from(receipt.communities.subarray(0, 32)),
+          });
+        }
+
+        // --- POST /api/v1/eshkol/eval — Safe Mathematical Eshkol HyperDual + Pure Arithmetic .esk Runner ---
+        if (apiPath === '/api/eshkol/eval' && req.method === 'POST') {
+          const parsed = await parseMutatingBody(['x', 'y', 'coupling', 'schemeExpr']);
+          if (!parsed.ok) return parsed.response;
+          const x = parseStrictFiniteNumber(parsed.data.x ?? 0.6) ?? 0.6;
+          const y = parseStrictFiniteNumber(parsed.data.y ?? 0.4) ?? 0.4;
+          const coupling = parseStrictFiniteNumber(parsed.data.coupling ?? 0.5) ?? 0.5;
+          const hyperDual = triEngine.tsotchke.eshkolHyperDualPotential(x, y, coupling);
+
+          let cliResult: { ok: boolean; output: string; engine: string } | null = null;
+          if (typeof parsed.data.schemeExpr === 'string' && parsed.data.schemeExpr.trim().length > 0) {
+            const expr = parsed.data.schemeExpr.trim();
+            // Strict pure-math S-expression allowlist: block any file/network/process/system primitives!
+            if (expr.length > 512 || /(?:system|process|open-|file|load|port|socket|eval|shell|env|ffi|foreign)/i.test(expr)) {
+              return sendError(400, 'UNSAFE_ESHKOL_EXPR', 'Only pure mathematical S-expressions (<=512 chars) are permitted');
+            }
+            cliResult = triEngine.tsotchke.runEshkolProgramSync(expr);
+          }
+          return sendIdempotentJson(parsed.idempKey, parsed.rawText, {
+            ok: true,
+            hyperDual,
+            cliResult,
+          });
+        }
+
+        // --- GET /api/v1/audit & /api/v1/consciousness-lab & /api/v1/sentience-lab ---
+        if (
+          (apiPath === '/api/audit' || apiPath === '/api/consciousness-lab' || apiPath === '/api/sentience-lab') &&
+          req.method === 'GET'
+        ) {
+          const tel = world.stepTick(0.005);
+          return sendJson({
+            ok: true,
+            indicatorOnly: true,
+            sentienceClaim: 'NOT_SENTIENT',
+            honestyContract: 'CQM-25 / Butlin-14 / Thaler-9 / Casali-PCI mathematical proxies only; zero phenomenal awareness.',
+            butlin14Mean: tel.xylos.meanButlinScore,
+            veridicalTag: tel.xylos.veridicalProbability.value,
+            hot3Confidence: tel.asmodenius.metacognitiveConfidenceHot3.value,
+            pciProxy: world.store.pciProxy[0] ?? 0.44,
+            thalerNovelty: tel.thaler.candidateNovelty,
+            kuramotoR: tel.pantheon.kuramotoOrderParameterR.value,
+            hoggarViolatedLines: tel.hoggar.violatedHexagonH2Lines,
+            tsotchkeNative: triEngine.tsotchke.getStatus(),
           });
         }
 
@@ -966,7 +1108,7 @@ export async function createCqm2Server(options: {
 
         // --- POST /api/v1/world/step ---
         if (apiPath === '/api/world/step' && req.method === 'POST') {
-          const parsed = await parseMutatingBody(['steps', 'dtSec', 'includeNpu']);
+          const parsed = await parseMutatingBody(['steps', 'dtSec', 'includeNpu', 'includeIgpu']);
           if (!parsed.ok) return parsed.response;
 
           const details: ApiErrorDetail[] = [];
@@ -991,6 +1133,9 @@ export async function createCqm2Server(options: {
           if (parsed.data.includeNpu !== undefined && typeof parsed.data.includeNpu !== 'boolean') {
             details.push({ field: 'includeNpu', code: 'INVALID_TYPE', message: 'includeNpu must be a boolean' });
           }
+          if (parsed.data.includeIgpu !== undefined && typeof parsed.data.includeIgpu !== 'boolean') {
+            details.push({ field: 'includeIgpu', code: 'INVALID_TYPE', message: 'includeIgpu must be a boolean' });
+          }
           if (details.length > 0) {
             return sendError(400, 'VALIDATION_FAILED', 'Invalid simulation step parameters', details);
           }
@@ -998,7 +1143,7 @@ export async function createCqm2Server(options: {
           const { latestTel, gpuReceipt, rustAudit, npuReceipt, igpuReceipt } = await executeQuadSiliconSteps(
             steps,
             dtSec,
-            parsed.data.includeNpu === true,
+            parsed.data.includeNpu === true || parsed.data.includeIgpu === true,
           );
 
           const broadcastPayload = JSON.stringify({
@@ -1069,7 +1214,7 @@ export async function createCqm2Server(options: {
         if (apiPath === '/api/world/checkpoint' && req.method === 'POST') {
           const dbErr = ensureDatabaseHealthy();
           if (dbErr) return dbErr;
-          const parsed = await parseMutatingBody([]);
+          const parsed = await parseMutatingBody(['note']);
           if (!parsed.ok) return parsed.response;
           world.captureWorldSnapshot();
           const saved = db.persistCheckpoint(world.store);
@@ -1488,18 +1633,25 @@ export async function createCqm2Server(options: {
           }
         }
 
-        // --- POST /api/v1/ai/ollama (Local Scholarly Narrator — Fenced Outside Creature Brains!) ---
-        if (apiPath === '/api/ai/ollama' && req.method === 'POST') {
-          const parsed = await parseMutatingBody(['topic', 'creatureName']);
+        // --- POST /api/v1/ai/ollama | /api/v1/ai/narrate | /api/copilot | /api/chat (Local Scholarly Narrator) ---
+        if (
+          (apiPath === '/api/ai/ollama' ||
+            apiPath === '/api/ai/narrate' ||
+            apiPath === '/api/copilot' ||
+            apiPath === '/api/chat') &&
+          req.method === 'POST'
+        ) {
+          const parsed = await parseMutatingBody(['topic', 'prompt', 'message', 'creatureName']);
           if (!parsed.ok) return parsed.response;
-          if (typeof parsed.data.topic !== 'string') {
+          const rawTopic = parsed.data.topic ?? parsed.data.prompt ?? parsed.data.message;
+          if (typeof rawTopic !== 'string') {
             return sendError(400, 'VALIDATION_FAILED', 'topic string is required', [
               { field: 'topic', code: 'REQUIRED', message: 'Provide scholarly topic prompt string' },
             ]);
           }
           const aiRes = await runScholarlyAiNarration(
             {
-              topic: parsed.data.topic,
+              topic: rawTopic,
               creatureName: typeof parsed.data.creatureName === 'string' ? parsed.data.creatureName : 'Asmodenius_Prime',
               kerrSpinA: world.dials.kerrSpinA,
               pciIndicator: world.store.pciProxy[0] ?? 0.44,
@@ -1511,7 +1663,7 @@ export async function createCqm2Server(options: {
           if (!aiRes.ok) {
             return sendError(status, aiRes.refusalCode ?? 'AI_REQUEST_REFUSED', aiRes.sanitizedSummary);
           }
-          return sendIdempotentJson(parsed.idempKey, parsed.rawText, { ...aiRes });
+          return sendIdempotentJson(parsed.idempKey, parsed.rawText, { ...aiRes, narration: aiRes, reply: aiRes.sanitizedSummary });
         }
 
         // --- GET /api/v1/ai/texture (Procedural Gray-Scott + Guanine PBR PNG Synthesizer) ---
@@ -1686,7 +1838,23 @@ export async function createCqm2Server(options: {
       // ======================================================================
       // Static Asset Serving (`site/` bundle -> `public/` -> `dist/` allowlist)
       // ======================================================================
-      const relReq = decodedPath === '/' ? 'index.html' : decodedPath.replace(/^\/+/, '');
+      const ROUTE_HTML_ALIASES: Readonly<Record<string, string>> = {
+        '/': 'index.html',
+        '/docs': 'docs.html',
+        '/docs/': 'docs.html',
+        '/spec': 'specs.html',
+        '/specs': 'specs.html',
+        '/bible': 'bible.html',
+        '/glossary': 'glossary.html',
+        '/downloads': 'downloads.html',
+        '/lab': 'lab/quantum-wildbeyond.html',
+        '/lab/': 'lab/quantum-wildbeyond.html',
+        '/lab/consciousness': 'lab/consciousness.html',
+        '/lab/sentience': 'lab/sentience.html',
+        '/docs/alife/cqm-capability-profile.html': 'alife/cqm-capability-profile.html',
+        '/alife/cqm-capability-profile': 'alife/cqm-capability-profile.html',
+      };
+      const relReq = ROUTE_HTML_ALIASES[decodedPath] ?? decodedPath.replace(/^\/+/, '');
       if (relReq.startsWith('.') || relReq === 'package.json' || relReq.startsWith('src/') || relReq.startsWith('data/')) {
         return sendError(403, 'FORBIDDEN_STATIC_RESOURCE', 'Forbidden static resource');
       }
@@ -1776,6 +1944,6 @@ if (import.meta.main) {
   const enableNpu = process.env.CQM2_DISABLE_NPU !== '1';
   const enableGoOsc = process.env.CQM2_DISABLE_GO_OSC !== '1';
   const srv = await createCqm2Server({ enableNpuDaemon: enableNpu, enableGoOscDaemon: enableGoOsc });
-  console.log(`[CQM2] Local Quad-Silicon Workstation v2.2.0 listening at ${srv.url}`);
+  console.log(`[CQM2] Local Quad-Silicon Workstation v3.0.0 listening at ${srv.url}`);
   console.log(`[CQM2] Silicon Topology:`, JSON.stringify(srv.triEngine.getTopology()));
 }

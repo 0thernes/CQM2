@@ -10,12 +10,19 @@
  */
 import * as THREE from 'three';
 import type { ErpRelationalStore } from '../erp/relational-store';
+import { getZigBridge } from '../native/zig-bridge';
 import { projectZooidStrandS3ToR3 } from '../quantum/xenolinguistics';
 import {
   buildBrutalistMegastructures,
   buildFloatingFrustumsAndShafts,
   buildGodColossusGroup,
   buildGroundedObeliskSpires,
+  buildNhiTossedProbePool,
+  buildPantheon101Ring,
+  buildQuasicrystalLatticeShell,
+  buildSecondSuperCreatureGroup,
+  buildSortingPillars64,
+  buildStageIIMonolithTemple,
   buildVoxelGlitchSwarm,
   buildWildAlienFloraInstanced,
   buildWovenSanctuaryDomes,
@@ -114,6 +121,25 @@ export type CameraPresetId =
   | 'TOP_MANIFOLD'
   | 'SHELL_CORE';
 
+export type CqmWorldSystemId =
+  | 'godColossus'
+  | 'quasicrystal'
+  | 'spires'
+  | 'brutalist'
+  | 'frustums'
+  | 'voxels'
+  | 'sanctuary'
+  | 'bigTree'
+  | 'flora'
+  | 'pantheon101'
+  | 'sortingPillars'
+  | 'organisms'
+  | 'titans'
+  | 'links'
+  | 'nhiProbes'
+  | 'asmodenius'
+  | 'xylos';
+
 const SPACE_FOVS: readonly number[] = [66, 82, 98, 38, 52];
 
 export class Cqm2Scene4kRenderer {
@@ -190,11 +216,41 @@ export class Cqm2Scene4kRenderer {
   // Major World Groups
   private readonly skyDome: THREE.Mesh;
   private readonly godColossusGroup: THREE.Group;
+  private readonly quasicrystalGroup: THREE.Group;
+  public readonly quasicrystalNodeCount: number;
+  private readonly spiresGroup: THREE.Group;
+  private readonly brutalistGroup: THREE.Group;
+  private readonly frustumsGroup: THREE.Group;
+  private readonly voxelSwarmMesh: THREE.InstancedMesh;
+  private readonly sanctuariesGroup: THREE.Group;
   private readonly primarySanctuaryDome: THREE.Group;
   private readonly bigTreeGroup: THREE.Group;
+  private readonly floraGroup: THREE.Group;
   private readonly floraPools: THREE.InstancedMesh[];
   public readonly wildFloraTotal: number;
   public readonly wildFloraChunks: number;
+  private readonly pantheonGroup: THREE.Group;
+  private readonly pantheonGlyphPools5: THREE.InstancedMesh[];
+  private readonly apexMonolith: THREE.Group;
+  private readonly glyphStates16 = new Float32Array(16 * 1024);
+  private readonly glyphLateralW16 = new Float32Array(16 * 4);
+  private readonly glyphDrive16 = new Float32Array(16 * 4);
+  private readonly glyphEnergy100 = new Float32Array(100);
+  private glyphSliceCursor = 0;
+  private readonly sortingPillarsGroup: THREE.Group;
+  private readonly sortingPillarsMesh: THREE.InstancedMesh;
+  private readonly nhiProbeMesh: THREE.InstancedMesh;
+  private readonly nhiProbePosVel = new Float32Array(64 * 7); // [x, y, z, vx, vy, vz, age]
+  public activeNhiProbeCount = 0;
+  private nhiProbeWriteCursor = 0;
+  private readonly stageIITempleGroup: THREE.Group;
+  public templeUnlocked = false;
+  private readonly secondSuperCreature: THREE.Group;
+  public superheroUnlocked = false;
+  public superheroFlightBoost = false;
+  private pulseBeamMesh: THREE.Mesh | null = null;
+  private pulseBeamTtl = 0;
+  private readonly worldSystemEnabled = new Map<CqmWorldSystemId, boolean>();
   private readonly kerrBillboard: THREE.Mesh;
   private readonly mechShells: THREE.Mesh[];
   private readonly starPoints: THREE.Points;
@@ -355,28 +411,62 @@ export class Cqm2Scene4kRenderer {
     gridMesh.position.y = 148; // Overhead violet/cyan celestial coordinate plane!
     this.scene.add(gridMesh);
 
-    // 3. Towering Rainbow Oil-Slick Prismatic `GodColossus` in Center Sky!
+    // 3. Towering Rainbow Oil-Slick Prismatic `GodColossus` + 6D->3D Quasicrystal Lattice Shell in Center Sky!
     this.godColossusGroup = buildGodColossusGroup(this.godColossusUniforms);
     this.scene.add(this.godColossusGroup);
 
+    const quasi = buildQuasicrystalLatticeShell();
+    this.quasicrystalGroup = quasi.group;
+    this.quasicrystalNodeCount = quasi.nodeCount;
+    this.scene.add(this.quasicrystalGroup);
+
     // 4. 16 Obsidian/Emerald Monolith Spires + Cantilevered Brutalist Megastructures + Frustums + Voxel Glitch-Cubes
-    this.scene.add(buildGroundedObeliskSpires());
-    this.scene.add(buildBrutalistMegastructures().group);
-    this.scene.add(buildFloatingFrustumsAndShafts().group);
-    this.scene.add(buildVoxelGlitchSwarm(this.voxelUniforms));
+    this.spiresGroup = buildGroundedObeliskSpires();
+    this.brutalistGroup = buildBrutalistMegastructures().group;
+    this.frustumsGroup = buildFloatingFrustumsAndShafts().group;
+    this.voxelSwarmMesh = buildVoxelGlitchSwarm(this.voxelUniforms);
+    this.scene.add(this.spiresGroup, this.brutalistGroup, this.frustumsGroup, this.voxelSwarmMesh);
 
     // 5. Woven 22-Ring Holographic Wire-Sphere Sanctuary Dome + Colossal `CrystalEcosystem` Big Tree
     const sanctuaries = buildWovenSanctuaryDomes();
+    this.sanctuariesGroup = sanctuaries.group;
     this.primarySanctuaryDome = sanctuaries.primaryDome;
     this.bigTreeGroup = sanctuaries.bigTreeGroup;
-    this.scene.add(sanctuaries.group);
+    this.scene.add(this.sanctuariesGroup);
 
     // 6. `6,272` GPU-Instanced Bioluminescent Wild Alien Flora (`4` draw calls, `0` CPU per-frame loop!)
     const flora = buildWildAlienFloraInstanced(this.floraUniforms, 6272);
+    this.floraGroup = flora.group;
     this.floraPools = flora.pools;
     this.wildFloraTotal = flora.totalInstances;
     this.wildFloraChunks = flora.chunkCount;
-    this.scene.add(flora.group);
+    this.scene.add(this.floraGroup);
+
+    // 6b. 100 Alphabet Pantheon Glyphs + 101st `APEX ς` Monolith + 64 Sorting Field Pillars + `⟁ NHI` Probe Pool + Temple + Seraph-Prime
+    const pantheon101 = buildPantheon101Ring();
+    this.pantheonGroup = pantheon101.group;
+    this.pantheonGlyphPools5 = pantheon101.glyphPools5;
+    this.apexMonolith = pantheon101.apexMonolith;
+    this.scene.add(this.pantheonGroup);
+    for (let i = 0; i < this.glyphLateralW16.length; i++) {
+      this.glyphLateralW16[i] = (i % 4 === 0 ? 0.32 : -0.14);
+      this.glyphDrive16[i] = Math.sin(i * 0.73) * 0.45;
+    }
+    this.glyphEnergy100.fill(0.5);
+
+    const sortingPillars = buildSortingPillars64();
+    this.sortingPillarsGroup = sortingPillars.group;
+    this.sortingPillarsMesh = sortingPillars.mesh;
+    this.scene.add(this.sortingPillarsGroup);
+
+    this.nhiProbeMesh = buildNhiTossedProbePool(64);
+    this.scene.add(this.nhiProbeMesh);
+
+    this.stageIITempleGroup = buildStageIIMonolithTemple();
+    this.scene.add(this.stageIITempleGroup);
+
+    this.secondSuperCreature = buildSecondSuperCreatureGroup();
+    this.scene.add(this.secondSuperCreature);
 
     // 7. Summonable Kerr / Cosmological Singularity Billboard + High-Zenith 10-Shell Mechalogodrom Core
     const kerrMat = new THREE.ShaderMaterial({
@@ -843,6 +933,144 @@ export class Cqm2Scene4kRenderer {
     return { x: this.camera.position.x, z: this.camera.position.z };
   }
 
+  /**
+   * Launches physical `⟁ NHI` bioluminescent crystalline probes outward from the camera's forward look vector
+   * with ballistic gravity and seabed terrain restitution (`tossNhiEntities` matching Original CQM's NHI button!).
+   */
+  public tossNhiEntities(count = 4): number {
+    const fwdX = -Math.sin(this.freeCamYaw) * Math.cos(this.freeCamPitch);
+    const fwdY = Math.sin(this.freeCamPitch);
+    const fwdZ = -Math.cos(this.freeCamYaw) * Math.cos(this.freeCamPitch);
+    const rightX = Math.cos(this.freeCamYaw);
+    const rightZ = -Math.sin(this.freeCamYaw);
+
+    const origin = this.camera.position;
+    for (let i = 0; i < count; i++) {
+      const slot = this.nhiProbeWriteCursor % 64;
+      this.nhiProbeWriteCursor++;
+      if (this.activeNhiProbeCount < 64) this.activeNhiProbeCount++;
+
+      const spread = (i - (count - 1) * 0.5) * 3.8;
+      const base = slot * 7;
+      this.nhiProbePosVel[base] = origin.x + fwdX * 14.0 + rightX * spread;
+      this.nhiProbePosVel[base + 1] = origin.y + fwdY * 14.0 - 2.0;
+      this.nhiProbePosVel[base + 2] = origin.z + fwdZ * 14.0 + rightZ * spread;
+      this.nhiProbePosVel[base + 3] = fwdX * (56.0 + i * 5.0) + rightX * spread * 1.4;
+      this.nhiProbePosVel[base + 4] = fwdY * 52.0 + 16.0 + (i % 3) * 4.5;
+      this.nhiProbePosVel[base + 5] = fwdZ * (56.0 + i * 5.0) + rightZ * spread * 1.4;
+      this.nhiProbePosVel[base + 6] = 0.01;
+    }
+    this.nhiProbeMesh.count = this.activeNhiProbeCount;
+    return this.activeNhiProbeCount;
+  }
+
+  /**
+   * Unlocks and rises the 3D Obsidian-Rune `Monolith Temple` (`◈ STAGE II` -> `UwU` cipher).
+   */
+  public unlockStageIITemple(): void {
+    this.templeUnlocked = true;
+    this.stageIITempleGroup.visible = true;
+    if (this.simulationStage !== 2) {
+      this.toggleSimulationStage();
+    }
+  }
+
+  /**
+   * Unlocks `SUPERHERO` mode (`⛓ ACCESS` Roman Tally cipher) and summons the 2nd Super Creature (`Seraph-Prime`).
+   */
+  public unlockSuperheroMode(): void {
+    this.superheroUnlocked = true;
+    this.secondSuperCreature.visible = true;
+  }
+
+  /**
+   * Fires a visible golden-cyan `SUPERHERO` Pulse Beam forward from the player camera into the cosmos.
+   */
+  public triggerSuperheroPulseBeam(): void {
+    if (!this.pulseBeamMesh) {
+      const geo = new THREE.CylinderGeometry(0.55, 2.2, 160, 12);
+      geo.rotateX(Math.PI / 2);
+      geo.translate(0, 0, -80);
+      const mat = new THREE.MeshBasicMaterial({
+        color: 0x38bdf8,
+        transparent: true,
+        opacity: 0.78,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false,
+      });
+      this.pulseBeamMesh = new THREE.Mesh(geo, mat);
+      this.scene.add(this.pulseBeamMesh);
+    }
+    this.pulseBeamMesh.position.copy(this.camera.position);
+    this.pulseBeamMesh.position.y -= 2.2;
+    this.pulseBeamMesh.quaternion.copy(this.camera.quaternion);
+    this.pulseBeamMesh.visible = true;
+    this.pulseBeamTtl = 0.65;
+  }
+
+  public isWorldSystemEnabled(sysId: CqmWorldSystemId): boolean {
+    return this.worldSystemEnabled.get(sysId) ?? true;
+  }
+
+  public setWorldSystemEnabled(sysId: CqmWorldSystemId, enabled: boolean): void {
+    this.worldSystemEnabled.set(sysId, enabled);
+    switch (sysId) {
+      case 'godColossus':
+        this.godColossusGroup.visible = enabled;
+        break;
+      case 'quasicrystal':
+        this.quasicrystalGroup.visible = enabled;
+        break;
+      case 'spires':
+        this.spiresGroup.visible = enabled;
+        break;
+      case 'brutalist':
+        this.brutalistGroup.visible = enabled;
+        break;
+      case 'frustums':
+        this.frustumsGroup.visible = enabled;
+        break;
+      case 'voxels':
+        this.voxelSwarmMesh.visible = enabled;
+        break;
+      case 'sanctuary':
+        this.sanctuariesGroup.visible = enabled;
+        break;
+      case 'bigTree':
+        this.bigTreeGroup.visible = enabled;
+        break;
+      case 'flora':
+        this.floraGroup.visible = enabled;
+        break;
+      case 'pantheon101':
+        this.pantheonGroup.visible = enabled;
+        break;
+      case 'sortingPillars':
+        this.sortingPillarsGroup.visible = enabled;
+        break;
+      case 'organisms':
+        for (const p of this.organismPools) p.visible = enabled;
+        break;
+      case 'titans':
+        this.titanMesh.visible = enabled;
+        break;
+      case 'links':
+        this.linkLineSegments.visible = enabled;
+        break;
+      case 'nhiProbes':
+        this.nhiProbeMesh.visible = enabled;
+        break;
+      case 'asmodenius':
+        for (const s of this.asmoSomites) s.visible = enabled;
+        this.connectomeLine.visible = enabled;
+        break;
+      case 'xylos':
+        this.xylosGroup.visible = enabled;
+        this.zooidLine.visible = enabled;
+        break;
+    }
+  }
+
   private applyFreeCameraOrientation(): void {
     this.camera.position.copy(this.freeCamPos);
     this.camera.rotation.order = 'YXZ';
@@ -853,7 +1081,7 @@ export class Cqm2Scene4kRenderer {
 
   private stepCameraNavigation(dtSec: number, simTimeSec: number, store: ErpRelationalStore): void {
     if (this.viewMode === 'free') {
-      const speed = 78.0 * dtSec;
+      const speed = (this.superheroFlightBoost ? 195.0 : 78.0) * dtSec;
       const forwardX = -Math.sin(this.freeCamYaw);
       const forwardZ = -Math.cos(this.freeCamYaw);
       const rightX = Math.cos(this.freeCamYaw);
@@ -1030,6 +1258,7 @@ export class Cqm2Scene4kRenderer {
     skinUGs?: Float32Array;
     skinVGs?: Float32Array;
     asmodeniusConfidence?: number;
+    sortingBins64?: Float32Array;
   }): void {
     if (this.contextLost) return;
     const { store, spinePtsXyz, simTimeSec } = params;
@@ -1233,6 +1462,144 @@ export class Cqm2Scene4kRenderer {
     const ev = new THREE.Vector3(params.executedVec[0], 0.15, params.executedVec[1]);
     if (iv.lengthSq() > 1e-6) this.intendedArrow.setDirection(iv.clone().normalize());
     if (ev.lengthSq() > 1e-6) this.executedArrow.setDirection(ev.clone().normalize());
+
+    // 8. 6D->3D Quasicrystal Lattice Shell + 100 Alphabet Pantheon Glyphs (`stepGlyphBrainBatch`) + `APEX ς` Monolith
+    const dtPhys = Math.min(0.05, Math.max(0.004, params.dtSec ?? 0.016));
+    if (!this.reducedMotion) {
+      this.quasicrystalGroup.rotation.y = tAnim * 0.045;
+      this.quasicrystalGroup.rotation.x = Math.sin(tAnim * 0.03) * 0.12;
+      this.apexMonolith.rotation.y = tAnim * 0.32;
+      this.apexMonolith.position.y = 56 + Math.sin(tAnim * 1.1) * 3.2;
+    }
+
+    if (this.pantheonGroup.visible) {
+      // Step 16-glyph slice via Zig SIMD128 `cqm2_glyph_brain_batch_step` (< 0.08 ms)
+      for (let k = 0; k < 16; k++) {
+        this.glyphDrive16[k * 4] = Math.sin(tAnim * 1.3 + (this.glyphSliceCursor + k) * 0.4) * (0.4 + chaos * 0.4);
+      }
+      const meanGlyphE = getZigBridge().stepGlyphBrainBatch(
+        this.glyphStates16,
+        this.glyphLateralW16,
+        this.glyphDrive16,
+        16,
+        0.015,
+      );
+      for (let k = 0; k < 16; k++) {
+        const gIdx = (this.glyphSliceCursor + k) % 100;
+        this.glyphEnergy100[gIdx] = Math.min(1.5, Math.max(0.2, meanGlyphE + Math.abs(this.glyphStates16[k * 1024] ?? 0.3)));
+      }
+      this.glyphSliceCursor = (this.glyphSliceCursor + 16) % 100;
+
+      for (let p = 0; p < 5; p++) {
+        const inst = this.pantheonGlyphPools5[p]!;
+        for (let j = 0; j < 20; j++) {
+          const idx100 = p * 20 + j;
+          const ang = (idx100 / 100) * Math.PI * 2 + tAnim * 0.055;
+          const r = 136 + (idx100 % 2) * 16;
+          const y = 94 + Math.sin(ang * 3 + tAnim * 0.5) * 14;
+          this.dummyPos.set(Math.cos(ang) * r, y, Math.sin(ang) * r - 34);
+          this.dummyEuler.set(ang + tAnim * 0.35, idx100 * 0.2 + tAnim * 0.28, 0);
+          this.dummyQuat.setFromEuler(this.dummyEuler);
+          const gScale = 0.82 + (this.glyphEnergy100[idx100] ?? 0.5) * 0.48;
+          this.dummyScale.setScalar(gScale);
+          this.dummyMatrix.compose(this.dummyPos, this.dummyQuat, this.dummyScale);
+          inst.setMatrixAt(j, this.dummyMatrix);
+        }
+        inst.instanceMatrix.needsUpdate = true;
+      }
+    }
+
+    // 9. 64 GPU-Instanced 3D Sorting Field Pillars synced live with `sortingBins64`
+    if (params.sortingBins64 && this.sortingPillarsGroup.visible) {
+      const bins = params.sortingBins64;
+      for (let i = 0; i < 64; i++) {
+        const v = Math.max(0.04, Math.min(1.0, bins[i] ?? 0.5));
+        const frac = i / 63;
+        const ang = Math.PI * 0.12 + frac * Math.PI * 0.76;
+        const x = 24 + Math.cos(ang) * 44;
+        const z = 124 - Math.sin(ang) * 44;
+        const gy = sampleCqmTerrainHeight(x, z, tAnim, chaos);
+        this.dummyPos.set(x, gy, z);
+        this.dummyQuat.identity();
+        this.dummyScale.set(1.0, 2.5 + v * 26.0, 1.0);
+        this.dummyMatrix.compose(this.dummyPos, this.dummyQuat, this.dummyScale);
+        this.sortingPillarsMesh.setMatrixAt(i, this.dummyMatrix);
+        this.dummyColor.setHSL((0.5 + v * 0.42) % 1, 0.9, 0.56);
+        this.sortingPillarsMesh.setColorAt(i, this.dummyColor);
+      }
+      this.sortingPillarsMesh.instanceMatrix.needsUpdate = true;
+      if (this.sortingPillarsMesh.instanceColor) this.sortingPillarsMesh.instanceColor.needsUpdate = true;
+    }
+
+    // 10. Ballistic Physics & Seabed Restitution for Tossed `⟁ NHI` Probes
+    if (this.activeNhiProbeCount > 0 && this.nhiProbeMesh.visible) {
+      for (let i = 0; i < this.activeNhiProbeCount; i++) {
+        const base = i * 7;
+        let px = this.nhiProbePosVel[base]!;
+        let py = this.nhiProbePosVel[base + 1]!;
+        let pz = this.nhiProbePosVel[base + 2]!;
+        let vx = this.nhiProbePosVel[base + 3]!;
+        let vy = this.nhiProbePosVel[base + 4]!;
+        let vz = this.nhiProbePosVel[base + 5]!;
+        const age = this.nhiProbePosVel[base + 6]! + dtPhys;
+
+        vy -= 22.0 * dtPhys;
+        px += vx * dtPhys;
+        py += vy * dtPhys;
+        pz += vz * dtPhys;
+
+        const floorY = sampleCqmTerrainHeight(px, pz, tAnim, chaos) + 2.2;
+        if (py < floorY) {
+          py = floorY;
+          vy = Math.abs(vy) * 0.68 + 2.4;
+          vx *= 0.86;
+          vz *= 0.86;
+        }
+
+        this.nhiProbePosVel[base] = px;
+        this.nhiProbePosVel[base + 1] = py;
+        this.nhiProbePosVel[base + 2] = pz;
+        this.nhiProbePosVel[base + 3] = vx;
+        this.nhiProbePosVel[base + 4] = vy;
+        this.nhiProbePosVel[base + 5] = vz;
+        this.nhiProbePosVel[base + 6] = age;
+
+        this.dummyPos.set(px, py, pz);
+        this.dummyEuler.set(age * 2.4, age * 3.1 + i, age * 1.7);
+        this.dummyQuat.setFromEuler(this.dummyEuler);
+        this.dummyScale.setScalar(1.0 + 0.18 * Math.sin(age * 5.0 + i));
+        this.dummyMatrix.compose(this.dummyPos, this.dummyQuat, this.dummyScale);
+        this.nhiProbeMesh.setMatrixAt(i, this.dummyMatrix);
+      }
+      this.nhiProbeMesh.count = this.activeNhiProbeCount;
+      this.nhiProbeMesh.instanceMatrix.needsUpdate = true;
+    }
+
+    // 11. `◈ STAGE II` (`UwU`) Rising Monolith Temple + `⛓ ACCESS` (`SUPERHERO`) 2nd Super Creature & Pulse Beam
+    if (this.templeUnlocked && this.stageIITempleGroup.visible) {
+      const targetY = sampleCqmTerrainHeight(0, 58, tAnim, chaos) - 1.2;
+      this.stageIITempleGroup.position.y += (targetY - this.stageIITempleGroup.position.y) * Math.min(1, dtPhys * 2.6);
+      this.stageIITempleGroup.rotation.y = Math.sin(tAnim * 0.15) * 0.08;
+    }
+
+    if (this.superheroUnlocked && this.secondSuperCreature.visible) {
+      const orbitAng = tAnim * 0.85;
+      this.secondSuperCreature.position.set(
+        this.camera.position.x + Math.cos(orbitAng) * 26 - Math.sin(this.freeCamYaw) * 34,
+        this.camera.position.y + 6.0 + Math.sin(tAnim * 1.9) * 3.5,
+        this.camera.position.z + Math.sin(orbitAng) * 26 - Math.cos(this.freeCamYaw) * 34,
+      );
+      this.secondSuperCreature.rotation.y = -orbitAng;
+    }
+
+    if (this.pulseBeamMesh && this.pulseBeamTtl > 0) {
+      this.pulseBeamTtl -= dtPhys;
+      if (this.pulseBeamTtl <= 0) {
+        this.pulseBeamMesh.visible = false;
+      } else {
+        (this.pulseBeamMesh.material as THREE.MeshBasicMaterial).opacity = Math.min(0.85, this.pulseBeamTtl * 1.3);
+      }
+    }
 
     if (this.renderer) {
       this.renderer.render(this.scene, this.camera);

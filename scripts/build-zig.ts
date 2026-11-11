@@ -75,8 +75,20 @@ mkdirSync(BIN_DIR, { recursive: true });
 for (const name of ['cqm2_zig.dll', 'libcqm2_zig.so', 'libcqm2_zig.dylib']) {
   const p = join(ZIG_DIR, 'zig-out', 'bin', name);
   const pLib = join(ZIG_DIR, 'zig-out', 'lib', name);
-  if (existsSync(p)) copyFileSync(p, join(BIN_DIR, name));
-  else if (existsSync(pLib)) copyFileSync(pLib, join(BIN_DIR, name));
+  const src = existsSync(p) ? p : existsSync(pLib) ? pLib : null;
+  if (src) {
+    const dst = join(BIN_DIR, name);
+    try {
+      copyFileSync(src, dst);
+    } catch (err) {
+      const code = (err as NodeJS.ErrnoException)?.code;
+      if (code === 'EBUSY' && existsSync(dst)) {
+        console.warn(`[build:zig] ${name} is currently mapped by a running process; keeping loaded native/bin/${name}.`);
+      } else {
+        throw err;
+      }
+    }
+  }
 }
 
 console.log(`[build:zig] Embedded cqm2_zig.wasm (${wasmBytes.byteLength} bytes) + copied native library to native/bin/.`);

@@ -97,6 +97,37 @@ export interface ZigWasmExports extends WebAssembly.Exports {
     dopamine: number,
     neuralDrive: number,
   ): number;
+  cqm2_fwht_quantum_magic_m2(psiRePtr: number, psiImPtr: number, nQubits: number): number;
+  cqm2_glyph_brain_batch_step(
+    statesPtr: number,
+    lateralWPtr: number,
+    drivePtr: number,
+    numGlyphs: number,
+    lr: number,
+  ): number;
+  cqm2_csr_pagerank_louvain_arena(
+    numNodes: number,
+    edgeUPtr: number,
+    edgeVPtr: number,
+    numEdges: number,
+    rowPtr: number,
+    colIdxPtr: number,
+    degPtr: number,
+    cursorPtr: number,
+    nextPrPtr: number,
+    commVolPtr: number,
+    pagerankOutPtr: number,
+    communityOutPtr: number,
+    statsOut4Ptr: number,
+  ): number;
+  cqm2_quasicrystal_icosa_shell(
+    gridExtent: number,
+    perpCutoff: number,
+    rMin: number,
+    rMax: number,
+    outXyzPtr: number,
+    maxPoints: number,
+  ): number;
 }
 
 function decodeBase64Bytes(b64: string): Uint8Array {
@@ -444,6 +475,128 @@ export class ZigKernelBridge {
     fhnV.set(new Float32Array(buf, fvPtr, len));
     fhnW.set(new Float32Array(buf, fwPtr, len));
     return meanPattern;
+  }
+
+  public computeFwhtQuantumMagicM2(psiRe: Float64Array, psiIm: Float64Array, nQubits: number): number {
+    if (nQubits <= 0 || nQubits > 8) return 0;
+    const dim = 1 << nQubits;
+    this.exports.cqm2_reset_heap();
+    const rePtr = this.exports.cqm2_alloc(dim * 8);
+    const imPtr = this.exports.cqm2_alloc(dim * 8);
+    new Float64Array(this.exports.memory.buffer, rePtr, dim).set(psiRe.subarray(0, dim));
+    new Float64Array(this.exports.memory.buffer, imPtr, dim).set(psiIm.subarray(0, dim));
+    return this.exports.cqm2_fwht_quantum_magic_m2(rePtr, imPtr, nQubits >>> 0);
+  }
+
+  public stepGlyphBrainBatch(
+    states: Float32Array,
+    lateralW: Float32Array,
+    drive: Float32Array,
+    numGlyphs: number,
+    lr: number,
+  ): number {
+    if (numGlyphs <= 0) return 0;
+    this.exports.cqm2_reset_heap();
+    const sPtr = this.allocF32(states.subarray(0, numGlyphs * 1024));
+    const wPtr = this.allocF32(lateralW.subarray(0, numGlyphs * 4));
+    const dPtr = this.allocF32(drive.subarray(0, numGlyphs * 4));
+    const meanEnergy = this.exports.cqm2_glyph_brain_batch_step(sPtr, wPtr, dPtr, numGlyphs >>> 0, lr);
+    const buf = this.exports.memory.buffer;
+    states.subarray(0, numGlyphs * 1024).set(new Float32Array(buf, sPtr, numGlyphs * 1024));
+    if (Math.abs(lr) > 1e-7) {
+      lateralW.subarray(0, numGlyphs * 4).set(new Float32Array(buf, wPtr, numGlyphs * 4));
+    }
+    return meanEnergy;
+  }
+
+  public computeCsrPagerankLouvain(
+    numNodes: number,
+    edgeU: Uint32Array,
+    edgeV: Uint32Array,
+    numEdges: number,
+  ): {
+    pagerank: Float32Array;
+    communities: Uint32Array;
+    modularityQ: number;
+    degreeEntropyBits: number;
+    maxPagerank: number;
+    communityCount: number;
+  } {
+    const pagerank = new Float32Array(numNodes);
+    const communities = new Uint32Array(numNodes);
+    if (numNodes <= 0) {
+      return { pagerank, communities, modularityQ: 0, degreeEntropyBits: 0, maxPagerank: 0, communityCount: 0 };
+    }
+    this.exports.cqm2_reset_heap();
+    const eCount = Math.min(numEdges, edgeU.length, edgeV.length);
+    const euPtr = this.exports.cqm2_alloc(Math.max(16, eCount * 4));
+    const evPtr = this.exports.cqm2_alloc(Math.max(16, eCount * 4));
+    const rowPtr = this.exports.cqm2_alloc((numNodes + 1) * 4);
+    const colIdxPtr = this.exports.cqm2_alloc(Math.max(16, eCount * 2 * 4));
+    const degPtr = this.exports.cqm2_alloc(numNodes * 4);
+    const cursorPtr = this.exports.cqm2_alloc((numNodes + 1) * 4);
+    const nextPrPtr = this.exports.cqm2_alloc(numNodes * 4);
+    const commVolPtr = this.exports.cqm2_alloc(numNodes * 8);
+    const prOutPtr = this.exports.cqm2_alloc(numNodes * 4);
+    const commOutPtr = this.exports.cqm2_alloc(numNodes * 4);
+    const statsPtr = this.exports.cqm2_alloc(32);
+
+    const buf0 = this.exports.memory.buffer;
+    if (eCount > 0) {
+      new Uint32Array(buf0, euPtr, eCount).set(edgeU.subarray(0, eCount));
+      new Uint32Array(buf0, evPtr, eCount).set(edgeV.subarray(0, eCount));
+    }
+
+    this.exports.cqm2_csr_pagerank_louvain_arena(
+      numNodes >>> 0,
+      euPtr,
+      evPtr,
+      eCount >>> 0,
+      rowPtr,
+      colIdxPtr,
+      degPtr,
+      cursorPtr,
+      nextPrPtr,
+      commVolPtr,
+      prOutPtr,
+      commOutPtr,
+      statsPtr,
+    );
+
+    const buf = this.exports.memory.buffer;
+    pagerank.set(new Float32Array(buf, prOutPtr, numNodes));
+    communities.set(new Uint32Array(buf, commOutPtr, numNodes));
+    const stats = new Float64Array(buf, statsPtr, 4);
+    return {
+      pagerank,
+      communities,
+      modularityQ: stats[0]!,
+      degreeEntropyBits: stats[1]!,
+      maxPagerank: stats[2]!,
+      communityCount: Math.round(stats[3]!),
+    };
+  }
+
+  public projectQuasicrystalIcosaShell(
+    gridExtent = 3,
+    perpCutoff = 1.65,
+    rMin = 0.8,
+    rMax = 3.2,
+    maxPoints = 2048,
+  ): Float32Array {
+    this.exports.cqm2_reset_heap();
+    const outPtr = this.allocF32Zero(maxPoints * 3);
+    const count = this.exports.cqm2_quasicrystal_icosa_shell(
+      gridExtent | 0,
+      perpCutoff,
+      rMin,
+      rMax,
+      outPtr,
+      maxPoints >>> 0,
+    );
+    const res = new Float32Array(count * 3);
+    res.set(new Float32Array(this.exports.memory.buffer, outPtr, count * 3));
+    return res;
   }
 }
 

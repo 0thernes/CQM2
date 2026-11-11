@@ -9,6 +9,7 @@
 import { existsSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { NpuWorldClient, type IgpuFieldResult, type NpuRssmResult, type NpuWorkerStatus } from './npu-client';
+import { getTsotchkeNativeBridge, type TsotchkeNativeBridge, type TsotchkeNativeStatus } from './tsotchke-bridge';
 import { getZigBridge, type ZigKernelBridge } from './zig-bridge';
 
 export interface SiliconHardwareTopology {
@@ -24,10 +25,12 @@ export interface SiliconHardwareTopology {
   npuSlices: number;
   avx2AsmReady: boolean;
   zigNativeFfiReady: boolean;
+  zigNativeDllReady: boolean;
   rustLedgerReady: boolean;
   zigSimdReady: boolean;
   goOscBridgePresent: boolean;
   npuWorker: NpuWorkerStatus;
+  tsotchkeNative: TsotchkeNativeStatus;
 }
 
 export interface CortexGemmReceipt {
@@ -138,6 +141,7 @@ function mixPair64Fallback(left: bigint, right: bigint): bigint {
 export class TriEngineOrchestrator {
   public readonly zig: ZigKernelBridge;
   public readonly npu: NpuWorldClient;
+  public readonly tsotchke: TsotchkeNativeBridge;
   private triSymbols: TriAccelFfiSymbols | null = null;
   private zigNativeSymbols: ZigNativeFfiSymbols | null = null;
   private rustSymbols: RustLedgerFfiSymbols | null = null;
@@ -147,11 +151,13 @@ export class TriEngineOrchestrator {
   public constructor() {
     this.zig = getZigBridge();
     this.npu = new NpuWorldClient();
+    this.tsotchke = getTsotchkeNativeBridge();
   }
 
   public async init(options: { enableNpuDaemon?: boolean } = {}): Promise<SiliconHardwareTopology> {
     if (!this.initialized) {
       await this.loadNativeLibraries();
+      await this.tsotchke.init();
       await this.npu.init(options.enableNpuDaemon ?? false);
       this.initialized = true;
     }
@@ -284,10 +290,12 @@ export class TriEngineOrchestrator {
       npuSlices: Number(this.hwJson.npuSlices ?? 0),
       avx2AsmReady: Boolean(this.triSymbols && this.hwJson.avx2AsmReady),
       zigNativeFfiReady: Boolean(this.zigNativeSymbols),
+      zigNativeDllReady: Boolean(this.zigNativeSymbols),
       rustLedgerReady: Boolean(this.rustSymbols),
       zigSimdReady: true,
       goOscBridgePresent: existsSync(goExe),
       npuWorker: npuStatus,
+      tsotchkeNative: this.tsotchke.getStatus(),
     };
   }
 

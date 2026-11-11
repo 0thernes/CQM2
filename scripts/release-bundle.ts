@@ -66,6 +66,12 @@ if (existsSync(triDll)) {
   });
   if (tarWin.exitCode !== 0) process.exit(tarWin.exitCode);
   rmSync(stageWin, { recursive: true, force: true });
+
+  // Also include standalone native launcher CQM2.exe directly in release-artifacts/
+  const standaloneExe = join(ROOT, 'native', 'bin', 'CQM2.exe');
+  if (existsSync(standaloneExe)) {
+    copyFileSync(standaloneExe, join(OUT_DIR, 'CQM2.exe'));
+  }
 }
 
 // Compute SHA256SUMS.txt over all files in `release-artifacts/`

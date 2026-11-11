@@ -1,7 +1,7 @@
 # Inspection report
 
 - Project: CQM2
-- Version: 2.2.0
+- Version: 3.0.0
 - Date: 2026-11-11
 - Profile: WEB, API, DB, AI, SIM, NATIVE, AGENT, PUB
 - Standard: 2.2.0 (catalog 5cc223ef1d1a)
@@ -23,7 +23,7 @@ Inspection  446 of 446 applicable points pass (100.0%); 13 not applicable, 0 wai
 Gates       every P0 and P1 point passes
 Tests       368 of 368 applicable tests pass (100.0%); 0 failing, 0 not written, 17 not applicable
 Grade       A+
-Rows        77190e910f0aae12 (digest of the rows, profile, version and result)
+Rows        3a454351c2b2cf94 (digest of the rows, profile, version and result)
 Diligence   not graded (--no-diligence), so no readiness verdict
 
 Gate points marked NA (the owner checks each reason):

@@ -1615,6 +1615,398 @@ pre,
   gap: 12px;
 }
 
+/* ==========================================================================
+   10. v3.0.0 Complete Original-CQM Fidelity Extensions
+       - Scrollable 16-Metric Left Telemetry + Economy Section (`#sP`)
+       - Roman Tally `⛓ ACCESS` & `◈ STAGE II` (`UwU`) Cipher Puzzle Dialogs
+       - Top-Center `SUPERHERO` HUD (`#cqm-superhero-hud`)
+       - `🧪 SANDBOX` Phyla & World-System Matrix
+       - `⚙ SET` 6-Tab Settings & Keyboard Shortcut Matrix
+       - `ARCHON` 5 Archons + `PRIME Super Neural` (4×27 = 108 Cards) + `MEGA 4D`
+       - `XYLOS` `{7,3}` Poincaré Hyperbolic Disk + 6 ADR-0018 Organs
+       - `NHI OBS` 9-Panel Mind Readout Grid & Satellite Lab Visuals
+   ========================================================================== */
+
+.tel-scroll-body {
+  max-height: clamp(168px, 26vh, 310px);
+  overflow-y: auto;
+  padding-right: 3px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(34, 211, 238, 0.35) transparent;
+}
+
+.tel-section-div {
+  margin: 7px 0 4px;
+  padding-top: 5px;
+  border-top: 1px solid rgba(71, 108, 155, 0.32);
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  color: #fbbf24;
+  text-transform: uppercase;
+}
+
+.tel-compact-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 6px;
+  padding: 2px 0;
+  border-bottom: 1px dashed rgba(51, 65, 85, 0.32);
+}
+
+.tel-compact-row .tel-v {
+  font-size: 10.5px;
+}
+
+.tel-badge-honest {
+  color: #34d399;
+  font-size: 9.5px;
+}
+
+/* Top-Center Superhero Mode HUD (`⛓ ACCESS` Unlocked) */
+#cqm-superhero-hud {
+  position: fixed;
+  top: 48px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 33;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  border-radius: 999px;
+  background: linear-gradient(135deg, rgba(12, 24, 48, 0.92), rgba(58, 22, 72, 0.92));
+  border: 1px solid rgba(56, 189, 248, 0.55);
+  box-shadow: 0 6px 24px rgba(34, 211, 238, 0.28);
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  color: #f8fafc;
+}
+
+#cqm-superhero-hud.hidden-panel {
+  display: none;
+}
+
+@media (max-width: 960px) {
+  #cqm-superhero-hud {
+    top: 88px;
+    width: calc(100vw - 24px);
+    max-width: 440px;
+    justify-content: center;
+    border-radius: 12px;
+    padding: 6px 8px;
+    gap: 5px;
+  }
+}
+
+.hero-stat-pill {
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: rgba(6, 78, 59, 0.65);
+  border: 1px solid rgba(52, 211, 153, 0.5);
+  color: #6ee7b7;
+  font-weight: 700;
+}
+
+/* Cipher Puzzle Dialogs (`⛓ ACCESS` & `◈ STAGE II`) */
+.cipher-dialog {
+  border: 1px solid #38bdf8;
+  border-radius: var(--radius-md);
+  background: rgba(7, 12, 24, 0.96);
+  color: var(--text-primary);
+  padding: 20px;
+  width: min(480px, 92vw);
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.85);
+}
+
+.cipher-dialog::backdrop {
+  background: rgba(3, 5, 14, 0.78);
+}
+
+.cipher-tally-hint {
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  background: rgba(15, 23, 42, 0.88);
+  border: 1px solid rgba(251, 191, 36, 0.38);
+  color: #fde68a;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  margin-bottom: 12px;
+}
+
+.cipher-status {
+  min-height: 22px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  margin: 8px 0;
+}
+
+/* Sub-Tab Bar inside Studio Panels (`ARCHON` / `PRIME NEURAL` / `SET`) */
+.subtab-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 14px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.subtab-btn {
+  padding: 5px 11px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-elevated);
+  color: var(--text-secondary);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.subtab-btn.subtab-active {
+  border-color: #22d3ee;
+  background: rgba(8, 47, 73, 0.72);
+  color: #22d3ee;
+}
+
+/* Archon 5 Sovereign Cards & PRIME Super Neural 27-Card Grid */
+.archon-5-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(175px, 1fr));
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.archon-card {
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  background: rgba(15, 23, 42, 0.85);
+  border: 1px solid rgba(192, 132, 252, 0.35);
+}
+
+.neural-27-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(156px, 1fr));
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.neural-card {
+  padding: 8px 10px;
+  border-radius: 6px;
+  background: rgba(11, 18, 33, 0.9);
+  border: 1px solid rgba(56, 189, 248, 0.26);
+  font-family: var(--font-mono);
+  font-size: 11px;
+}
+
+.neural-card-title {
+  color: #38bdf8;
+  font-weight: 700;
+  margin-bottom: 3px;
+}
+
+/* 101 Pantheons Glyph Matrix */
+.pantheon-101-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(64px, 1fr));
+  gap: 6px;
+  max-height: 250px;
+  overflow-y: auto;
+  padding: 6px;
+  border-radius: var(--radius-sm);
+  background: rgba(4, 7, 16, 0.85);
+  border: 1px solid var(--border-subtle);
+  margin-bottom: 14px;
+}
+
+.pantheon-glyph-tile {
+  padding: 5px 4px;
+  border-radius: 5px;
+  background: rgba(15, 23, 42, 0.85);
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  text-align: center;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  cursor: pointer;
+}
+
+.pantheon-glyph-tile:hover,
+.pantheon-glyph-tile.apex-tile {
+  border-color: #fbbf24;
+  color: #fef08a;
+  background: rgba(120, 53, 15, 0.42);
+}
+
+.glyph-sym {
+  display: block;
+  font-size: 15px;
+  font-weight: 700;
+  color: #f8fafc;
+}
+
+/* Xylos Poincaré Hyperbolic Disk + 6 ADR-0018 Organs */
+.xylos-split-grid {
+  display: grid;
+  grid-template-columns: minmax(240px, 320px) 1fr;
+  gap: 16px;
+  align-items: start;
+  margin-bottom: 14px;
+}
+
+@media (max-width: 760px) {
+  .xylos-split-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.poincare-canvas {
+  width: 100%;
+  max-width: 300px;
+  aspect-ratio: 1 / 1;
+  display: block;
+  border-radius: 50%;
+  border: 1px solid rgba(56, 189, 248, 0.45);
+  background: radial-gradient(circle at 50% 50%, #0d1b36 0%, #040711 75%, #020308 100%);
+}
+
+.organ-row {
+  padding: 8px 10px;
+  border-radius: 6px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-subtle);
+  margin-bottom: 7px;
+}
+
+.organ-hdr {
+  display: flex;
+  justify-content: space-between;
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  font-weight: 700;
+  color: #e2e8f0;
+  margin-bottom: 4px;
+}
+
+.organ-prog {
+  width: 100%;
+  height: 7px;
+  appearance: none;
+  border: none;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.95);
+  overflow: hidden;
+}
+
+.organ-prog::-webkit-progress-bar {
+  background: rgba(15, 23, 42, 0.95);
+  border-radius: 999px;
+}
+
+.organ-prog::-webkit-progress-value {
+  background: linear-gradient(90deg, #34d399, #22d3ee, #c084fc);
+  border-radius: 999px;
+}
+
+/* NHI OBS 9-Panel Mind Readout Grid */
+.nhi-9-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 9px;
+  margin-bottom: 14px;
+}
+
+.nhi-mind-card {
+  padding: 9px 11px;
+  border-radius: 6px;
+  background: rgba(11, 19, 36, 0.9);
+  border: 1px solid rgba(56, 189, 248, 0.3);
+}
+
+.nhi-mind-title {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  font-weight: 700;
+  color: #22d3ee;
+  letter-spacing: 0.05em;
+  margin-bottom: 4px;
+}
+
+/* Sandbox Phyla Stepper & World System Toggles */
+.sandbox-grid-2 {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 14px;
+}
+
+.phyla-stepper-row {
+  display: grid;
+  grid-template-columns: 1fr auto auto auto;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 8px;
+  border-radius: 5px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-subtle);
+  margin-bottom: 5px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+}
+
+.sys-toggle-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+  gap: 7px;
+}
+
+.sys-toggle-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 9px;
+  border-radius: 5px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-subtle);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.mega4d-canvas {
+  width: 100%;
+  height: 190px;
+  display: block;
+  border-radius: var(--radius-sm);
+  border: 1px solid rgba(192, 132, 252, 0.4);
+  background: #040610;
+  margin-top: 8px;
+}
+
+/* Satellite Lab SVG Visualization Frames */
+.lab-svg-frame {
+  width: 100%;
+  height: auto;
+  display: block;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-subtle);
+  background: #040814;
+  margin: 10px 0 16px;
+}
+
+.honesty-callout {
+  padding: 12px 16px;
+  border-radius: var(--radius-sm);
+  border-left: 4px solid #fbbf24;
+  background: rgba(120, 53, 15, 0.25);
+  color: #fef3c7;
+  margin-bottom: 18px;
+  font-size: var(--fs-sm);
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
