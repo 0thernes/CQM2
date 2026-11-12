@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Cosmogonic Quantum Mechalogodrom 2 (CQM2) Local Quad-Silicon Workstation API",
-    "version": "4.0.0",
+    "version": "5.0.0",
     "summary": "Local-first polyglot artificial-life, quantum contextuality, 3NF SQLite ERP, and 3D/AI studio REST API",
     "description": "Serves real-time 5-phase artificial-life simulation ticks, CUDA/NPU/iGPU/Zig/Rust hardware dispatch receipts, 12-benchmark causal lesion suites, 3NF SQLite cursor-paginated ERP queries, fenced local AI scholarly narration, and watertight .glb/Blender/Unity/TouchDesigner/WAV exports.",
     "license": {

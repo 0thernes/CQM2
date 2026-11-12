@@ -537,7 +537,7 @@ export async function createCqm2Server(options: {
           ws.send(
           JSON.stringify({
             type: 'welcome',
-            version: '4.0.0',
+            version: '5.0.0',
             hardware: triEngine.getTopology(),
             epoch: world.store.epoch,
           }),
@@ -891,7 +891,7 @@ export async function createCqm2Server(options: {
           return sendJson({
             ok: true,
             service: 'cqm2-workstation',
-            version: '4.0.0',
+            version: '5.0.0',
             simTick: world.store.epoch.simTick,
             runState: world.runState,
             databaseHealthy: true,
@@ -1950,6 +1950,6 @@ if (import.meta.main) {
   const enableNpu = process.env.CQM2_DISABLE_NPU !== '1';
   const enableGoOsc = process.env.CQM2_DISABLE_GO_OSC !== '1';
   const srv = await createCqm2Server({ enableNpuDaemon: enableNpu, enableGoOscDaemon: enableGoOsc });
-  console.log(`[CQM2] Local Quad-Silicon Workstation v4.0.0 listening at ${srv.url}`);
+  console.log(`[CQM2] Local Quad-Silicon Workstation v5.0.0 listening at ${srv.url}`);
   console.log(`[CQM2] Silicon Topology:`, JSON.stringify(srv.triEngine.getTopology()));
 }

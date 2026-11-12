@@ -12,40 +12,12 @@
 namespace cqm2_render {
 
 namespace {
-constexpr float kPi = 3.14159265358979323846f;
-constexpr float kTau = 6.28318530717958647692f;
+constexpr size_t kMaxStreamInstances = 65536;
+constexpr size_t kMaxStreamLineVerts = 65536;
 
-struct MeshVertex {
-    glm::vec3 pos;
-    glm::vec3 norm;
-};
-
-struct LineVertex {
-    glm::vec3 pos;
-    glm::vec4 col;
-};
-
-void setupInstancedAttribs(GLuint vao, GLuint meshVbo, GLuint instVbo) {
-    glBindVertexArray(vao);
-    glBindBuffer(GL_ARRAY_BUFFER, meshVbo);
-    glEnableVertexAttribArray(0);
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(MeshVertex), reinterpret_cast<const void*>(0));
-    glEnableVertexAttribArray(1);
-    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(MeshVertex), reinterpret_cast<const void*>(sizeof(glm::vec3)));
-
-    glBindBuffer(GL_ARRAY_BUFFER, instVbo);
-    glEnableVertexAttribArray(2);
-    glVertexAttribPointer(2, 4, GL_FLOAT, GL_FALSE, sizeof(cqm2_sim::InstanceData), reinterpret_cast<const void*>(0));
-    glVertexAttribDivisor(2, 1);
-
-    glEnableVertexAttribArray(3);
-    glVertexAttribPointer(3, 4, GL_FLOAT, GL_FALSE, sizeof(cqm2_sim::InstanceData), reinterpret_cast<const void*>(sizeof(glm::vec4)));
-    glVertexAttribDivisor(3, 1);
-
-    glEnableVertexAttribArray(4);
-    glVertexAttribPointer(4, 4, GL_FLOAT, GL_FALSE, sizeof(cqm2_sim::InstanceData), reinterpret_cast<const void*>(2 * sizeof(glm::vec4)));
-    glVertexAttribDivisor(4, 1);
-    glBindVertexArray(0);
+inline bool isTranslucentInstance(const cqm2_sim::MeshInstance& inst, int renderMode) {
+    int mc = static_cast<int>(inst.rotMat.w + 0.5f);
+    return (mc == 3 || mc == 6 || mc == 7 || renderMode == 2 || renderMode == 5);
 }
 } // namespace
 
@@ -63,7 +35,7 @@ glm::mat4 OrbitCamera::viewMatrix() const {
 }
 
 glm::mat4 OrbitCamera::projMatrix(float aspect) const {
-    return glm::perspective(glm::radians(fovDeg), std::max(0.1f, aspect), 0.25f, 420.0f);
+    return glm::perspective(glm::radians(fovDeg), std::max(0.1f, aspect), 0.25f, 460.0f);
 }
 
 NativeCosmosRenderer::~NativeCosmosRenderer() {
@@ -95,7 +67,7 @@ bool NativeCosmosRenderer::init() {
     glGenVertexArrays(1, &m_emptyVao);
     buildBaseMeshes();
 
-    // Gray-Scott RGBA32F texture
+    // 256x256 Gray-Scott RGBA32F texture
     glGenTextures(1, &m_grayScottTex);
     glBindTexture(GL_TEXTURE_2D, m_grayScottTex);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
@@ -104,7 +76,7 @@ bool NativeCosmosRenderer::init() {
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, cqm2_sim::kGrayScottSize, cqm2_sim::kGrayScottSize, 0, GL_RGBA, GL_FLOAT, nullptr);
 
-    // 3 Live Brain RGBA8 textures
+    // 3 Live Brain RGBA8 textures (0=APEX/XYLOS, 1=MECHA, 2=GLYPH)
     glGenTextures(3, m_brainTex);
     for (int i = 0; i < 3; ++i) {
         glBindTexture(GL_TEXTURE_2D, m_brainTex[i]);
@@ -129,9 +101,17 @@ void NativeCosmosRenderer::shutdown() {
     glDeleteTextures(3, m_brainTex);
     if (m_emptyVao) glDeleteVertexArrays(1, &m_emptyVao);
     if (m_floorVao) glDeleteVertexArrays(1, &m_floorVao);
-    if (m_cubeVao) glDeleteVertexArrays(1, &m_cubeVao);
-    if (m_sphereVao) glDeleteVertexArrays(1, &m_sphereVao);
+    if (m_floorVbo) glDeleteBuffers(1, &m_floorVbo);
+    if (m_floorEbo) glDeleteBuffers(1, &m_floorEbo);
+    for (auto& slot : m_meshes) {
+        if (slot.vao) glDeleteVertexArrays(1, &slot.vao);
+        if (slot.vbo) glDeleteBuffers(1, &slot.vbo);
+        if (slot.ebo) glDeleteBuffers(1, &slot.ebo);
+        slot = {};
+    }
+    if (m_sharedInstVbo) glDeleteBuffers(1, &m_sharedInstVbo);
     if (m_lineVao) glDeleteVertexArrays(1, &m_lineVao);
+    if (m_lineVbo) glDeleteBuffers(1, &m_lineVbo);
     glDeleteProgram(m_progSkyColossus);
     glDeleteProgram(m_progFloor);
     glDeleteProgram(m_progInstanced);
@@ -142,8 +122,8 @@ void NativeCosmosRenderer::shutdown() {
 }
 
 void NativeCosmosRenderer::buildBaseMeshes() {
-    // 1. Floor grid (96 x 96 subdivisions across [-84, 84])
-    constexpr int G = 96;
+    // 1. Displaced Gray-Scott Terrain Grid (128 x 128 across [-84, +84])
+    constexpr int G = 128;
     struct FloorVert { glm::vec3 pos; glm::vec2 uv; };
     std::vector<FloorVert> fVerts;
     std::vector<uint32_t> fIdx;
@@ -152,7 +132,10 @@ void NativeCosmosRenderer::buildBaseMeshes() {
         float vz = static_cast<float>(z) / static_cast<float>(G);
         for (int x = 0; x <= G; ++x) {
             float vx = static_cast<float>(x) / static_cast<float>(G);
-            fVerts.push_back({ glm::vec3((vx * 2.0f - 1.0f) * 84.0f, 0.0f, (vz * 2.0f - 1.0f) * 84.0f), glm::vec2(vx * 3.0f, vz * 3.0f) });
+            fVerts.push_back({
+                glm::vec3((vx * 2.0f - 1.0f) * 84.0f, 0.0f, (vz * 2.0f - 1.0f) * 84.0f),
+                glm::vec2(vx * 3.5f, vz * 3.5f)
+            });
         }
     }
     for (int z = 0; z < G; ++z) {
@@ -179,72 +162,60 @@ void NativeCosmosRenderer::buildBaseMeshes() {
     glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, sizeof(FloorVert), reinterpret_cast<const void*>(sizeof(glm::vec3)));
     glBindVertexArray(0);
 
-    // 2. Unit Cube [-0.5, 0.5]^3 (36 vertices) for Voxel Greebles, Spires, Monoliths & Flora
-    const glm::vec3 nrms[6] = {
-        {0,0,1}, {0,0,-1}, {1,0,0}, {-1,0,0}, {0,1,0}, {0,-1,0}
-    };
-    const glm::vec3 tangs[6] = {
-        {1,0,0}, {-1,0,0}, {0,0,-1}, {0,0,1}, {1,0,0}, {1,0,0}
-    };
-    std::vector<MeshVertex> cubeV;
-    for (int f = 0; f < 6; ++f) {
-        glm::vec3 n = nrms[f];
-        glm::vec3 t = tangs[f];
-        glm::vec3 b = glm::cross(n, t);
-        glm::vec3 p0 = n * 0.5f - t * 0.5f - b * 0.5f;
-        glm::vec3 p1 = n * 0.5f + t * 0.5f - b * 0.5f;
-        glm::vec3 p2 = n * 0.5f + t * 0.5f + b * 0.5f;
-        glm::vec3 p3 = n * 0.5f - t * 0.5f + b * 0.5f;
-        cubeV.push_back({p0, n}); cubeV.push_back({p1, n}); cubeV.push_back({p2, n});
-        cubeV.push_back({p0, n}); cubeV.push_back({p2, n}); cubeV.push_back({p3, n});
-    }
-    m_cubeVertCount = static_cast<GLsizei>(cubeV.size());
-    glGenVertexArrays(1, &m_cubeVao);
-    glGenBuffers(1, &m_cubeMeshVbo);
-    glGenBuffers(1, &m_cubeInstVbo);
-    glBindBuffer(GL_ARRAY_BUFFER, m_cubeMeshVbo);
-    glBufferData(GL_ARRAY_BUFFER, static_cast<GLsizeiptr>(cubeV.size() * sizeof(MeshVertex)), cubeV.data(), GL_STATIC_DRAW);
-    glBindBuffer(GL_ARRAY_BUFFER, m_cubeInstVbo);
-    glBufferData(GL_ARRAY_BUFFER, static_cast<GLsizeiptr>(65000 * sizeof(cqm2_sim::InstanceData)), nullptr, GL_STREAM_DRAW);
-    setupInstancedAttribs(m_cubeVao, m_cubeMeshVbo, m_cubeInstVbo);
+    // 2. Shared Streaming Instance VBO + All 64 Procedural Indexed 3D Topologies
+    glGenBuffers(1, &m_sharedInstVbo);
+    glBindBuffer(GL_ARRAY_BUFFER, m_sharedInstVbo);
+    glBufferData(GL_ARRAY_BUFFER, static_cast<GLsizeiptr>(kMaxStreamInstances * sizeof(cqm2_sim::MeshInstance)), nullptr, GL_STREAM_DRAW);
 
-    // 3. UV Sphere (14 stacks x 18 slices) for Living Organisms, Xenomimics, Archon Eyed Spheres & Canopy Fruits
-    std::vector<MeshVertex> sphV;
-    constexpr int ST = 12, SL = 16;
-    for (int i = 0; i < ST; ++i) {
-        float v0 = static_cast<float>(i) / ST * kPi;
-        float v1 = static_cast<float>(i + 1) / ST * kPi;
-        for (int j = 0; j < SL; ++j) {
-            float u0 = static_cast<float>(j) / SL * kTau;
-            float u1 = static_cast<float>(j + 1) / SL * kTau;
-            auto pt = [](float th, float ph) {
-                return glm::vec3(std::sin(th) * std::cos(ph), std::cos(th), std::sin(th) * std::sin(ph));
-            };
-            glm::vec3 q00 = pt(v0, u0), q10 = pt(v0, u1), q01 = pt(v1, u0), q11 = pt(v1, u1);
-            sphV.push_back({q00 * 0.65f, q00}); sphV.push_back({q01 * 0.65f, q01}); sphV.push_back({q10 * 0.65f, q10});
-            sphV.push_back({q10 * 0.65f, q10}); sphV.push_back({q01 * 0.65f, q01}); sphV.push_back({q11 * 0.65f, q11});
+    for (int id = 0; id < cqm2_meshes::kTotalMeshTopologies; ++id) {
+        cqm2_meshes::CpuMeshData cpu = cqm2_meshes::generateMeshTopology(id);
+        GpuMeshSlot& slot = m_meshes[id];
+        slot.indexCount = static_cast<GLsizei>(cpu.indices.size());
+
+        glGenVertexArrays(1, &slot.vao);
+        glGenBuffers(1, &slot.vbo);
+        glGenBuffers(1, &slot.ebo);
+
+        glBindVertexArray(slot.vao);
+        glBindBuffer(GL_ARRAY_BUFFER, slot.vbo);
+        glBufferData(GL_ARRAY_BUFFER,
+                     static_cast<GLsizeiptr>(cpu.vertices.size() * sizeof(cqm2_meshes::MeshVertex)),
+                     cpu.vertices.data(), GL_STATIC_DRAW);
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, slot.ebo);
+        glBufferData(GL_ELEMENT_ARRAY_BUFFER,
+                     static_cast<GLsizeiptr>(cpu.indices.size() * sizeof(uint32_t)),
+                     cpu.indices.data(), GL_STATIC_DRAW);
+
+        // Per-vertex attributes (locations 0, 1, 2)
+        glEnableVertexAttribArray(0);
+        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(cqm2_meshes::MeshVertex), reinterpret_cast<const void*>(0));
+        glEnableVertexAttribArray(1);
+        glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(cqm2_meshes::MeshVertex), reinterpret_cast<const void*>(sizeof(glm::vec3)));
+        glEnableVertexAttribArray(2);
+        glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, sizeof(cqm2_meshes::MeshVertex), reinterpret_cast<const void*>(2 * sizeof(glm::vec3)));
+
+        // Per-instance attributes from shared streaming VBO (locations 3, 4, 5, 6)
+        glBindBuffer(GL_ARRAY_BUFFER, m_sharedInstVbo);
+        for (GLuint a = 0; a < 4; ++a) {
+            GLuint loc = 3 + a;
+            glEnableVertexAttribArray(loc);
+            glVertexAttribPointer(loc, 4, GL_FLOAT, GL_FALSE, sizeof(cqm2_sim::MeshInstance),
+                                  reinterpret_cast<const void*>(a * sizeof(glm::vec4)));
+            glVertexAttribDivisor(loc, 1);
         }
+        glBindVertexArray(0);
     }
-    m_sphereVertCount = static_cast<GLsizei>(sphV.size());
-    glGenVertexArrays(1, &m_sphereVao);
-    glGenBuffers(1, &m_sphereMeshVbo);
-    glGenBuffers(1, &m_sphereInstVbo);
-    glBindBuffer(GL_ARRAY_BUFFER, m_sphereMeshVbo);
-    glBufferData(GL_ARRAY_BUFFER, static_cast<GLsizeiptr>(sphV.size() * sizeof(MeshVertex)), sphV.data(), GL_STATIC_DRAW);
-    glBindBuffer(GL_ARRAY_BUFFER, m_sphereInstVbo);
-    glBufferData(GL_ARRAY_BUFFER, static_cast<GLsizeiptr>(55000 * sizeof(cqm2_sim::InstanceData)), nullptr, GL_STREAM_DRAW);
-    setupInstancedAttribs(m_sphereVao, m_sphereMeshVbo, m_sphereInstVbo);
 
-    // 4. Dynamic Line/Ribbon VAO
+    // 3. Dynamic Color Line / 4D Tesseract / Xylos VAO
     glGenVertexArrays(1, &m_lineVao);
     glGenBuffers(1, &m_lineVbo);
     glBindVertexArray(m_lineVao);
     glBindBuffer(GL_ARRAY_BUFFER, m_lineVbo);
-    glBufferData(GL_ARRAY_BUFFER, 32768 * sizeof(LineVertex), nullptr, GL_STREAM_DRAW);
+    glBufferData(GL_ARRAY_BUFFER, static_cast<GLsizeiptr>(kMaxStreamLineVerts * sizeof(cqm2_sim::ColorLineVertex)), nullptr, GL_STREAM_DRAW);
     glEnableVertexAttribArray(0);
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(LineVertex), reinterpret_cast<const void*>(0));
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(cqm2_sim::ColorLineVertex), reinterpret_cast<const void*>(0));
     glEnableVertexAttribArray(1);
-    glVertexAttribPointer(1, 4, GL_FLOAT, GL_FALSE, sizeof(LineVertex), reinterpret_cast<const void*>(sizeof(glm::vec3)));
+    glVertexAttribPointer(1, 4, GL_FLOAT, GL_FALSE, sizeof(cqm2_sim::ColorLineVertex), reinterpret_cast<const void*>(sizeof(glm::vec3)));
     glBindVertexArray(0);
 }
 
@@ -285,11 +256,12 @@ void NativeCosmosRenderer::uploadSimTextures(const cqm2_sim::NativeCosmosSim& si
         glBindTexture(GL_TEXTURE_2D, m_grayScottTex);
         glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, cqm2_sim::kGrayScottSize, cqm2_sim::kGrayScottSize, GL_RGBA, GL_FLOAT, sim.grayScottRgba.data());
     }
-    if (!sim.brainTexMecha.empty()) {
+    if (!sim.brainTexXylos.empty()) {
+        // 0 = APEX (Xylos Hyperbolic), 1 = MECHA (54k STDP), 2 = GLYPH (10x10 Dot Matrix)
         glBindTexture(GL_TEXTURE_2D, m_brainTex[0]);
-        glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, cqm2_sim::kBrainTexSize, cqm2_sim::kBrainTexSize, GL_RGBA, GL_UNSIGNED_BYTE, sim.brainTexMecha.data());
-        glBindTexture(GL_TEXTURE_2D, m_brainTex[1]);
         glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, cqm2_sim::kBrainTexSize, cqm2_sim::kBrainTexSize, GL_RGBA, GL_UNSIGNED_BYTE, sim.brainTexXylos.data());
+        glBindTexture(GL_TEXTURE_2D, m_brainTex[1]);
+        glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, cqm2_sim::kBrainTexSize, cqm2_sim::kBrainTexSize, GL_RGBA, GL_UNSIGNED_BYTE, sim.brainTexMecha.data());
         glBindTexture(GL_TEXTURE_2D, m_brainTex[2]);
         glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, cqm2_sim::kBrainTexSize, cqm2_sim::kBrainTexSize, GL_RGBA, GL_UNSIGNED_BYTE, sim.brainTexGlyph.data());
     }
@@ -307,58 +279,87 @@ void NativeCosmosRenderer::renderWorld(
     ensureSceneFbo(fbw, fbh);
     uploadSimTextures(sim);
 
-    // Apply camera view mode overrides when non-free mode selected
     const float t = static_cast<float>(sim.simTime);
-    if (sim.miniWorld) {
-        cam.fovDeg = 64.0f;
+    if (sim.miniWorldMode) {
+        cam.fovDeg = 72.0f;
+        if (sim.viewMode == 0 && cam.distance > 14.0f) {
+            cam.distance = 8.5f;
+            cam.pitch = 0.06f;
+        }
+    } else if (cam.fovDeg > 64.0f) {
+        cam.fovDeg = 56.0f;
     }
+
+    // All 12 Original CQM Camera View Modes:
+    // 0=free, 1=orbit, 2=fly, 3=top, 4=follow, 5=chase, 6=cinematic, 7=vortex, 8=titan, 9=specimen, 10=mimic, 11=tree
     switch (sim.viewMode) {
         case 1: // orbit
             cam.yaw = t * 0.14f;
-            cam.pitch = 0.22f;
-            cam.distance = 52.0f;
-            cam.target = glm::vec3(0.0f, 3.0f, -6.0f);
+            cam.pitch = 0.18f;
+            cam.distance = 44.0f;
+            cam.target = glm::vec3(0.0f, 3.8f, -8.0f);
             break;
-        case 2: // top
+        case 2: // fly
+            cam.yaw = std::sin(t * 0.18f) * 0.95f;
+            cam.pitch = 0.08f + 0.08f * std::cos(t * 0.23f);
+            cam.distance = 22.0f;
+            cam.target = glm::vec3(std::sin(t * 0.12f) * 14.0f, 5.0f, -6.0f + std::cos(t * 0.12f) * 12.0f);
+            break;
+        case 3: // top
             cam.pitch = 1.38f;
-            cam.distance = 88.0f;
-            cam.target = glm::vec3(0.0f, 0.0f, 0.0f);
+            cam.distance = 86.0f;
+            cam.target = glm::vec3(0.0f, 0.0f, -4.0f);
             break;
-        case 3: // side
-            cam.pitch = 0.05f;
-            cam.distance = 58.0f;
-            cam.target = glm::vec3(0.0f, 4.0f, -8.0f);
+        case 4: // follow (Archon #0)
+            cam.target = sim.archons[0].pos;
+            cam.distance = 11.5f;
+            cam.pitch = 0.16f;
             break;
-        case 4: // entity close-up
-            if (!sim.organismInstances.empty()) {
-                cam.target = glm::vec3(sim.organismInstances[0].posScale);
-                cam.distance = 8.5f;
-                cam.pitch = 0.25f;
+        case 5: // chase (Mechalogodrom)
+            cam.target = sim.mechalogodromCenter;
+            cam.distance = 16.5f;
+            cam.pitch = 0.18f;
+            break;
+        case 6: // cinematic (GodColossus + Xylos sweep)
+            cam.yaw = 0.18f + 0.35f * std::sin(t * 0.10f);
+            cam.pitch = 0.10f;
+            cam.distance = 36.0f;
+            cam.target = glm::vec3(-1.0f, 5.2f, -10.0f);
+            break;
+        case 7: // vortex (Xylos Hyperbolic Portal)
+            cam.target = sim.xylosCenter + glm::vec3(0.0f, 4.2f, 0.0f);
+            cam.distance = 13.5f;
+            cam.yaw = t * 0.22f;
+            cam.pitch = 0.16f;
+            break;
+        case 8: // titan (4D Tesseract Titan #0)
+            cam.target = sim.titans[0].pos;
+            cam.distance = 10.5f;
+            cam.pitch = 0.18f;
+            break;
+        case 9: // specimen (close-up organism morphology)
+            for (int m = 0; m < 40; ++m) {
+                if (!sim.dynamicMeshBuckets[m].empty()) {
+                    cam.target = glm::vec3(sim.dynamicMeshBuckets[m][0].posScale);
+                    cam.distance = 5.5f;
+                    cam.pitch = 0.22f;
+                    break;
+                }
             }
             break;
-        case 5: // 4D Titan close-up
-            cam.target = sim.titans[0].pos;
-            cam.distance = 12.0f;
-            cam.pitch = 0.18f;
+        case 10: // mimic (Chiral Enantiomeric Xenomimic close-up)
+            for (int m = 40; m < 50; ++m) {
+                if (!sim.dynamicMeshBuckets[m].empty()) {
+                    cam.target = glm::vec3(sim.dynamicMeshBuckets[m][0].posScale);
+                    cam.distance = 5.8f;
+                    cam.pitch = 0.20f;
+                    break;
+                }
+            }
             break;
-        case 6: // GodColossus Mandelbulb close-up
-            cam.target = glm::vec3(-2.0f, 13.5f, -34.0f);
-            cam.distance = 32.0f;
-            cam.pitch = 0.08f;
-            break;
-        case 7: // Stage II MonolithTemple close-up
-            cam.target = glm::vec3(22.0f, 3.8f, -20.0f);
-            cam.distance = 21.0f;
-            cam.pitch = 0.18f;
-            break;
-        case 8: // Crystal Big Tree close-up
-            cam.target = glm::vec3(-28.0f, 8.5f, -22.0f);
-            cam.distance = 24.0f;
-            cam.pitch = 0.14f;
-            break;
-        case 10: // Archon Godform close-up
-            cam.target = sim.archons[0].pos;
-            cam.distance = 14.0f;
+        case 11: // tree (Crystal Big Tree of Life)
+            cam.target = sim.crystalTreeCenter + glm::vec3(0.0f, 6.5f, 0.0f);
+            cam.distance = 19.0f;
             cam.pitch = 0.14f;
             break;
         default:
@@ -372,17 +373,16 @@ void NativeCosmosRenderer::renderWorld(
     const glm::mat4 invVP = glm::inverse(VP);
     const glm::vec3 eye = cam.eyePosition();
 
-    // Render into HDR scene FBO
     glBindFramebuffer(GL_FRAMEBUFFER, m_sceneFbo);
     glViewport(0, 0, fbw, fbh);
     glEnable(GL_DEPTH_TEST);
     glDepthMask(GL_TRUE);
     glDisable(GL_BLEND);
-    glClearColor(0.16f, 0.02f, 0.15f, 1.0f);
+    glClearColor(0.05f, 0.005f, 0.068f, 1.0f);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-    // Special Reliquary SDF + Jolt 5.5 Fracture mode
-    if (sim.renderMode == 9 || sim.viewMode == 11) {
+    // Render Mode 10 (`reliquary`): Fullscreen Jolt 5.5 + Filigree SDF Raymarcher
+    if (sim.renderMode == 10) {
         glDisable(GL_DEPTH_TEST);
         glUseProgram(m_progReliquary);
         glUniform2f(glGetUniformLocation(m_progReliquary, "uResolution"), static_cast<float>(fbw), static_cast<float>(fbh));
@@ -405,18 +405,20 @@ void NativeCosmosRenderer::renderWorld(
         glBindVertexArray(m_emptyVao);
         glDrawArrays(GL_TRIANGLES, 0, 3);
     } else {
-        // Pass 1: Crimson-Burgundy Geodesic Sky Dome + Iridescent Rainbow Mandelbulb GodColossus (writes exact gl_FragDepth!)
+        // Pass 1: Geodesic Dome + GodColossus Mandelbulb Core + Singularity Disk
         glUseProgram(m_progSkyColossus);
         glUniformMatrix4fv(glGetUniformLocation(m_progSkyColossus, "uInvViewProj"), 1, GL_FALSE, glm::value_ptr(invVP));
         glUniformMatrix4fv(glGetUniformLocation(m_progSkyColossus, "uViewProj"), 1, GL_FALSE, glm::value_ptr(VP));
         glUniform3f(glGetUniformLocation(m_progSkyColossus, "uCamPos"), eye.x, eye.y, eye.z);
         glUniform1f(glGetUniformLocation(m_progSkyColossus, "uTime"), t);
         glUniform1i(glGetUniformLocation(m_progSkyColossus, "uWeather"), sim.weatherMode);
+        glUniform1i(glGetUniformLocation(m_progSkyColossus, "uSingularity"), sim.singularityMode);
+        glUniform1i(glGetUniformLocation(m_progSkyColossus, "uNMode"), sim.nMode);
         glUniform1f(glGetUniformLocation(m_progSkyColossus, "uChaos"), sim.chaosLevel);
         glBindVertexArray(m_emptyVao);
         glDrawArrays(GL_TRIANGLES, 0, 3);
 
-        // Pass 2: Live 128x128 Gray-Scott Reaction-Diffusion Undulating Floor
+        // Pass 2: 256x256 Live Gray-Scott Displaced Terrain
         glUseProgram(m_progFloor);
         glUniformMatrix4fv(glGetUniformLocation(m_progFloor, "uViewProj"), 1, GL_FALSE, glm::value_ptr(VP));
         glUniform1f(glGetUniformLocation(m_progFloor, "uTime"), t);
@@ -426,131 +428,100 @@ void NativeCosmosRenderer::renderWorld(
         glBindVertexArray(m_floorVao);
         glDrawElements(GL_TRIANGLES, m_floorIndexCount, GL_UNSIGNED_INT, nullptr);
 
-        // Pass 3: Hardware-Instanced Structures, AlienFlora, Crystal Big Tree, Organisms, Xenomimics & Archons
-        glEnable(GL_BLEND);
-        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+        // Pass 3A (Opaque) & Pass 3B (Translucent) across all 64 Procedural 3D Topologies!
         glUseProgram(m_progInstanced);
         glUniformMatrix4fv(glGetUniformLocation(m_progInstanced, "uViewProj"), 1, GL_FALSE, glm::value_ptr(VP));
         glUniform3f(glGetUniformLocation(m_progInstanced, "uCamPos"), eye.x, eye.y, eye.z);
         glUniform1f(glGetUniformLocation(m_progInstanced, "uTime"), t);
+        glUniform1i(glGetUniformLocation(m_progInstanced, "uRenderMode"), sim.renderMode);
+        glUniform1i(glGetUniformLocation(m_progInstanced, "uBrutalMode"), sim.brutalMode);
 
-        // Combine cube-based instances (Flora stalks tid 10..12 + Architectural Structures: Spires, Voxels, Monoliths)
-        std::vector<cqm2_sim::InstanceData> cubeBatch;
-        cubeBatch.reserve(sim.structureInstances.size() + sim.floraInstances.size());
-        cubeBatch.insert(cubeBatch.end(), sim.structureInstances.begin(), sim.structureInstances.end());
+        if (sim.renderMode == 1) { // wire mode
+            glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+        }
 
-        // Sphere-based instances (Living Phyla + Chiral Xenomimics + 4D Titans + Crystal Big Tree Canopy + 5 Eyed Archons)
-        std::vector<cqm2_sim::InstanceData> sphereBatch = sim.organismInstances;
-        sphereBatch.reserve(sim.organismInstances.size() + 1024);
-        for (const auto& fl : sim.floraInstances) {
-            if (fl.colorType.w >= 13.5f || fl.colorType.w >= 12.5f) {
-                sphereBatch.push_back(fl);
-            } else {
-                cubeBatch.push_back(fl);
+        thread_local std::vector<cqm2_sim::MeshInstance> batchBuf;
+        batchBuf.reserve(8192);
+
+        auto drawPass = [&](bool translucentPass) {
+            for (int id = 0; id < cqm2_meshes::kTotalMeshTopologies; ++id) {
+                const auto& stVec = sim.staticMeshBuckets[id];
+                const auto& dyVec = sim.dynamicMeshBuckets[id];
+                if (stVec.empty() && dyVec.empty()) continue;
+
+                batchBuf.clear();
+                for (const auto& inst : stVec) {
+                    if (isTranslucentInstance(inst, sim.renderMode) == translucentPass) batchBuf.push_back(inst);
+                }
+                for (const auto& inst : dyVec) {
+                    if (isTranslucentInstance(inst, sim.renderMode) == translucentPass) batchBuf.push_back(inst);
+                }
+                if (batchBuf.empty()) continue;
+
+                size_t count = std::min(batchBuf.size(), kMaxStreamInstances);
+                glBindBuffer(GL_ARRAY_BUFFER, m_sharedInstVbo);
+                glBufferSubData(GL_ARRAY_BUFFER, 0,
+                                static_cast<GLsizeiptr>(count * sizeof(cqm2_sim::MeshInstance)),
+                                batchBuf.data());
+                glBindVertexArray(m_meshes[id].vao);
+                glDrawElementsInstanced(GL_TRIANGLES, m_meshes[id].indexCount, GL_UNSIGNED_INT, nullptr, static_cast<GLsizei>(count));
             }
-        }
-        if (!cubeBatch.empty()) {
-            size_t count = std::min<size_t>(cubeBatch.size(), 65000);
-            glBindBuffer(GL_ARRAY_BUFFER, m_cubeInstVbo);
-            glBufferSubData(GL_ARRAY_BUFFER, 0, static_cast<GLsizeiptr>(count * sizeof(cqm2_sim::InstanceData)), cubeBatch.data());
-            glBindVertexArray(m_cubeVao);
-            glDrawArraysInstanced(GL_TRIANGLES, 0, m_cubeVertCount, static_cast<GLsizei>(count));
+        };
+
+        // Opaque meshes first (writes depth)
+        glDisable(GL_BLEND);
+        glDepthMask(GL_TRUE);
+        drawPass(false);
+
+        // Pass 4: 4D Titan Tesseracts, Xylos Sphere Cage & Axons, Lorenz/Rossler Ribbons, Quasicrystal Stars
+        glEnable(GL_BLEND);
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+        if (sim.renderMode == 1) {
+            glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
         }
 
-        for (int a = 0; a < 5; ++a) {
-            const auto& ar = sim.archons[a];
-            sphereBatch.push_back({
-                glm::vec4(ar.pos, ar.radius),
-                glm::vec4(ar.gyroAngle, 1.0f, 1.0f, t),
-                glm::vec4(0.35f + 0.4f * ar.broadcastProb, 0.55f, 0.95f, 40.0f)
-            });
-        }
-        if (!sphereBatch.empty()) {
-            size_t count = std::min<size_t>(sphereBatch.size(), 55000);
-            glBindBuffer(GL_ARRAY_BUFFER, m_sphereInstVbo);
-            glBufferSubData(GL_ARRAY_BUFFER, 0, static_cast<GLsizeiptr>(count * sizeof(cqm2_sim::InstanceData)), sphereBatch.data());
-            glBindVertexArray(m_sphereVao);
-            glDrawArraysInstanced(GL_TRIANGLES, 0, m_sphereVertCount, static_cast<GLsizei>(count));
-        }
-
-        // Pass 4: Viz3D Glowing Containment Orb + Cyan/Gold Lorenz Attractor Ribbons + Archon Gyroscope Rings + Synaptic Web
         glUseProgram(m_progLine);
         glUniformMatrix4fv(glGetUniformLocation(m_progLine, "uViewProj"), 1, GL_FALSE, glm::value_ptr(VP));
         glBindVertexArray(m_lineVao);
         glBindBuffer(GL_ARRAY_BUFFER, m_lineVbo);
 
-        std::vector<LineVertex> lines;
-        lines.reserve(8192);
-
-        // Enforce Original CQM Tether-Removal Law (connectome topology is evaluated for CSR Louvain Q/Entropy, never drawn as dome laser lines)
-
-        // Viz3D Glowing Woven Containment Sphere + Lorenz chaotic ribbons at (4.8, -0.4, 3.5) (matches user screenshot!)
-        const glm::vec3 vizCenter(4.8f, -0.4f, 3.5f);
-        const float vizR = 4.2f;
-        for (int ring = 0; ring < 11; ++ring) {
-            float lat = (static_cast<float>(ring) / 10.0f - 0.5f) * 2.5f;
-            float rr = std::cos(lat) * vizR;
-            float yy = std::sin(lat) * vizR;
-            for (int s = 0; s < 48; ++s) {
-                float a0 = static_cast<float>(s) / 48.0f * kTau + t * 0.25f;
-                float a1 = static_cast<float>(s + 1) / 48.0f * kTau + t * 0.25f;
-                lines.push_back({ vizCenter + glm::vec3(std::cos(a0) * rr, yy, std::sin(a0) * rr), glm::vec4(0.22f, 0.36f, 0.62f, 0.34f) });
-                lines.push_back({ vizCenter + glm::vec3(std::cos(a1) * rr, yy, std::sin(a1) * rr), glm::vec4(0.38f, 0.22f, 0.62f, 0.34f) });
-            }
-        }
-        // Longitude meridian arcs on Viz3D orb
-        for (int mer = 0; mer < 8; ++mer) {
-            float phi = static_cast<float>(mer) / 8.0f * kPi + t * 0.18f;
-            for (int s = 0; s < 36; ++s) {
-                float b0 = static_cast<float>(s) / 36.0f * kTau;
-                float b1 = static_cast<float>(s + 1) / 36.0f * kTau;
-                glm::vec3 p0(std::sin(b0) * std::cos(phi), std::cos(b0), std::sin(b0) * std::sin(phi));
-                glm::vec3 p1(std::sin(b1) * std::cos(phi), std::cos(b1), std::sin(b1) * std::sin(phi));
-                lines.push_back({ vizCenter + p0 * vizR, glm::vec4(0.26f, 0.32f, 0.58f, 0.22f) });
-                lines.push_back({ vizCenter + p1 * vizR, glm::vec4(0.36f, 0.20f, 0.54f, 0.22f) });
-            }
-        }
-        for (size_t i = 0; i + 1 < sim.lorenzRibbonPts.size(); ++i) {
-            float u = static_cast<float>(i) / static_cast<float>(sim.lorenzRibbonPts.size());
-            glm::vec4 ccol = (i % 2 == 0) ? glm::vec4(0.06f, 0.62f, 0.65f, 0.85f * u)
-                                          : glm::vec4(0.68f, 0.44f, 0.06f, 0.85f * u);
-            lines.push_back({ sim.lorenzRibbonPts[i], ccol });
-            lines.push_back({ sim.lorenzRibbonPts[i + 1], ccol });
-        }
-
-        // Archon orbital gyroscope rings
-        for (int a = 0; a < 5; ++a) {
-            const auto& ar = sim.archons[a];
-            float gr = ar.radius * 1.38f;
-            for (int s = 0; s < 32; ++s) {
-                float a0 = static_cast<float>(s) / 32.0f * kTau + ar.gyroAngle;
-                float a1 = static_cast<float>(s + 1) / 32.0f * kTau + ar.gyroAngle;
-                lines.push_back({ ar.pos + glm::vec3(std::cos(a0) * gr, std::sin(a0) * gr * 0.35f, std::sin(a0) * gr), glm::vec4(1.0f, 0.84f, 0.32f, 0.65f) });
-                lines.push_back({ ar.pos + glm::vec3(std::cos(a1) * gr, std::sin(a1) * gr * 0.35f, std::sin(a1) * gr), glm::vec4(0.32f, 0.95f, 0.92f, 0.65f) });
-            }
-        }
-
-        if (!lines.empty()) {
-            size_t cnt = std::min<size_t>(lines.size(), 32768);
-            glBufferSubData(GL_ARRAY_BUFFER, 0, static_cast<GLsizeiptr>(cnt * sizeof(LineVertex)), lines.data());
+        if (!sim.worldColorLines.empty()) {
+            size_t cnt = std::min(sim.worldColorLines.size(), kMaxStreamLineVerts);
+            glBufferSubData(GL_ARRAY_BUFFER, 0,
+                            static_cast<GLsizeiptr>(cnt * sizeof(cqm2_sim::ColorLineVertex)),
+                            sim.worldColorLines.data());
             glDrawArrays(GL_LINES, 0, static_cast<GLsizei>(cnt));
         }
 
-        // 6D->3D Quasicrystal shimmering star halo around GodColossus
         if (!sim.quasicrystalShellPts.empty()) {
-            std::vector<LineVertex> qpts;
-            size_t nq = std::min<size_t>(sim.quasicrystalShellPts.size(), 1024);
+            thread_local std::vector<cqm2_sim::ColorLineVertex> qpts;
+            size_t nq = std::min<size_t>(sim.quasicrystalShellPts.size(), 512);
+            qpts.clear();
             qpts.reserve(nq);
             for (size_t i = 0; i < nq; ++i) {
-                glm::vec3 p = glm::vec3(-2.0f, 13.5f, -34.0f) + sim.quasicrystalShellPts[i] * 6.8f;
-                qpts.push_back({ p, glm::vec4(0.28f, 0.20f, 0.38f, 0.42f) });
+                glm::vec3 p = sim.godColossusCenter + sim.quasicrystalShellPts[i] * 0.42f;
+                qpts.push_back({ p, glm::vec4(0.65f, 0.55f, 0.95f, 0.55f) });
             }
-            glBufferSubData(GL_ARRAY_BUFFER, 0, static_cast<GLsizeiptr>(qpts.size() * sizeof(LineVertex)), qpts.data());
+            glBufferSubData(GL_ARRAY_BUFFER, 0,
+                            static_cast<GLsizeiptr>(qpts.size() * sizeof(cqm2_sim::ColorLineVertex)),
+                            qpts.data());
             glDrawArrays(GL_POINTS, 0, static_cast<GLsizei>(qpts.size()));
+        }
+
+        // Translucent glass bells, frosted gyroid clouds, Xylos membranes & solar FireCone (depth-tested, depth-write off)
+        glUseProgram(m_progInstanced);
+        if (sim.renderMode == 1) {
+            glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+        }
+        glDepthMask(GL_FALSE);
+        drawPass(true);
+        glDepthMask(GL_TRUE);
+        if (sim.renderMode == 1) {
+            glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
         }
     }
 
-    // Pass 5: Composite Scene FBO -> Target FBO via ACES Filmic + Singularity Lensing + 10 Render Modes
+    // Pass 5: Composite Scene FBO -> Target FBO via ACES Filmic + Singularity Lensing
     glBindFramebuffer(GL_FRAMEBUFFER, targetFbo);
     glViewport(0, 0, fbw, fbh);
     glDisable(GL_DEPTH_TEST);
@@ -562,7 +533,7 @@ void NativeCosmosRenderer::renderWorld(
     glUniform1i(glGetUniformLocation(m_progPost, "uSceneTex"), 0);
     glUniform2f(glGetUniformLocation(m_progPost, "uResolution"), static_cast<float>(fbw), static_cast<float>(fbh));
     glUniform1f(glGetUniformLocation(m_progPost, "uTime"), t);
-    glUniform1i(glGetUniformLocation(m_progPost, "uRenderMode"), sim.renderMode == 9 ? 0 : sim.renderMode);
+    glUniform1i(glGetUniformLocation(m_progPost, "uRenderMode"), sim.renderMode);
     glUniform1i(glGetUniformLocation(m_progPost, "uSingularity"), sim.singularityMode);
 
     glBindVertexArray(m_emptyVao);

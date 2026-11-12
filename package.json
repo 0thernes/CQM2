@@ -1,7 +1,7 @@
 {
   "name": "cqm2",
-  "version": "4.0.0",
-  "description": "Cosmogonic Quantum Mechalogodrom 2 (CQM2 v4.0.0) — Standalone Native OpenGL 3.3 / Jolt 5.5 / Dear ImGui / Quad-Silicon (CUDA 12.9+NPU LevelZero+iGPU DirectML+Zig 0.17+C17 RosettaWire+C++20 Moonlab/Eshkol+Rust 1.94) CQM2.exe Workstation & Universal Browser 4K Artificial Life Cosmos.",
+  "version": "5.0.0",
+  "description": "Cosmogonic Quantum Mechalogodrom 2 (CQM2 v5.0.0) — Standalone Native 64-Mesh OpenGL 3.3 / Jolt 5.5 / Dear ImGui / Quad-Silicon (RTX 5070 Ti CUDA 12.9 + sm_120 PTX + NPU LevelZero + iGPU DirectML + Zig 0.17 49-Kernel SIMD + C17 RosettaWire + C++20 Moonlab/Eshkol/QGTL/QRNG + Rust 1.94) CQM2.exe Workstation & Universal Browser 4K Artificial Life Cosmos.",
   "license": "SEE LICENSE IN LICENSE",
   "author": "0thernes LLC <0_0@0thernes.art> (https://0thernes.art)",
   "homepage": "https://0thernes.github.io/CQM2/",

@@ -50,7 +50,7 @@ function New-Cqm2Shortcut {
   } else {
     $Sc.IconLocation = "$TargetExe,0"
   }
-  $Sc.Description = "Cosmogonic Quantum Mechalogodrom 2 (CQM2 v4.0.0) — Standalone Native OpenGL 3.3 / Jolt 5.5 / Quad-Silicon Workstation"
+  $Sc.Description = "Cosmogonic Quantum Mechalogodrom 2 (CQM2 v5.0.0) — Standalone Native 64-Mesh OpenGL 3.3 / Jolt 5.5 / Quad-Silicon Workstation"
   $Sc.WindowStyle = 1
   $Sc.Save()
 }

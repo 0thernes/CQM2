@@ -1,5 +1,5 @@
 /**
- * CQM2 v4.0.0 — CQM-25 Canonical Capability Profile & 150-Peer ALife Comparative Landscape Filters
+ * CQM2 v5.0.0 — CQM-25 Canonical Capability Profile & 150-Peer ALife Comparative Landscape Filters
  * (`alife/cqm-capability-profile.html` & `alife/cqm-alife-catalog.html`).
  * Strict CSP (`script-src 'self'`) interactive client-side filtering — zero inline scripts, zero composite aggregation.
  */
@@ -29,7 +29,7 @@ function initAlifeCatalogFilter(): void {
       card.hidden = !visible;
       if (visible) shown++;
     }
-    countEl.textContent = `Showing ${shown} of ${cards.length} audited comparison entries (focal system CQM2 v4.0.0 listed separately above).`;
+    countEl.textContent = `Showing ${shown} of ${cards.length} audited comparison entries (focal system CQM2 v5.0.0 listed separately above).`;
   };
 
   search.addEventListener('input', filter);

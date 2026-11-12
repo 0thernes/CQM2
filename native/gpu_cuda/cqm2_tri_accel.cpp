@@ -12,6 +12,7 @@
 #include <cstring>
 #include <cmath>
 #include <mutex>
+#include "cqm2_kernels_sm120_ptx.h"
 
 // Assembly symbols from cqm2_avx2_asm.S
 extern "C" {
@@ -97,6 +98,180 @@ void* g_dB = nullptr;
 void* g_dC = nullptr;
 size_t g_capBytes = 0;
 
+// NVRTC + CUDA Driver API JIT state for custom RTX 5070 Ti (`compute_120` Blackwell) kernels
+typedef struct _nvrtcProgram* nvrtcProgram;
+typedef int nvrtcResult;
+bool g_nvrtc_ready = false;
+CUmodule g_cuMod = nullptr;
+CUfunction g_fnGrayScott = nullptr;
+CUfunction g_fnAsmodenius100m = nullptr;
+CUresult(CUDAAPI* p_cuModuleLoadData)(CUmodule*, const void*) = nullptr;
+CUresult(CUDAAPI* p_cuModuleUnload)(CUmodule) = nullptr;
+CUresult(CUDAAPI* p_cuModuleGetFunction)(CUfunction*, CUmodule, const char*) = nullptr;
+CUresult(CUDAAPI* p_cuLaunchKernel)(
+    CUfunction,
+    unsigned int, unsigned int, unsigned int,
+    unsigned int, unsigned int, unsigned int,
+    unsigned int, CUstream, void**, void**
+) = nullptr;
+
+static const char* kCqm2CudaJitSrc = R"CUDA(
+extern "C" __global__ void k_gray_scott_rgba(
+    const float* __restrict__ src,
+    float* __restrict__ dst,
+    int n,
+    float feed,
+    float kill,
+    float du,
+    float dv,
+    float dt,
+    float f_spatial
+) {
+    int x = (int)(blockIdx.x * blockDim.x + threadIdx.x);
+    int y = (int)(blockIdx.y * blockDim.y + threadIdx.y);
+    if (x >= n || y >= n) return;
+    int xm = (x == 0) ? (n - 1) : (x - 1);
+    int xp = (x + 1 == n) ? 0 : (x + 1);
+    int ym = (y == 0) ? (n - 1) : (y - 1);
+    int yp = (y + 1 == n) ? 0 : (y + 1);
+    int idx4 = (y * n + x) * 4;
+
+    float u = src[idx4];
+    float v = src[idx4 + 1];
+    float b = src[idx4 + 2];
+    float lap_u = src[(ym * n + x) * 4] + src[(yp * n + x) * 4] + src[(y * n + xm) * 4] + src[(y * n + xp) * 4] - 4.0f * u;
+    float lap_v = src[(ym * n + x) * 4 + 1] + src[(yp * n + x) * 4 + 1] + src[(y * n + xm) * 4 + 1] + src[(y * n + xp) * 4 + 1] - 4.0f * v;
+
+    float inv_n = 1.0f / (float)n;
+    float fx = ((float)x * inv_n - 0.5f) * 2.0f;
+    float fy = ((float)y * inv_n - 0.5f) * 2.0f;
+    float f_loc = feed + f_spatial * (0.5f - (fx * fx + fy * fy));
+    if (f_loc < 0.008f) f_loc = 0.008f;
+    if (f_loc > 0.095f) f_loc = 0.095f;
+
+    float uvv = u * v * v;
+    float nu = u + (du * lap_u - uvv + f_loc * (1.0f - u)) * dt;
+    float nv = v + (dv * lap_v + uvv - (f_loc + kill) * v) * dt;
+    if (nu < 0.0f) nu = 0.0f; else if (nu > 1.0f) nu = 1.0f;
+    if (nv < 0.0f) nv = 0.0f; else if (nv > 1.0f) nv = 1.0f;
+    float nb = b * 0.992f + nv * 0.008f;
+    if (nb < 0.0f) nb = 0.0f; else if (nb > 1.0f) nb = 1.0f;
+
+    dst[idx4]     = nu;
+    dst[idx4 + 1] = nv;
+    dst[idx4 + 2] = nb;
+    dst[idx4 + 3] = 1.0f;
+}
+
+extern "C" __global__ void k_asmodenius_100m_lora(
+    const float* __restrict__ x_in,
+    const float* __restrict__ lora_a, // [out_dim * 16]
+    const float* __restrict__ lora_b, // [16 * in_dim]
+    float* __restrict__ y_out,
+    int out_dim,
+    int in_dim,
+    unsigned int seed
+) {
+    int row = (int)(blockIdx.x * blockDim.x + threadIdx.x);
+    if (row >= out_dim) return;
+    float acc = 0.0f;
+    unsigned int row_hash = seed ^ ((unsigned int)row * 0x9E3779B9u);
+    for (int col = 0; col < in_dim; ++col) {
+        // Procedural Murmur3-finalizer weight from 100M virtual parameter manifold
+        unsigned int h = row_hash ^ ((unsigned int)col * 0x85EBCA6Bu);
+        h ^= h >> 16;
+        h *= 0x85EBCA6Bu;
+        h ^= h >> 13;
+        h *= 0xC2B2AE35u;
+        h ^= h >> 16;
+        float w_proc = ((float)(h & 0xFFFFu) * (1.0f / 32768.0f) - 1.0f) * 0.08f;
+        acc += w_proc * x_in[col];
+    }
+    // Add plastic Rank-16 LoRA adapter contribution
+    float lora_sum = 0.0f;
+    for (int r = 0; r < 16; ++r) {
+        float proj = 0.0f;
+        const float* b_row = lora_b + r * in_dim;
+        for (int col = 0; col < in_dim; ++col) proj += b_row[col] * x_in[col];
+        lora_sum += lora_a[row * 16 + r] * proj;
+    }
+    float z = acc + 0.25f * lora_sum;
+    float z2 = z * z;
+    y_out[row] = (z > 4.95f) ? 1.0f : ((z < -4.95f) ? -1.0f : (z * (27.0f + z2) / (27.0f + 9.0f * z2)));
+}
+)CUDA";
+
+void tryInitNvrtcJit(HMODULE hCuda) {
+    if (!hCuda || !g_cuda_ready) return;
+    p_cuModuleLoadData = (decltype(p_cuModuleLoadData))GetProcAddress(hCuda, "cuModuleLoadData");
+    p_cuModuleUnload = (decltype(p_cuModuleUnload))GetProcAddress(hCuda, "cuModuleUnload");
+    p_cuModuleGetFunction = (decltype(p_cuModuleGetFunction))GetProcAddress(hCuda, "cuModuleGetFunction");
+    p_cuLaunchKernel = (decltype(p_cuLaunchKernel))GetProcAddress(hCuda, "cuLaunchKernel");
+    if (!p_cuModuleLoadData || !p_cuModuleGetFunction || !p_cuLaunchKernel) return;
+
+    HMODULE hNvrtc = LoadLibraryA("nvrtc64_120_0.dll");
+    if (!hNvrtc) hNvrtc = LoadLibraryA("nvrtc64_120.dll");
+    if (hNvrtc) {
+        auto fnCreate = (nvrtcResult(*)(nvrtcProgram*, const char*, const char*, int, const char* const*, const char* const*))
+            GetProcAddress(hNvrtc, "nvrtcCreateProgram");
+        auto fnCompile = (nvrtcResult(*)(nvrtcProgram, int, const char* const*))
+            GetProcAddress(hNvrtc, "nvrtcCompileProgram");
+        auto fnGetPtxSize = (nvrtcResult(*)(nvrtcProgram, size_t*))
+            GetProcAddress(hNvrtc, "nvrtcGetPTXSize");
+        auto fnGetPtx = (nvrtcResult(*)(nvrtcProgram, char*))
+            GetProcAddress(hNvrtc, "nvrtcGetPTX");
+        auto fnDestroy = (nvrtcResult(*)(nvrtcProgram*))
+            GetProcAddress(hNvrtc, "nvrtcDestroyProgram");
+        if (fnCreate && fnCompile && fnGetPtxSize && fnGetPtx && fnDestroy) {
+            const char* archOpts[3] = {
+                "--gpu-architecture=compute_120",
+                "--gpu-architecture=compute_89",
+                "--gpu-architecture=compute_80"
+            };
+            for (int a = 0; a < 3 && !g_nvrtc_ready; ++a) {
+                nvrtcProgram prog = nullptr;
+                if (fnCreate(&prog, kCqm2CudaJitSrc, "cqm2_jit.cu", 0, nullptr, nullptr) != 0) continue;
+                const char* opts[2] = { archOpts[a], "--use_fast_math" };
+                if (fnCompile(prog, 2, opts) == 0) {
+                    size_t ptxSz = 0;
+                    if (fnGetPtxSize(prog, &ptxSz) == 0 && ptxSz > 16) {
+                        char* ptx = (char*)malloc(ptxSz + 1);
+                        if (ptx) {
+                            if (fnGetPtx(prog, ptx) == 0) {
+                                ptx[ptxSz] = '\0';
+                                if (p_cuModuleLoadData(&g_cuMod, ptx) == CUDA_SUCCESS && g_cuMod) {
+                                    if (p_cuModuleGetFunction(&g_fnGrayScott, g_cuMod, "k_gray_scott_rgba") == CUDA_SUCCESS &&
+                                        p_cuModuleGetFunction(&g_fnAsmodenius100m, g_cuMod, "k_asmodenius_100m_lora") == CUDA_SUCCESS) {
+                                        g_nvrtc_ready = true;
+                                    }
+                                }
+                            }
+                            free(ptx);
+                        }
+                    }
+                }
+                fnDestroy(&prog);
+            }
+        }
+    }
+
+    // Direct LLVM-21 NVPTX64 (`sm_120` Blackwell PTX 8.7 -> NVIDIA Driver SASS JIT via `cuModuleLoadData`)
+    if (!g_nvrtc_ready) {
+        const char* ptxCandidates[2] = { kCqm2PtxSm120, kCqm2PtxSm80 };
+        for (int p = 0; p < 2 && !g_nvrtc_ready; ++p) {
+            if (p_cuModuleLoadData(&g_cuMod, ptxCandidates[p]) == CUDA_SUCCESS && g_cuMod) {
+                if (p_cuModuleGetFunction(&g_fnGrayScott, g_cuMod, "k_gray_scott_rgba") == CUDA_SUCCESS &&
+                    p_cuModuleGetFunction(&g_fnAsmodenius100m, g_cuMod, "k_asmodenius_100m_lora") == CUDA_SUCCESS) {
+                    g_nvrtc_ready = true;
+                } else if (p_cuModuleUnload) {
+                    p_cuModuleUnload(g_cuMod);
+                    g_cuMod = nullptr;
+                }
+            }
+        }
+    }
+}
+
 inline float fastPadeTanh(float x) {
     if (x > 4.95f) return 1.0f;
     if (x < -4.95f) return -1.0f;
@@ -145,13 +320,16 @@ __declspec(dllexport) int cqm2_hw_init(char* json_out, int max_len) {
             if (dirExists(cudaPathBuf)) SetDllDirectoryA(cudaPathBuf);
         } else if (dirExists("Z:\\Tools\\cuda-12.9-redist\\bin")) {
             SetDllDirectoryA("Z:\\Tools\\cuda-12.9-redist\\bin");
+            AddDllDirectory(L"Z:\\Tools\\cuda-12.9-redist\\bin");
         }
 
         // 1. Probe CUDA + cuBLAS (NVIDIA RTX 5070 Ti dGPU)
         if (allowCuda) {
             HMODULE hCuda = LoadLibraryA("nvcuda.dll");
-            g_hCudart = LoadLibraryA("cudart64_12.dll");
-            g_hCublas = LoadLibraryA("cublas64_12.dll");
+            g_hCudart = LoadLibraryExA("cudart64_12.dll", nullptr, LOAD_LIBRARY_SEARCH_DEFAULT_DIRS | LOAD_LIBRARY_SEARCH_USER_DIRS);
+            if (!g_hCudart) g_hCudart = LoadLibraryA("cudart64_12.dll");
+            g_hCublas = LoadLibraryExA("cublas64_12.dll", nullptr, LOAD_LIBRARY_SEARCH_DEFAULT_DIRS | LOAD_LIBRARY_SEARCH_USER_DIRS);
+            if (!g_hCublas) g_hCublas = LoadLibraryA("cublas64_12.dll");
             if (hCuda && g_hCudart && g_hCublas) {
                 auto p_cuInit = (CUresult(CUDAAPI*)(unsigned int))GetProcAddress(hCuda, "cuInit");
                 auto p_cuDeviceGet = (CUresult(CUDAAPI*)(CUdevice*, int))GetProcAddress(hCuda, "cuDeviceGet");
@@ -176,6 +354,7 @@ __declspec(dllexport) int cqm2_hw_init(char* json_out, int max_len) {
                     g_vram_gb = (double)mem / (1024.0 * 1024.0 * 1024.0);
                     g_cuda_ready = true;
                     ensureDeviceBuffers(16ULL * 1024 * 1024);
+                    tryInitNvrtcJit(hCuda);
                 }
             }
         }
@@ -679,8 +858,107 @@ __declspec(dllexport) float cqm2_cuda_mecha_54k_step(
     return energy * (1.0f / 64.0f);
 }
 
+__declspec(dllexport) int cqm2_hw_nvrtc_ready() {
+    std::lock_guard<std::mutex> lk(g_mtx);
+    if (!g_initialized) cqm2_hw_init(nullptr, 0);
+    return g_nvrtc_ready ? 1 : 0;
+}
+
+__declspec(dllexport) int cqm2_cuda_gray_scott_rgba_step(
+    const float* src_rgba,
+    float* dst_rgba,
+    int n,
+    float feed,
+    float kill,
+    float du,
+    float dv,
+    float dt,
+    float f_spatial
+) {
+    std::lock_guard<std::mutex> lk(g_mtx);
+    if (!g_initialized) cqm2_hw_init(nullptr, 0);
+    if (!src_rgba || !dst_rgba || n < 4) return -1;
+    size_t bytes = (size_t)n * (size_t)n * 4ULL * sizeof(float);
+    if (g_cuda_ready && g_nvrtc_ready && g_fnGrayScott && ensureDeviceBuffers(bytes)) {
+        p_cudaMemcpy(g_dA, src_rgba, bytes, 1);
+        void* dSrc = g_dA;
+        void* dDst = g_dB;
+        void* args[9] = { &dSrc, &dDst, &n, &feed, &kill, &du, &dv, &dt, &f_spatial };
+        unsigned int bx = (unsigned int)((n + 15) / 16);
+        unsigned int by = (unsigned int)((n + 15) / 16);
+        if (p_cuLaunchKernel(g_fnGrayScott, bx, by, 1, 16, 16, 1, 0, nullptr, args, nullptr) == CUDA_SUCCESS) {
+            p_cudaDeviceSynchronize();
+            p_cudaMemcpy(dst_rgba, g_dB, bytes, 2);
+            return 1; // Executed on RTX 5070 Ti SMs via NVRTC JIT!
+        }
+    }
+    return 0; // Caller falls back to Zig SIMD128/AVX2
+}
+
+__declspec(dllexport) float cqm2_cuda_asmodenius_100m_lora_step(
+    const float* x_in,
+    const float* lora_a,
+    const float* lora_b,
+    float* y_out,
+    int out_dim,
+    int in_dim,
+    unsigned int seed
+) {
+    std::lock_guard<std::mutex> lk(g_mtx);
+    if (!g_initialized) cqm2_hw_init(nullptr, 0);
+    if (!x_in || !lora_a || !lora_b || !y_out || out_dim <= 0 || in_dim <= 0) return 0.0f;
+
+    size_t xBytes = (size_t)in_dim * sizeof(float);
+    size_t aBytes = (size_t)out_dim * 16ULL * sizeof(float);
+    size_t bBytes = 16ULL * (size_t)in_dim * sizeof(float);
+    size_t yBytes = (size_t)out_dim * sizeof(float);
+    if (g_cuda_ready && g_nvrtc_ready && g_fnAsmodenius100m && ensureDeviceBuffers(xBytes + aBytes + bBytes + yBytes + 256)) {
+        char* baseA = (char*)g_dA;
+        void* dX = baseA;
+        void* dLa = baseA + ((xBytes + 255ULL) & ~255ULL);
+        void* dLb = (char*)dLa + ((aBytes + 255ULL) & ~255ULL);
+        void* dY = g_dC;
+        p_cudaMemcpy(dX, x_in, xBytes, 1);
+        p_cudaMemcpy(dLa, lora_a, aBytes, 1);
+        p_cudaMemcpy(dLb, lora_b, bBytes, 1);
+        void* args[7] = { &dX, &dLa, &dLb, &dY, &out_dim, &in_dim, &seed };
+        unsigned int blocks = (unsigned int)((out_dim + 127) / 128);
+        if (p_cuLaunchKernel(g_fnAsmodenius100m, blocks, 1, 1, 128, 1, 1, 0, nullptr, args, nullptr) == CUDA_SUCCESS) {
+            p_cudaDeviceSynchronize();
+            p_cudaMemcpy(y_out, dY, yBytes, 2);
+            float e = 0.0f;
+            for (int i = 0; i < out_dim; ++i) e += fabsf(y_out[i]);
+            return e / (float)out_dim;
+        }
+    }
+
+    // AVX2 + Murmur3 fallback if CUDA is disabled
+    float energy = 0.0f;
+    float proj16[16];
+    for (int r = 0; r < 16; ++r) {
+        proj16[r] = cqm2_asm_dot8_fma_avx2(lora_b + r * in_dim, x_in, (uint64_t)in_dim);
+    }
+    for (int row = 0; row < out_dim; ++row) {
+        float acc = 0.0f;
+        unsigned int row_hash = seed ^ ((unsigned int)row * 0x9E3779B9u);
+        for (int col = 0; col < in_dim; ++col) {
+            unsigned int h = row_hash ^ ((unsigned int)col * 0x85EBCA6Bu);
+            h ^= h >> 16; h *= 0x85EBCA6Bu; h ^= h >> 13; h *= 0xC2B2AE35u; h ^= h >> 16;
+            float wp = ((float)(h & 0xFFFFu) * (1.0f / 32768.0f) - 1.0f) * 0.08f;
+            acc += wp * x_in[col];
+        }
+        float lsum = 0.0f;
+        for (int r = 0; r < 16; ++r) lsum += lora_a[row * 16 + r] * proj16[r];
+        y_out[row] = fastPadeTanh(acc + 0.25f * lsum);
+        energy += fabsf(y_out[row]);
+    }
+    return energy / (float)out_dim;
+}
+
 __declspec(dllexport) void cqm2_hw_shutdown() {
     std::lock_guard<std::mutex> lk(g_mtx);
+    if (g_cuMod && p_cuModuleUnload) { p_cuModuleUnload(g_cuMod); g_cuMod = nullptr; }
+    g_nvrtc_ready = false;
     if (g_dA && p_cudaFree) { p_cudaFree(g_dA); g_dA = nullptr; }
     if (g_dB && p_cudaFree) { p_cudaFree(g_dB); g_dB = nullptr; }
     if (g_dC && p_cudaFree) { p_cudaFree(g_dC); g_dC = nullptr; }

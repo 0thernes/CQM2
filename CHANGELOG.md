@@ -6,6 +6,19 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
+## [5.0.0] - 2026-11-11
+
+### Added
+- **64-Topology Procedural 3D OpenGL 3.3 Core Engine, Retina 4K Logical DPI & Full 17-Window In-App Back-Room Suite (`native/engine/*`, `CQM2.exe`)**:
+  - Upgraded the standalone native Windows 11 workstation (`CQM2.exe`, installed to Desktop, Start Menu, and Taskbar) to **64 procedural indexed 3D topologies** (`40` living organism morphotypes including Platonic/Geodesic, TorusKnots, HopfLink, MedusaBell frustums, Nautilus, Diatoms, Radiolarians, Trilobites, MantaGliders, GyroidBlobs, and VoxelClusters; `10` chiral enantiomeric untethered `Xenomimics`; and `14` multi-part Deity, Seraph Wing, Ocellus Eyeball, Botanical `AlienFlora`, `Xylos` Hyperbolic Membrane, and `MechaFirePillar` rigs) with sRGB-linearized ACES Filmic PBR tone mapping, cantilevered brutalist megastructure framing, wireframe-and-geodesic `Xylos` Poincaré portal, and 32-bit `ImDrawIdx` Retina 4K logical DPI scaling.
+  - Added complete in-app native `cqm2_native_backrooms.hpp` vector diagram & live-telemetry back-rooms (`DOCS`, `SPEC`, `BIBLE` 5 Books, `LAB` WildBeyond 4-page Kerr/Hoggar/QWZ/Forest suite + Butlin `C1–C14` + Birch `S1–S8` + `CQM-25` + `150`-Peer ALife catalog, `AUDIT`, `COPILOT AI LLM` with live Eshkol S-expression AD evaluation, `MARKET` 48-bar OHLC candlesticks + Lorenz Wealth Gini, `NHI OBS` 9-panel matrix, `ARCHON GODFORMS` 16-stat `REA` cards + 4D Neural Obs, `101 PANTHEONS`, `XYLOS` 192 KiB tape, `XENOMIMIC`, `ACCESS` Level Omega `3455456754`, and `STAGE II` `UwU` Menger Sanctum).
+- **49 Zig 0.17 SIMD128/AVX2 Kernels & Clang-21 NVPTX64 Blackwell `sm_120` Direct-Driver PTX (`zig/src/root.zig`, `native/gpu_cuda/cqm2_kernels_sm120.c`, `src/native/zig-bridge.ts`)**:
+  - Added 6 new native & WebAssembly Zig kernels (`49` total): `cqm2_philox4x32_10_batch` (counter-based domain-isolated PRNG), `cqm2_alife_v3_ledger11_step` (11-pool closed FP64 Kahan-Babuška-Neumaier thermodynamic ledger holding `|drift| <= 1e-12`), `cqm2_pci_lz_forked_snapshot` (non-destructive state-cloned Zap-and-Zip LZ76 Perturbational Complexity Index `PCI*`), `cqm2_spectral_guard_csr_step` (incremental power-iteration contraction `sigma_max <= 0.99`), `cqm2_super_mind_10k_step` (10,081-parameter Archon `SuperMind` with `32×32` episodic memory and 16 cognitive stats including `REA` Reasoning `#10`), and `cqm2_entity_resource_head_51_batch` (51-parameter endogenous `Matter ◇` / `Energy ❖` market pricing head).
+  - Compiled native CUDA device kernels (`k_gray_scott_rgba` and `k_asmodenius_100m_lora`, a 100,000,000-weight Murmur3 ternary cortical manifold with Rank-16 plastic LoRA) directly to `.version 8.7` `.target sm_120` Blackwell PTX (`+ sm_80` fallback) loaded via `cuModuleLoadData` on NVIDIA GeForce RTX 5070 Ti Laptop GPU without requiring external NVRTC DLLs.
+
+### Fixed
+- Eliminated 16-bit `ImDrawIdx` vertex cap across dense multi-band Observatory and Back-Room vector plots (`-DImDrawIdx=unsigned int`) and fixed dense `48×48` coupling expansion for `cqm2_pci_lz_forked_snapshot` and 90-channel shell input sizing for `cqm2_mecha_brain_54k_stdp_step` in `cqm2_native_sim.cpp`.
+
 ## [4.0.0] - 2026-11-11
 
 ### Added

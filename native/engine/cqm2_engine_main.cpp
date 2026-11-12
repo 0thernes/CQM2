@@ -268,14 +268,21 @@ int main(int argc, char** argv) {
     int reqH = 1080;
     bool explicitRes = false;
     int warmupFrames = 24;
-    int reqTier = 3; // desktop default
+    int reqTier = 0; // Matches Original CQM 495/1000 default (override via --tier=0..5)
+    int reqObsTab = -1;
+    int reqNMode = 0;
+    int reqSingularity = -1;
+    int reqWeather = -1;
+    float reqScrollLeft = -1.0f;
+    bool cliMiniWorld = false;
     std::string reqWindow;
     std::string reqView;
     std::string reqRender;
     std::string reqBrutal;
+    std::string reqSubject;
     bool hasYaw = false, hasPitch = false, hasDist = false, hasTarget = false;
-    float cliYaw = 0.22f, cliPitch = 0.14f, cliDist = 42.0f;
-    glm::vec3 cliTarget{0.0f, 3.5f, -8.0f};
+    float cliYaw = 0.16f, cliPitch = 0.11f, cliDist = 38.0f;
+    glm::vec3 cliTarget{-1.5f, 4.2f, -9.0f};
     bool cliStage2 = false;
     bool cliAccess = false;
     bool cliNhi = false;
@@ -305,6 +312,20 @@ int main(int argc, char** argv) {
             warmupFrames = std::clamp(std::atoi(arg.c_str() + 9), 1, 600);
         } else if (arg.rfind("--tier=", 0) == 0) {
             reqTier = std::clamp(std::atoi(arg.c_str() + 7), 0, cqm2_sim::kTierCount - 1);
+        } else if (arg.rfind("--obs-tab=", 0) == 0) {
+            reqObsTab = std::clamp(std::atoi(arg.c_str() + 10), 0, 3);
+        } else if (arg.rfind("--scroll-left=", 0) == 0) {
+            reqScrollLeft = static_cast<float>(std::atof(arg.c_str() + 14));
+        } else if (arg.rfind("--nmode=", 0) == 0) {
+            reqNMode = std::clamp(std::atoi(arg.c_str() + 8), 1, 2);
+        } else if (arg.rfind("--singularity=", 0) == 0) {
+            reqSingularity = std::clamp(std::atoi(arg.c_str() + 14), 0, cqm2_sim::kSingularityCount - 1);
+        } else if (arg.rfind("--weather=", 0) == 0) {
+            reqWeather = std::clamp(std::atoi(arg.c_str() + 10), 0, cqm2_sim::kWeatherCount - 1);
+        } else if (arg == "--miniworld") {
+            cliMiniWorld = true;
+        } else if (arg.rfind("--subject=", 0) == 0) {
+            reqSubject = arg.substr(10);
         } else if (arg.rfind("--window=", 0) == 0) {
             reqWindow = arg.substr(9);
         } else if (arg.rfind("--view=", 0) == 0) {
@@ -369,7 +390,7 @@ int main(int argc, char** argv) {
     GLFWwindow* window = glfwCreateWindow(
         initWinW,
         initWinH,
-        "Cosmogonic Quantum Mechalogodrom — CQM2 v4.0.0 [Quad-Silicon Native Workstation]",
+        "Cosmogonic Quantum Mechalogodrom — CQM2 v5.0.0 [Quad-Silicon Native Workstation]",
         nullptr,
         nullptr
     );
@@ -422,12 +443,47 @@ int main(int argc, char** argv) {
     }
 
     cqm2_render::OrbitCamera cam;
-    if (cliStage2) sim.submitStage2Sigil("STAGE-II");
-    if (cliAccess) sim.accessUnlocked = true;
+    if (cliStage2) {
+        sim.submitStage2Sigil("UwU");
+        sim.rebuildStaticWorld();
+    }
+    if (cliAccess) {
+        sim.accessUnlocked = true;
+        sim.heroHudVisible = true;
+    }
+    if (cliMiniWorld) sim.miniWorldMode = true;
+    if (reqNMode > 0) sim.nMode = reqNMode;
+    if (reqSingularity >= 0) sim.singularityMode = reqSingularity;
+    if (reqWeather >= 0) sim.weatherMode = reqWeather;
+    if (reqObsTab >= 0) hud.setObsTab(reqObsTab);
+    if (reqScrollLeft >= 0.0f) hud.setLeftScrollFrac(reqScrollLeft);
     if (cliNhi) sim.actionNhiRelease(48);
     if (cliXno) sim.actionSpawnXenomimic(40);
     if (cliShatter) sim.actionShatterReliquary();
     if (cliNoPanels) hud.panelsVisible = false;
+
+    if (!reqSubject.empty()) {
+        hasYaw = hasPitch = hasDist = hasTarget = true;
+        if (reqSubject == "colossus") {
+            cliTarget = sim.godColossusCenter; cliYaw = 0.06f; cliPitch = 0.03f; cliDist = 26.0f;
+        } else if (reqSubject == "mecha") {
+            cliTarget = sim.mechalogodromCenter; cliYaw = 0.35f; cliPitch = 0.16f; cliDist = 16.5f;
+        } else if (reqSubject == "xylos") {
+            cliTarget = sim.xylosCenter + glm::vec3(0.0f, 4.5f, 0.0f); cliYaw = 0.48f; cliPitch = 0.18f; cliDist = 13.0f;
+        } else if (reqSubject == "tree") {
+            cliTarget = sim.crystalTreeCenter + glm::vec3(0.0f, 6.5f, 0.0f); cliYaw = -0.55f; cliPitch = 0.14f; cliDist = 18.0f;
+        } else if (reqSubject == "temple") {
+            cliTarget = sim.monolithTempleCenter + glm::vec3(0.0f, 4.2f, 0.0f); cliYaw = 0.42f; cliPitch = 0.16f; cliDist = 17.5f;
+        } else if (reqSubject == "archon") {
+            cliTarget = sim.archons[0].pos; cliYaw = 0.25f; cliPitch = 0.12f; cliDist = 10.5f;
+        } else if (reqSubject == "shoggoth") {
+            cliTarget = glm::vec3(16.5f, sim.terrainHeightAt(16.5f, 0.0f) + 1.2f, 0.0f); cliYaw = 0.8f; cliPitch = 0.20f; cliDist = 6.5f;
+        } else if (reqSubject == "leviathan") {
+            cliTarget = glm::vec3(0.0f, 16.0f, 32.0f); cliYaw = 3.14f; cliPitch = 0.12f; cliDist = 18.0f;
+        } else if (reqSubject == "flora") {
+            cliTarget = glm::vec3(-8.0f, sim.terrainHeightAt(-8.0f, 10.0f) + 1.5f, 10.0f); cliYaw = 0.35f; cliPitch = 0.15f; cliDist = 9.5f;
+        }
+    }
 
     if (!reqView.empty()) {
         int vi = matchNameIndex(reqView, cqm2_sim::kViewModeNames, cqm2_sim::kViewModeCount);
@@ -477,8 +533,8 @@ int main(int argc, char** argv) {
             }
         }
 
-        // Render 2 full frames into outFbo so Dear ImGui dynamic font textures settle cleanly
-        for (int pass = 0; pass < 2; ++pass) {
+        // Render 4 full frames into outFbo so Dear ImGui dynamic font textures and scroll offsets settle cleanly
+        for (int pass = 0; pass < 4; ++pass) {
             renderer.renderWorld(sim, cam, reqW, reqH, 0.25f, outFbo);
             glBindFramebuffer(GL_FRAMEBUFFER, outFbo);
             glViewport(0, 0, reqW, reqH);
@@ -515,24 +571,29 @@ int main(int argc, char** argv) {
         glDeleteTextures(1, &outColor);
         glDeleteFramebuffers(1, &outFbo);
 
-        const bool firstLawOk = std::abs(sim.firstLawDrift) <= 1e-12;
+        const bool firstLawOk = (std::abs(sim.firstLawDrift) <= 1e-12) && (sim.alifeV3Drift <= 1e-12);
         const bool ok = shotSaved && (nonBlack > totalPx / 20) && firstLawOk;
 
         std::printf(
-            "{\"ok\":%s,\"version\":\"4.0.0\",\"engine\":\"CQM2-Native-OpenGL33-Jolt55-QuadSilicon\","
-            "\"width\":%d,\"height\":%d,\"entities\":%d,\"xenomimics\":%d,"
-            "\"cuda\":%s,\"npu\":%s,\"dml\":%s,\"zig\":%s,\"moonlab\":%s,\"libirrep\":%s,\"rust\":%s,"
-            "\"firstLawDrift\":%.3e,\"meanLuminance\":%.2f,\"shot\":\"%s\"}\n",
+            "{\"ok\":%s,\"version\":\"5.0.0\",\"engine\":\"CQM2-Native-64Mesh-OpenGL33-Jolt55-QuadSilicon\","
+            "\"width\":%d,\"height\":%d,\"entities\":%d,\"xenomimics\":%d,\"topologies\":64,"
+            "\"cuda\":%s,\"nvrtcSm120\":%s,\"npu\":%s,\"dml\":%s,\"zig\":%s,\"moonlab\":%s,\"libirrep\":%s,\"rsw1\":%s,\"rust\":%s,"
+            "\"firstLawDrift\":%.3e,\"alifeV3Drift\":%.3e,\"rea0\":%.3f,\"pciLzStar\":%.3f,\"meanLuminance\":%.2f,\"shot\":\"%s\"}\n",
             ok ? "true" : "false",
             reqW, reqH, sim.liveEntityCount, sim.xenomimicCount,
             sim.silicon.cudaReady ? "true" : "false",
+            sim.silicon.nvrtcSm120Ready ? "true" : "false",
             sim.silicon.npuLevelZeroReady ? "true" : "false",
             sim.silicon.igpuDmlReady ? "true" : "false",
             sim.silicon.zigLoaded ? "true" : "false",
             sim.silicon.moonlabLoaded ? "true" : "false",
             sim.silicon.libirrepLoaded ? "true" : "false",
+            sim.silicon.rsw1StreamOk ? "true" : "false",
             sim.silicon.rustLedgerLoaded ? "true" : "false",
             sim.firstLawDrift,
+            sim.alifeV3Drift,
+            sim.archons[0].stats16[9],
+            sim.pciLzStar,
             meanLum,
             shotPath.c_str()
         );

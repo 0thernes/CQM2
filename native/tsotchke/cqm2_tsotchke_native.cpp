@@ -1272,4 +1272,208 @@ CQM2_TS_API int32_t cqm2_asmodenius_lif272_step(
     return static_cast<int32_t>(total_spk);
 }
 
+/**
+ * 12. RosettaWire `RSW1` 60-Byte Fail-Closed Stream Frame Encoder & Verifier
+ * Exact 60-byte wire header:
+ *   [0..3]   magic = "RSW1"
+ *   [4..5]   version_u16 = 1
+ *   [6..7]   flags_u16 (bit 0 = canonical_float_checked, bit 1 = linear_port_owned)
+ *   [8..15]  stream_id_u64
+ *   [16..23] seq_no_u64
+ *   [24..27] payload_len_u32
+ *   [28..35] schema_fnv1a64
+ *   [36..59] sha256_trunc24 (first 24 bytes of SHA-256 over header[0..35] || payload)
+ */
+CQM2_TS_API int32_t cqm2_rosette_rsw1_roundtrip(
+    uint64_t stream_id,
+    uint64_t seq_no,
+    const char* schema_tag,
+    const float* telemetry_floats,
+    uint32_t float_count,
+    uint8_t header_out60[60]
+) {
+    if (!schema_tag || !header_out60 || (float_count > 0 && !telemetry_floats)) return -1;
+    // Fail-closed IEEE-754 finite check ($float canonical law: reject NaN / Inf!)
+    for (uint32_t i = 0; i < float_count; ++i) {
+        if (!std::isfinite(telemetry_floats[i])) return -2;
+    }
+
+    uint64_t fnv = 0xcbf29ce484222325ULL;
+    for (const char* p = schema_tag; *p; ++p) {
+        fnv ^= static_cast<uint8_t>(*p);
+        fnv *= 0x100000001b3ULL;
+    }
+
+    const uint32_t pay_bytes = float_count * static_cast<uint32_t>(sizeof(float));
+    std::memset(header_out60, 0, 60);
+    header_out60[0] = 'R'; header_out60[1] = 'S'; header_out60[2] = 'W'; header_out60[3] = '1';
+    const uint16_t ver = 1u;
+    const uint16_t flags = 0x0003u;
+    std::memcpy(header_out60 + 4, &ver, 2);
+    std::memcpy(header_out60 + 6, &flags, 2);
+    std::memcpy(header_out60 + 8, &stream_id, 8);
+    std::memcpy(header_out60 + 16, &seq_no, 8);
+    std::memcpy(header_out60 + 24, &pay_bytes, 4);
+    std::memcpy(header_out60 + 28, &fnv, 8);
+
+    std::vector<uint8_t> msg(36 + pay_bytes);
+    std::memcpy(msg.data(), header_out60, 36);
+    if (pay_bytes > 0) {
+        std::memcpy(msg.data() + 36, telemetry_floats, pay_bytes);
+    }
+    uint8_t digest32[32]{};
+    cqm2_sha256_bytes(msg.data(), msg.size(), digest32);
+    std::memcpy(header_out60 + 36, digest32, 24);
+
+    // Self-verify via pure ISO C17 `cqm2_rsw1_stream_accept` fail-closed state machine!
+    cqm2_rsw1_stream_state_t st{};
+    cqm2_rsw1_stream_init(&st, static_cast<uint32_t>(stream_id & 0xFFFFFFFFu));
+    uint8_t openFrame[64]{};
+    int64_t openLen = cqm2_rsw1_encode_frame(CQM2_RSW1_KIND_OPEN, st.stream_id, 0, nullptr, 0, openFrame, sizeof(openFrame));
+    if (openLen < 60 || cqm2_rsw1_stream_accept(&st, openFrame, static_cast<size_t>(openLen)) != 0) return -3;
+    std::vector<uint8_t> dataFrame(60 + pay_bytes);
+    int64_t dataLen = cqm2_rsw1_encode_frame(
+        CQM2_RSW1_KIND_DATA, st.stream_id, 1,
+        reinterpret_cast<const uint8_t*>(telemetry_floats), pay_bytes,
+        dataFrame.data(), dataFrame.size()
+    );
+    if (dataLen < 60 || cqm2_rsw1_stream_accept(&st, dataFrame.data(), static_cast<size_t>(dataLen)) != 0) return -4;
+    std::memcpy(header_out60, dataFrame.data(), 60);
+    return 60;
+}
+
+/**
+ * 13. RosettaWire CSR Linear Port-Ownership Verifier
+ * Verifies linear session-type discipline: every active port must have exact 1 producer and 1 consumer.
+ */
+CQM2_TS_API int32_t cqm2_rosette_csr_port_verify(
+    uint32_t num_ports,
+    const uint32_t* producer_of_edge,
+    const uint32_t* consumer_of_edge,
+    uint32_t num_bindings
+) {
+    if (num_ports == 0 || num_bindings != num_ports || !producer_of_edge || !consumer_of_edge) return 0;
+    std::vector<uint32_t> prod_cnt(num_ports, 0u);
+    std::vector<uint32_t> cons_cnt(num_ports, 0u);
+    for (uint32_t i = 0; i < num_bindings; ++i) {
+        uint32_t p = producer_of_edge[i];
+        uint32_t c = consumer_of_edge[i];
+        if (p >= num_ports || c >= num_ports) return 0;
+        prod_cnt[p]++;
+        cons_cnt[c]++;
+    }
+    for (uint32_t i = 0; i < num_ports; ++i) {
+        if (prod_cnt[i] != 1u || cons_cnt[i] != 1u) return 0;
+    }
+    return 1;
+}
+
+/**
+ * 14. Eshkol Homoiconic S-Expression & Dual-Number Forward AD Evaluator
+ * Evaluates symbolic expressions over Dual{f, df/dx} at x = var_x (dx = 1.0), supporting:
+ *   (+ a b), (- a b), (* a b), (/ a b), (sin a), (cos a), (tanh a), (exp a), (sq a), x, pi, numeric literals
+ * Writes [f(x), f'(x)] into out_val_deriv[2].
+ */
+namespace {
+struct SExprDual { double v; double d; };
+
+void skipWs(const char*& p) {
+    while (*p == ' ' || *p == '\t' || *p == '\r' || *p == '\n') ++p;
+}
+
+SExprDual evalEshkolRec(const char*& p, double x_val, int depth) {
+    if (depth > 32) return {0.0, 0.0};
+    skipWs(p);
+    if (*p == '\0') return {0.0, 0.0};
+    if (*p == '(') {
+        ++p;
+        skipWs(p);
+        char op[24]{};
+        int oi = 0;
+        while (*p && *p != ' ' && *p != '\t' && *p != ')' && *p != '(' && oi < 23) {
+            op[oi++] = *p++;
+        }
+        op[oi] = '\0';
+        std::vector<SExprDual> args;
+        skipWs(p);
+        while (*p && *p != ')' && args.size() < 8) {
+            args.push_back(evalEshkolRec(p, x_val, depth + 1));
+            skipWs(p);
+        }
+        if (*p == ')') ++p;
+
+        if (std::strcmp(op, "+") == 0) {
+            SExprDual s{0.0, 0.0};
+            for (const auto& a : args) { s.v += a.v; s.d += a.d; }
+            return s;
+        }
+        if (std::strcmp(op, "-") == 0) {
+            if (args.empty()) return {0.0, 0.0};
+            if (args.size() == 1) return {-args[0].v, -args[0].d};
+            SExprDual s = args[0];
+            for (size_t i = 1; i < args.size(); ++i) { s.v -= args[i].v; s.d -= args[i].d; }
+            return s;
+        }
+        if (std::strcmp(op, "*") == 0) {
+            SExprDual s{1.0, 0.0};
+            for (const auto& a : args) {
+                s = { s.v * a.v, s.d * a.v + s.v * a.d };
+            }
+            return s;
+        }
+        if (std::strcmp(op, "/") == 0 && args.size() >= 2) {
+            double den = std::abs(args[1].v) < 1e-12 ? 1e-12 : args[1].v;
+            return { args[0].v / den, (args[0].d * den - args[0].v * args[1].d) / (den * den) };
+        }
+        if (std::strcmp(op, "sin") == 0 && !args.empty()) {
+            return { std::sin(args[0].v), std::cos(args[0].v) * args[0].d };
+        }
+        if (std::strcmp(op, "cos") == 0 && !args.empty()) {
+            return { std::cos(args[0].v), -std::sin(args[0].v) * args[0].d };
+        }
+        if (std::strcmp(op, "tanh") == 0 && !args.empty()) {
+            double th = std::tanh(args[0].v);
+            return { th, (1.0 - th * th) * args[0].d };
+        }
+        if (std::strcmp(op, "exp") == 0 && !args.empty()) {
+            double ex = std::exp(std::clamp(args[0].v, -40.0, 40.0));
+            return { ex, ex * args[0].d };
+        }
+        if (std::strcmp(op, "sq") == 0 && !args.empty()) {
+            return { args[0].v * args[0].v, 2.0 * args[0].v * args[0].d };
+        }
+        return args.empty() ? SExprDual{0.0, 0.0} : args[0];
+    }
+    if (*p == 'x' && (p[1] == '\0' || p[1] == ' ' || p[1] == ')' || p[1] == '\t')) {
+        ++p;
+        return { x_val, 1.0 };
+    }
+    if (std::strncmp(p, "pi", 2) == 0 && (p[2] == '\0' || p[2] == ' ' || p[2] == ')')) {
+        p += 2;
+        return { 3.14159265358979323846, 0.0 };
+    }
+    char* endp = nullptr;
+    double lit = std::strtod(p, &endp);
+    if (endp && endp != p) {
+        p = endp;
+        return { lit, 0.0 };
+    }
+    ++p;
+    return { 0.0, 0.0 };
+}
+} // namespace
+
+CQM2_TS_API int32_t cqm2_eshkol_sexpr_eval(
+    const char* sexpr,
+    double var_x,
+    double out_val_deriv[2]
+) {
+    if (!sexpr || !out_val_deriv) return -1;
+    const char* cur = sexpr;
+    SExprDual res = evalEshkolRec(cur, var_x, 0);
+    out_val_deriv[0] = res.v;
+    out_val_deriv[1] = res.d;
+    return 0;
+}
+
 } // extern "C"

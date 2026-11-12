@@ -1,6 +1,6 @@
 [package]
 name = "cqm2_rust_ledger"
-version = "4.0.0"
+version = "5.0.0"
 edition = "2021"
 license = "LicenseRef-Cosmogonic-NonCommercial"
 description = "CQM2 deterministic Entity-Relational Merkle state verifier and First-Law metabolic conservation auditor"

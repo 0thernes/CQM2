@@ -13,7 +13,7 @@ void main() {
 }
 )GLSL";
 
-// Pass 1: Crimson-Burgundy Geodesic Sky Dome + Towering Iridescent Rainbow Mandelbulb GodColossus
+// Pass 1: Velvet Plum-Purple Geodesic Dome + Raymarched Multi-Hue Thin-Film GodColossus + Singularity Disk + N(2) Sky
 inline const char* kSkyColossusFrag = R"GLSL(
 #version 330 core
 in vec2 vUv;
@@ -24,6 +24,8 @@ uniform mat4 uViewProj;
 uniform vec3 uCamPos;
 uniform float uTime;
 uniform int uWeather;
+uniform int uSingularity;
+uniform int uNMode;
 uniform float uChaos;
 
 float hash13(vec3 p) {
@@ -32,31 +34,32 @@ float hash13(vec3 p) {
     return fract((p.x + p.y) * p.z);
 }
 
-vec3 rainbowIridescence(float t) {
-    return 0.52 + 0.48 * cos(6.2831853 * (t + vec3(0.00, 0.33, 0.67)));
+vec3 soapBubbleThinFilm(float phase) {
+    vec3 a = 0.52 + 0.48 * cos(6.2831853 * (phase + vec3(0.00, 0.33, 0.67)));
+    vec3 b = 0.50 + 0.50 * cos(6.2831853 * (phase * 2.17 + vec3(0.18, 0.51, 0.84)));
+    return mix(a, b, 0.42);
 }
 
-// Towering Mandelbulb + Quasicrystal Fold SDF centered at (0, 14, -34)
+// Swirling Mandelbulb + Gyroid GodColossus centered at (0.0, 13.2, -29.0)
 float mapColossus(vec3 p, out float trapOut) {
-    vec3 w = (p - vec3(-2.0, 13.5, -34.0)) / 15.5;
+    vec3 w = (p - vec3(0.0, 13.2, -29.0)) / 16.4;
     float bound = length(w) - 1.35;
     if (bound > 0.25) {
         trapOut = 0.0;
-        return bound * 15.5;
+        return bound * 16.4;
     }
-    // Slow majestic rotation
-    float ca = cos(uTime * 0.09), sa = sin(uTime * 0.09);
+    float ca = cos(uTime * 0.07), sa = sin(uTime * 0.07);
     w.xz = mat2(ca, -sa, sa, ca) * w.xz;
 
     vec3 z = w;
     float dr = 1.0;
     float r = 0.0;
     float trap = 1e9;
-    float pwr = 7.5 + 1.2 * sin(uTime * 0.17);
-    for (int i = 0; i < 6; ++i) {
+    float pwr = 7.8 + 0.7 * sin(uTime * 0.13);
+    for (int i = 0; i < 7; ++i) {
         r = length(z);
         if (r > 2.2) break;
-        trap = min(trap, abs(z.y) + 0.35 * abs(sin(z.x * 6.0 + z.z * 6.0)));
+        trap = min(trap, abs(z.y) + 0.38 * abs(sin(z.x * 6.5 + z.z * 6.5)));
         float theta = acos(clamp(z.z / max(r, 1e-5), -1.0, 1.0));
         float phi = atan(z.y, z.x);
         dr = pow(max(r, 1e-4), pwr - 1.0) * pwr * dr + 1.0;
@@ -66,12 +69,12 @@ float mapColossus(vec3 p, out float trapOut) {
         z = zr * vec3(sin(theta) * cos(phi), sin(phi) * sin(theta), cos(theta)) + w;
     }
     trapOut = trap;
-    return 0.5 * log(max(r, 1.0001)) * r / max(dr, 1.0) * 15.5;
+    return 0.5 * log(max(r, 1.0001)) * r / max(dr, 1.0) * 16.4;
 }
 
 vec3 calcColossusNormal(vec3 p) {
     float dummy;
-    vec2 e = vec2(0.035, -0.035);
+    vec2 e = vec2(0.032, -0.032);
     return normalize(
         e.xyy * mapColossus(p + e.xyy, dummy) +
         e.yyx * mapColossus(p + e.yyx, dummy) +
@@ -81,28 +84,52 @@ vec3 calcColossusNormal(vec3 p) {
 }
 
 vec3 evalSkyDome(vec3 rd) {
-    // Deep velvet midnight plum-burgundy dome matching Original CQM (linear pre-ACES space)
-    vec3 horizon = vec3(0.015, 0.0014, 0.022);
-    vec3 zenith  = vec3(0.006, 0.0006, 0.011);
-    vec3 nadir   = vec3(0.004, 0.0009, 0.008);
-    vec3 col = rd.y >= 0.0 ? mix(horizon, zenith, pow(rd.y, 0.65)) : mix(horizon, nadir, clamp(-rd.y * 3.0, 0.0, 1.0));
+    // Rich deep magenta-plum dome matching user screenshot `media_1794383147566_15e228d5.jpg` (linear space before ACES)
+    vec3 horizon = (uNMode == 2) ? vec3(0.005, 0.032, 0.022) : vec3(0.024, 0.0018, 0.036);
+    vec3 zenith  = (uNMode == 2) ? vec3(0.002, 0.012, 0.012) : vec3(0.009, 0.0008, 0.016);
+    vec3 nadir   = vec3(0.003, 0.008, 0.014);
+    vec3 col = rd.y >= 0.0 ? mix(horizon, zenith, pow(rd.y, 0.62))
+                           : mix(horizon, nadir, clamp(-rd.y * 3.0, 0.0, 1.0));
 
-    // Geodesic dome triangle lattice lines projected onto sphere
-    vec3 sphereP = normalize(rd) * 14.0;
-    vec3 g1 = abs(fract(sphereP * 0.85) - 0.5);
-    float diag = abs(fract((sphereP.x + sphereP.y + sphereP.z) * 0.85) - 0.5);
+    // Geodesic dome structural lattice lines + glowing vertex nodes
+    vec3 sp = normalize(rd) * 15.0;
+    vec3 g1 = abs(fract(sp * 0.82) - 0.5);
+    float diag = abs(fract((sp.x + sp.y + sp.z) * 0.82) - 0.5);
     float wire = min(min(g1.x, g1.y), min(g1.z, diag));
-    float lineMask = smoothstep(0.020, 0.002, wire) * smoothstep(-0.15, 0.25, rd.y);
-    col += vec3(0.085, 0.012, 0.095) * lineMask * 0.68;
+    float lineMask = smoothstep(0.020, 0.002, wire) * smoothstep(-0.12, 0.22, rd.y);
+    vec3 gridCol = (uNMode == 2) ? vec3(0.04, 0.28, 0.18) : vec3(0.085, 0.012, 0.115);
+    col += gridCol * lineMask * 0.72;
 
-    // Subtle stars & weather aurora
-    float st = hash13(floor(rd * 260.0));
-    if (st > 0.9965 && rd.y > -0.05) {
-        col += vec3(0.55, 0.48, 0.75) * (st - 0.9965) * 95.0;
+    // Stars & weather modes (RAIN, STORM, AURORA, VOID, FOG)
+    float st = hash13(floor(rd * 290.0));
+    if (st > 0.9960 && rd.y > -0.05) {
+        col += vec3(0.65, 0.58, 0.90) * (st - 0.9960) * 110.0;
     }
-    if (uWeather == 4) {
-        float aur = pow(0.5 + 0.5 * sin(rd.x * 9.0 + uTime * 0.6) * cos(rd.z * 7.0), 4.0);
-        col += vec3(0.015, 0.12, 0.09) * aur * max(rd.y, 0.0);
+    if (uWeather == 3) { // AURORA
+        float aur = pow(0.5 + 0.5 * sin(rd.x * 8.5 + uTime * 0.7) * cos(rd.z * 6.5), 3.5);
+        col += vec3(0.02, 0.24, 0.18) * aur * max(rd.y, 0.0);
+    } else if (uWeather == 2) { // STORM lightning flicker
+        float fl = step(0.97, sin(uTime * 19.0) * cos(uTime * 7.3));
+        col += vec3(0.15, 0.18, 0.30) * fl * max(rd.y, 0.0);
+    } else if (uWeather == 5) { // FOG
+        col = mix(col, vec3(0.07, 0.05, 0.09), 0.45 * smoothstep(0.45, -0.1, rd.y));
+    }
+
+    // Relativistic Singularity Accretion Disk in upper sky when singularityMode > 0
+    if (uSingularity > 0) {
+        vec3 sDir = normalize(vec3(0.0, 0.48, -0.88));
+        float ang = acos(clamp(dot(rd, sDir), -1.0, 1.0));
+        if (uSingularity == 1) { // blackhole
+            float ring = exp(-pow((ang - 0.085) * 38.0, 2.0));
+            col = (ang < 0.055) ? vec3(0.0) : (col + vec3(1.2, 0.48, 0.12) * ring);
+        } else if (uSingularity == 2) { // whitehole
+            col += vec3(0.95, 0.98, 1.25) * exp(-ang * 18.0);
+        } else if (uSingularity == 3) { // greyhole
+            float ring = exp(-pow((ang - 0.075) * 34.0, 2.0));
+            col += vec3(0.48, 0.48, 0.52) * ring;
+        } else if (uSingularity == 4) { // strangestar
+            col += vec3(0.25, 1.15, 0.95) * exp(-ang * 22.0);
+        }
     }
     return col;
 }
@@ -117,10 +144,9 @@ void main() {
 
     vec3 sky = evalSkyDome(rd);
 
-    // Bounding-sphere pre-check against GodColossus at (-2, 13.5, -34), R = 21.5
-    vec3 oc = ro - vec3(-2.0, 13.5, -34.0);
+    vec3 oc = ro - vec3(0.0, 13.2, -29.0);
     float b = dot(oc, rd);
-    float c = dot(oc, oc) - 21.5 * 21.5;
+    float c = dot(oc, oc) - 22.5 * 22.5;
     float disc = b * b - c;
 
     if (disc > 0.0) {
@@ -129,27 +155,21 @@ void main() {
         float t = tStart;
         float trap = 0.0;
         bool hit = false;
-        for (int i = 0; i < 52; ++i) {
+        for (int i = 0; i < 54; ++i) {
             if (t > tEnd) break;
             float d = mapColossus(ro + rd * t, trap);
-            if (d < 0.045) {
-                hit = true;
-                break;
-            }
-            t += max(d * 0.78, 0.06);
+            if (d < 0.042) { hit = true; break; }
+            t += max(d * 0.78, 0.055);
         }
         if (hit) {
             vec3 hp = ro + rd * t;
             vec3 n = calcColossusNormal(hp);
-            vec3 lDir = normalize(vec3(0.45, 0.78, 0.42));
-            float diff = 0.38 + 0.62 * max(dot(n, lDir), 0.0);
-            float fres = pow(1.0 - max(dot(n, -rd), 0.0), 2.4);
-
-            // Multi-band psychedelic thin-film marbling (sole chromatic monolith!)
-            float band = trap * 4.2 + dot(hp, vec3(0.26, 0.35, 0.22)) + uTime * 0.08;
-            vec3 irid = pow(rainbowIridescence(band), vec3(2.0)) * 0.42
-                      + pow(rainbowIridescence(band * 2.9 + 0.22), vec3(2.0)) * 0.30;
-            vec3 col = irid * diff + vec3(0.28, 0.22, 0.36) * fres * 0.35;
+            vec3 lDir = normalize(vec3(0.42, 0.80, 0.40));
+            float diff = 0.36 + 0.64 * max(dot(n, lDir), 0.0);
+            float fres = pow(1.0 - max(dot(n, -rd), 0.0), 2.2);
+            float swirl = trap * 5.4 + dot(hp, vec3(0.32, 0.41, 0.29)) + uTime * 0.06;
+            vec3 irid = pow(soapBubbleThinFilm(swirl), vec3(1.55)) * 0.78;
+            vec3 col = irid * diff + soapBubbleThinFilm(swirl + 0.35) * fres * 0.48;
 
             vec4 clip = uViewProj * vec4(hp, 1.0);
             float ndcZ = clip.z / clip.w;
@@ -164,7 +184,7 @@ void main() {
 }
 )GLSL";
 
-// Pass 2: Undulating 256x256 Live Gray-Scott Reaction-Diffusion Petri Floor
+// Pass 2: Undulating 256x256 Live Gray-Scott Reaction-Diffusion Terrain (exact match to terrainHeightAt!)
 inline const char* kFloorVert = R"GLSL(
 #version 330 core
 layout(location = 0) in vec3 aPos;
@@ -180,8 +200,12 @@ out float vChemV;
 
 void main() {
     vec4 gs = texture(uGrayScottTex, aUv);
-    float wave = 0.8 * sin(aPos.x * 0.08) * cos(aPos.z * 0.08) + (gs.g - 0.15) * 2.1;
-    vec3 wp = vec3(aPos.x, -4.0 + wave, aPos.z);
+    float r = length(aPos.xz);
+    float bowl = 0.00035 * r * r;
+    float baseH = -3.9 + bowl
+                + 0.78 * sin(aPos.x * 0.085) * cos(aPos.z * 0.085)
+                + 0.32 * sin(aPos.x * 0.21 + aPos.z * 0.17);
+    vec3 wp = vec3(aPos.x, baseH + (gs.g - 0.12) * 0.45, aPos.z);
     vUv = aUv;
     vWorldPos = wp;
     vChemV = gs.g;
@@ -204,94 +228,90 @@ void main() {
     float r = length(vWorldPos.xz);
     if (r > 82.0) discard;
 
-    vec3 deepTeal = vec3(0.006, 0.032, 0.048);
-    vec3 bioCyan  = vec3(0.024, 0.165, 0.195);
-    vec3 violet   = vec3(0.018, 0.005, 0.028);
+    vec3 deepTeal = vec3(0.0035, 0.022, 0.036);
+    vec3 bioCyan  = vec3(0.0180, 0.135, 0.145);
+    vec3 seaMoss  = vec3(0.0095, 0.062, 0.058);
 
-    float c = clamp(gs.g * 2.8, 0.0, 1.0);
-    vec3 col = mix(mix(violet, deepTeal, clamp(gs.r, 0.0, 1.0)), bioCyan, c);
+    float c = clamp(gs.g * 3.1, 0.0, 1.0);
+    vec3 col = mix(mix(deepTeal, seaMoss, clamp(gs.r, 0.0, 1.0)), bioCyan, c);
 
-    // Subtle concentric Petri coordinate rings
-    float ring = abs(fract(r * 0.08) - 0.5);
-    col += vec3(0.018, 0.085, 0.115) * smoothstep(0.025, 0.0, ring) * 0.45;
+    // Subtle Petri grid + concentric coordinate rings
+    vec2 grid = abs(fract(vWorldPos.xz * 0.25) - 0.5);
+    float gLine = smoothstep(0.03, 0.004, min(grid.x, grid.y));
+    col += vec3(0.010, 0.055, 0.072) * gLine * 0.35;
 
-    float edgeFade = smoothstep(82.0, 68.0, r);
+    float ring = abs(fract(r * 0.075) - 0.5);
+    col += vec3(0.012, 0.065, 0.088) * smoothstep(0.025, 0.0, ring) * 0.42;
+
+    float edgeFade = smoothstep(82.0, 62.0, r);
     FragColor = vec4(col * edgeFade, 1.0);
 }
 )GLSL";
 
-// Pass 3: Unified Hardware-Instanced 3D Shader (Creatures, Flora, Big Tree, Voxel Greebles, Achromatic Monoliths, Archons)
+// Pass 3: 64-Topology Multi-Mesh Hardware-Instanced Vertex & Fragment Shaders
+// Supports all 9 matClass materials, 11 RENDER_MODES, and 6 BRUTALISM modes!
 inline const char* kInstancedVert = R"GLSL(
 #version 330 core
 layout(location = 0) in vec3 aVertPos;
 layout(location = 1) in vec3 aVertNorm;
-layout(location = 2) in vec4 aPosScale;   // xyz = world pos, w = uniform scale
-layout(location = 3) in vec4 aDirPhase;   // x = yaw/sx, y = sy/meta, z = sz/chiral, w = phase
-layout(location = 4) in vec4 aColorType;  // rgb = color, a = typeId
+layout(location = 2) in vec2 aVertUv;
+
+layout(location = 3) in vec4 iPosScale;     // xyz = world pos, w = uniform scale
+layout(location = 4) in vec4 iRotMat;       // x = yaw, y = pitch, z = roll, w = matClass
+layout(location = 5) in vec4 iStretchPhase; // xyz = non-uniform scale, w = animPhase / irisHue
+layout(location = 6) in vec4 iColorTag;     // rgb = base tint, a = alpha / glow
 
 uniform mat4 uViewProj;
 uniform float uTime;
+uniform int uBrutalMode;
 
 out vec3 vNormal;
 out vec3 vLocalPos;
 out vec3 vWorldPos;
+out vec2 vUv;
 out vec3 vColor;
-flat out int vTypeId;
+flat out int vMatClass;
 out float vPhase;
+out float vAlphaTag;
+
+mat3 eulerRotation(float yaw, float pitch, float roll) {
+    float cy = cos(yaw), sy = sin(yaw);
+    float cp = cos(pitch), sp = sin(pitch);
+    float cr = cos(roll), sr = sin(roll);
+    mat3 ry = mat3( cy, 0.0, -sy,
+                   0.0, 1.0, 0.0,
+                    sy, 0.0,  cy);
+    mat3 rx = mat3(1.0, 0.0, 0.0,
+                   0.0,  cp,  sp,
+                   0.0, -sp,  cp);
+    mat3 rz = mat3( cr,  sr, 0.0,
+                   -sr,  cr, 0.0,
+                   0.0, 0.0, 1.0);
+    return ry * rx * rz;
+}
 
 void main() {
-    int tid = int(aColorType.a + 0.5);
-    vTypeId = tid;
-    vColor = aColorType.rgb;
+    vMatClass = int(iRotMat.w + 0.5);
+    vColor = iColorTag.rgb;
+    vAlphaTag = iColorTag.a;
     vLocalPos = aVertPos;
-    vPhase = aDirPhase.w;
+    vUv = aVertUv;
+    vPhase = iStretchPhase.w;
 
-    vec3 p = aVertPos;
-    vec3 n = aVertNorm;
-    float yaw = aDirPhase.x;
+    vec3 p = aVertPos * iStretchPhase.xyz * iPosScale.w;
+    vec3 n = aVertNorm / max(iStretchPhase.xyz, vec3(0.05));
 
-    if (tid == 23) {
-        // Floating emerald lampshade / bell frustums (narrow top, flared bottom like user screenshot!)
-        float flare = mix(1.35, 0.58, aVertPos.y + 0.5);
-        p.x *= aDirPhase.x * flare * aPosScale.w;
-        p.z *= aDirPhase.z * flare * aPosScale.w;
-        p.y *= aDirPhase.y * aPosScale.w;
-        yaw = aDirPhase.w;
-    } else if (tid >= 20 && tid <= 25) {
-        // Architectural structures use aDirPhase.xyz as non-uniform box/spire scale & aDirPhase.w as yaw
-        p *= aDirPhase.xyz * aPosScale.w;
-        if (tid == 20 && aDirPhase.y > 6.0) {
-            // Taper tall obsidian needle obelisks to razor points!
-            float needle = max(0.06, 1.0 - (aVertPos.y + 0.5) * 0.92);
-            p.x *= needle;
-            p.z *= needle;
-        }
-        yaw = aDirPhase.w;
-    } else if (tid >= 10 && tid <= 12) {
-        // AlienFlora stalks: razor-tapered bioluminescent blades that sway in dome breeze
-        float uH = aVertPos.y + 0.5;
-        float taper = max(0.08, 1.0 - uH * 0.88);
-        p.x *= 0.11 * taper * aPosScale.w;
-        p.z *= 0.11 * taper * aPosScale.w;
-        p.y = uH * aDirPhase.z * aPosScale.w;
-        p.x += sin(uTime * 1.8 + aDirPhase.w + p.y * 0.8) * 0.14 * p.y;
-    } else if (tid < 10) {
-        // Living Phyla & Xenomimics: organic breathing + chiral twist
-        float pulse = 1.0 + 0.18 * sin(aDirPhase.w * 2.0 + p.y * 3.0);
-        p *= aPosScale.w * pulse;
-        p.x *= (1.0 + 0.35 * sin(p.y * 4.0 * aDirPhase.z));
-    } else {
-        p *= aPosScale.w;
+    // Brutalism geometric quantization when BRUTALISM (1) or REPRESSIONISM (5) is active
+    if (uBrutalMode == 1) {
+        p = floor(p * 6.0 + 0.5) / 6.0;
+    } else if (uBrutalMode == 2) { // NOUVEAUNESS organic wave
+        p.x += 0.08 * sin(p.y * 3.0 + uTime * 2.0 + vPhase) * iPosScale.w;
     }
 
-    float cy = cos(yaw), sy = sin(yaw);
-    mat2 rotY = mat2(cy, -sy, sy, cy);
-    p.xz = rotY * p.xz;
-    n.xz = rotY * n.xz;
-
-    vec3 wp = aPosScale.xyz + p;
+    mat3 R = eulerRotation(iRotMat.x, iRotMat.y, iRotMat.z);
+    vec3 wp = iPosScale.xyz + R * p;
     vWorldPos = wp;
-    vNormal = normalize(n);
+    vNormal = normalize(R * n);
     gl_Position = uViewProj * vec4(wp, 1.0);
 }
 )GLSL";
@@ -301,14 +321,18 @@ inline const char* kInstancedFrag = R"GLSL(
 in vec3 vNormal;
 in vec3 vLocalPos;
 in vec3 vWorldPos;
+in vec2 vUv;
 in vec3 vColor;
-flat in int vTypeId;
+flat in int vMatClass;
 in float vPhase;
+in float vAlphaTag;
 
 out vec4 FragColor;
 
 uniform vec3 uCamPos;
 uniform float uTime;
+uniform int uRenderMode;
+uniform int uBrutalMode;
 
 float hash31(vec3 p) {
     p = fract(p * 0.1031);
@@ -316,71 +340,146 @@ float hash31(vec3 p) {
     return fract((p.x + p.y) * p.z);
 }
 
+vec3 rainbowBand(float t) {
+    return 0.52 + 0.48 * cos(6.2831853 * (t + vec3(0.00, 0.33, 0.67)));
+}
+
 void main() {
     vec3 N = normalize(vNormal);
     vec3 V = normalize(uCamPos - vWorldPos);
-    vec3 L = normalize(vec3(0.42, 0.82, 0.38));
-    float diff = 0.32 + 0.68 * max(dot(N, L), 0.0);
-    float rim  = pow(1.0 - max(dot(N, V), 0.0), 2.5);
+    vec3 L1 = normalize(vec3(0.42, 0.82, 0.38));
+    vec3 L2 = normalize(vec3(-0.55, 0.35, -0.45));
+    vec3 H = normalize(L1 + V);
 
-    // STRICT MONOLITH-MEGALITH-ART-DIRECTION LAW: type 22 (Monoliths & Stage II Menger Temple) MUST have r == g == b!
-    if (vTypeId == 22) {
-        float lum = clamp(vColor.r * diff + rim * 0.18, 0.02, 0.92);
-        FragColor = vec4(lum, lum, lum, 0.94);
+    float ndl = max(dot(N, L1), 0.0);
+    float fill = max(dot(N, L2), 0.0) * 0.24;
+    float diff = 0.22 + 0.78 * ndl + fill;
+    float spec = pow(max(dot(N, H), 0.0), 48.0);
+    float rim  = pow(1.0 - max(dot(N, V), 0.0), 2.6);
+    vec3 linCol = pow(max(vColor, vec3(0.0)), vec3(2.2)); // Exact sRGB -> Linear PBR matching Three.js!
+
+    // 1. STRICT MONOLITH-MEGALITH-ART-DIRECTION LAW:
+    //    matClass == 2 (MonolithTemple & Achromatic Megaliths) MUST enforce r == g == b ALWAYS!
+    if (vMatClass == 2) {
+        float lum = clamp(dot(linCol, vec3(0.3333)) * diff + spec * 0.16 + rim * 0.08, 0.002, 0.85);
+        FragColor = vec4(lum, lum, lum, 1.0);
         return;
     }
 
-    // Neon-Patched Voxel Greeble Cubes (type 21 — matches Original CQM screenshot!)
-    if (vTypeId == 21) {
-        vec3 cell = floor((vLocalPos + 0.55) * 6.0 + vPhase);
+    // 2. matClass == 1: EXCLUSIVE GodColossus 1,000-Hue Thin-Film Soap-Bubble Iridescence
+    if (vMatClass == 1) {
+        float swirl = dot(vLocalPos, vec3(3.1, 4.2, 2.7)) + vPhase + uTime * 0.12 + rim * 1.4;
+        vec3 irid = pow(mix(rainbowBand(swirl), rainbowBand(swirl * 2.3 + 0.25), 0.45), vec3(2.0));
+        vec3 col = irid * (0.36 + 0.72 * ndl) + pow(rainbowBand(swirl + 0.5), vec3(2.0)) * rim * 0.45 + vec3(spec * 0.22);
+        FragColor = vec4(col, 1.0);
+        return;
+    }
+
+    // 3. matClass == 8: Midnight-Navy Brutalist Cantilever Blocks
+    if (vMatClass == 8) {
+        vec3 edgeTint = mix(linCol * 3.0, vec3(0.018, 0.075, 0.135), 0.45);
+        vec3 col = linCol * (0.45 + 0.75 * ndl) + edgeTint * rim * 0.65 + vec3(spec * 0.08);
+        FragColor = vec4(col, 1.0);
+        return;
+    }
+
+    // 4. matClass == 5: Multi-Hue Mossy / Neon Voxel Rubik Cluster (matches foreground voxel blocks!)
+    if (vMatClass == 5) {
+        vec3 cell = floor((vLocalPos + 1.5) * 4.2 + vPhase);
         float h = hash31(cell);
-        vec3 base = vec3(0.008, 0.005, 0.014) * diff;
-        if (h > 0.74) {
-            vec3 neon = (h > 0.93) ? vec3(0.55, 0.50, 0.03)
-                      : (h > 0.86) ? vec3(0.48, 0.02, 0.18)
-                      : (h > 0.80) ? vec3(0.28, 0.01, 0.02)
-                                   : vec3(0.04, 0.45, 0.09);
-            base = neon * (0.55 + 0.45 * diff);
+        vec3 base = vec3(0.004, 0.003, 0.008) * diff;
+        if (h > 0.42) {
+            vec3 voxCol = (h > 0.88) ? vec3(0.55, 0.68, 0.03)
+                        : (h > 0.74) ? vec3(0.03, 0.48, 0.08)
+                        : (h > 0.60) ? vec3(0.62, 0.03, 0.18)
+                                     : vec3(0.07, 0.32, 0.56);
+            base = voxCol * (0.38 + 0.72 * ndl);
         }
-        FragColor = vec4(base + rim * vec3(0.025, 0.012, 0.04), 1.0);
+        FragColor = vec4(base + vec3(spec * 0.14), 1.0);
         return;
     }
 
-    // Translucent cyan/mint vertical light curtains (type 24)
-    if (vTypeId == 24) {
-        float vFade = 1.0 - abs(vLocalPos.y) * 1.5;
-        FragColor = vec4(vColor * (0.75 + 0.25 * sin(uTime * 1.5 + vPhase)), clamp(vFade * 0.46, 0.10, 0.48));
-        return;
-    }
-
-    // Stippled frosted crystal clouds (type 25) & Eyed Archon Spheres (type 40)
-    if (vTypeId == 25) {
-        float n = hash31(floor(vWorldPos * 16.0));
-        if (n < 0.34) discard;
-        FragColor = vec4(vColor * (0.45 + 0.55 * diff) + rim * vec3(0.18, 0.22, 0.30), 0.82);
-        return;
-    }
-
-    if (vTypeId == 40) {
-        // Stippled Archon Godform Sphere with glowing central gaze eye
-        float stip = hash31(floor(vWorldPos * 14.0));
-        if (stip < 0.22) discard;
+    // 5. matClass == 4: 4-Layer Anatomical Eyeball (Sclera + Radial Iris Fibers + Pupil + Corneal Glint)
+    if (vMatClass == 4) {
         vec3 ln = normalize(vLocalPos);
-        float eyeDot = dot(ln, normalize(vec3(0.0, 0.08, 1.0)));
-        vec3 col = vColor * 0.28 * diff + rim * vec3(0.15, 0.28, 0.45);
-        if (eyeDot > 0.965) col = vec3(0.005, 0.003, 0.01); // pupil
-        else if (eyeDot > 0.90) col = vec3(0.65, 0.42, 0.04); // golden iris
-        else if (eyeDot > 0.82) col = vec3(0.45, 0.48, 0.58); // sclera
-        FragColor = vec4(col, 0.84);
+        float gaze = dot(ln, vec3(0.0, 0.0, 1.0));
+        float angle = atan(ln.y, ln.x);
+        vec3 irisCol = pow(rainbowBand(vPhase + 0.05 * sin(angle * 22.0)), vec3(2.0));
+        vec3 col = vec3(0.72, 0.76, 0.84) * diff; // sclera
+        if (gaze > 0.925) {
+            col = vec3(0.002, 0.002, 0.004) + vec3(spec * 1.4); // pupil + wet glint
+        } else if (gaze > 0.76) {
+            float fib = 0.72 + 0.28 * sin(angle * 28.0 + gaze * 18.0);
+            col = irisCol * fib * (0.55 + 0.55 * ndl) + vec3(spec * 0.9);
+        }
+        FragColor = vec4(col, 1.0);
         return;
     }
 
-    vec3 col = vColor * diff + vColor * rim * 0.55;
-    FragColor = vec4(col, 1.0);
+    // 6. matClass == 3: Translucent Emerald Bell / Frosted Gyroid Cloud / Crystal Transmission
+    if (vMatClass == 3) {
+        vec3 glass = linCol * (0.42 + 0.65 * ndl) + mix(linCol, vec3(0.45, 0.95, 0.72), 0.35) * rim * 0.75 + vec3(spec * 0.35);
+        FragColor = vec4(glass, clamp(vAlphaTag, 0.35, 0.90));
+        return;
+    }
+
+    // 7. matClass == 7: Xylos Hyperbolic Möbius Membrane (crystal-clear glass shell letting 192 axons shine!)
+    if (vMatClass == 7) {
+        float wave = 0.5 + 0.5 * sin(vUv.x * 25.1327 + uTime * 2.2 + vPhase);
+        vec3 mCol = mix(vec3(0.04, 0.58, 0.95), vec3(0.48, 0.08, 0.95), wave);
+        FragColor = vec4(mCol * (0.18 + 0.82 * rim), 0.14);
+        return;
+    }
+
+    // 8. matClass == 6: Additive Solar / FireCone / Portal Glow
+    if (vMatClass == 6) {
+        float flicker = 0.78 + 0.22 * sin(vLocalPos.y * 9.0 - uTime * 6.5 + vPhase);
+        FragColor = vec4(linCol * flicker * (0.85 + 0.65 * rim), clamp(vAlphaTag, 0.30, 0.92));
+        return;
+    }
+
+    // Standard Organism / Botanical / Deity Shading across all 11 RENDER_MODES!
+    vec3 col = linCol * diff + vec3(spec * 0.22) + linCol * rim * 0.42;
+    float outAlpha = 1.0;
+
+    if (uRenderMode == 2) { // ghost
+        col = mix(linCol, vec3(0.35, 0.72, 1.0), 0.45) * (0.25 + 0.95 * rim);
+        outAlpha = 0.45;
+    } else if (uRenderMode == 3) { // neon
+        col = linCol * (0.18 + 1.85 * rim) + linCol * step(0.75, sin(vLocalPos.y * 18.0 + uTime * 4.0)) * 0.6;
+    } else if (uRenderMode == 4) { // chrome
+        vec3 R = reflect(-V, N);
+        vec3 env = pow(rainbowBand(R.y * 0.5 + 0.25), vec3(2.0)) * 0.55 + vec3(0.12);
+        col = mix(env, linCol, 0.28) + vec3(spec * 0.95);
+    } else if (uRenderMode == 5) { // hologram
+        float scan = 0.65 + 0.35 * sin(vWorldPos.y * 14.0 - uTime * 7.0);
+        col = mix(vec3(0.02, 0.85, 0.72), linCol, 0.35) * scan * (0.4 + 0.9 * rim);
+        outAlpha = 0.72;
+    } else if (uRenderMode == 6) { // iridescent
+        col = mix(col, pow(rainbowBand(dot(N, V) * 2.0 + vPhase), vec3(2.0)), 0.62) + vec3(spec * 0.4);
+    } else if (uRenderMode == 7) { // plasma
+        float pl = 0.5 + 0.5 * sin(vWorldPos.x * 2.2 + uTime * 3.5) * cos(vWorldPos.z * 2.2 - uTime * 2.8);
+        col = mix(vec3(0.95, 0.04, 0.28), vec3(0.03, 0.82, 1.0), pl) * (0.5 + 0.6 * ndl);
+    } else if (uRenderMode == 8) { // obsidian
+        col = vec3(0.004, 0.004, 0.008) * diff + linCol * rim * 1.15 + vec3(spec * 0.85);
+    } else if (uRenderMode == 9) { // prismatic (DEFAULT!)
+        vec3 disp = pow(rainbowBand(rim * 1.35 + vPhase * 0.15), vec3(2.0));
+        col = linCol * diff + mix(linCol, disp, 0.52) * rim * 0.65 + vec3(spec * 0.30);
+    }
+
+    // Brutalism palette modifiers
+    if (uBrutalMode == 3) { // ROCOCOGOLOGY pastel gold filigree
+        col = mix(col, vec3(0.96, 0.84, 0.72), 0.28) + vec3(0.35, 0.28, 0.08) * rim;
+    } else if (uBrutalMode == 5) { // REPRESSIONISM stark desaturated contrast
+        float g = dot(col, vec3(0.299, 0.587, 0.114));
+        col = mix(vec3(g), col, 0.22);
+    }
+
+    FragColor = vec4(col, outAlpha);
 }
 )GLSL";
 
-// Pass 4: Additive Ribbon & Synaptic Connectome Line Shader
+// Pass 4: 4D Titan Tesseracts, Xylos Sphere Cage/Axons, & Lorenz/Rossler Ribbons
 inline const char* kLineVert = R"GLSL(
 #version 330 core
 layout(location = 0) in vec3 aPos;
@@ -390,7 +489,7 @@ out vec4 vCol;
 void main() {
     vCol = aCol;
     gl_Position = uViewProj * vec4(aPos, 1.0);
-    gl_PointSize = 1.8;
+    gl_PointSize = 2.0;
 }
 )GLSL";
 
@@ -403,7 +502,7 @@ void main() {
 }
 )GLSL";
 
-// Pass 5: Native Reliquary Filigree SDF + Jolt Physics 5.5 Fracture Raymarcher
+// Pass 5: Native Reliquary Filigree SDF + Jolt Physics 5.5 Fracture Raymarcher (`renderMode == 10`)
 inline const char* kReliquaryFrag = R"GLSL(
 #version 330 core
 out vec4 FragColor;
@@ -411,8 +510,6 @@ in vec2 vUv;
 
 uniform vec2  uResolution;
 uniform float uTime;
-uniform vec3  uCamPos;
-uniform vec3  uCamTarget;
 uniform float uBass;
 const int MAX_BODIES = 48;
 uniform int  uNumBodies;
@@ -534,7 +631,7 @@ void main(){
 }
 )GLSL";
 
-// Pass 6: HDR Post-FX (Gravitational Singularity Lensing + 10 Render Modes + ACES Filmic Tone Mapping)
+// Pass 6: HDR Post-FX (Gravitational Singularity Lensing + ACES Filmic Tone Mapping)
 inline const char* kPostFrag = R"GLSL(
 #version 330 core
 in vec2 vUv;
@@ -554,50 +651,25 @@ vec3 acesFilmic(vec3 x) {
 void main() {
     vec2 uv = vUv;
     float aspect = uResolution.x / max(uResolution.y, 1.0);
-    vec2 d = (uv - vec2(0.5, 0.54)) * vec2(aspect, 1.0);
+    vec2 d = (uv - vec2(0.5, 0.56)) * vec2(aspect, 1.0);
     float r = length(d);
 
-    // Singularity spacetime deflection
     if (uSingularity > 0 && r > 0.015) {
-        float einsteinR = (uSingularity == 2) ? 0.055 : 0.042;
-        vec2 swirl = (uSingularity == 2) ? vec2(-d.y, d.x) * (0.0025 / (r + 0.04)) : vec2(0.0);
-        uv -= (d / vec2(aspect, 1.0)) * ((einsteinR * einsteinR) / (r * r + 0.008)) + swirl;
+        float einsteinR = (uSingularity == 2) ? 0.050 : 0.038;
+        vec2 swirl = (uSingularity == 1) ? vec2(-d.y, d.x) * (0.0022 / (r + 0.04)) : vec2(0.0);
+        uv -= (d / vec2(aspect, 1.0)) * ((einsteinR * einsteinR) / (r * r + 0.010)) + swirl;
         uv = clamp(uv, vec2(0.001), vec2(0.999));
     }
 
-    vec3 col = texture(uSceneTex, uv).rgb * 1.32;
+    vec3 col = texture(uSceneTex, uv).rgb * 1.06;
 
-    if (uRenderMode == 1) {
-        // Hologram scanlines
-        float scan = 0.82 + 0.18 * sin(uv.y * uResolution.y * 1.4 + uTime * 8.0);
-        float lum = dot(col, vec3(0.299, 0.587, 0.114));
-        col = mix(col, vec3(0.15, 0.92, 0.88) * lum * 1.6, 0.65) * scan;
-    } else if (uRenderMode == 2 || uRenderMode == 3) {
-        // Edge / X-Ray highlight
-        vec2 px = 1.0 / max(uResolution, vec2(1.0));
-        vec3 cx = texture(uSceneTex, uv + vec2(px.x, 0.0)).rgb - texture(uSceneTex, uv - vec2(px.x, 0.0)).rgb;
-        vec3 cy = texture(uSceneTex, uv + vec2(0.0, px.y)).rgb - texture(uSceneTex, uv - vec2(0.0, px.y)).rgb;
-        float edge = length(cx) + length(cy);
-        col = (uRenderMode == 2) ? vec3(0.1, 0.95, 0.65) * edge * 3.2 + col * 0.22
-                                 : vec3(0.35, 0.75, 1.0) * (edge * 2.5 + dot(col, vec3(0.33)) * 0.6);
-    } else if (uRenderMode == 4) {
-        // Thermal FLIR
-        float t = clamp(dot(col, vec3(0.35, 0.45, 0.20)), 0.0, 1.0);
-        col = mix(vec3(0.08, 0.02, 0.28), mix(vec3(0.92, 0.18, 0.12), vec3(1.0, 0.96, 0.35), smoothstep(0.4, 1.0, t)), smoothstep(0.0, 0.6, t));
-    } else if (uRenderMode == 5) {
-        // Quantum phase interference
-        col *= 0.85 + 0.35 * cos(6.28318 * (r * 9.0 - uTime * 0.5) + vec3(0.0, 2.1, 4.2));
-    } else if (uRenderMode == 6) {
-        // Brutalist Noir
-        float g = dot(col, vec3(0.299, 0.587, 0.114));
-        col = vec3(pow(clamp(g * 1.25, 0.0, 1.0), 1.35));
-    } else if (uRenderMode == 7) {
-        // Biolume boost
-        col = pow(max(col, vec3(0.0)), vec3(0.85)) * vec3(0.85, 1.22, 1.15);
+    if (uRenderMode == 5) { // subtle hologram scanline overlay
+        float scan = 0.88 + 0.12 * sin(uv.y * uResolution.y * 1.4 + uTime * 8.0);
+        col *= scan;
     }
 
     col = acesFilmic(col);
-    col = pow(col, vec3(1.0 / 2.2));
+    col = pow(max(col, vec3(0.0)), vec3(1.0 / 2.2));
     FragColor = vec4(col, 1.0);
 }
 )GLSL";

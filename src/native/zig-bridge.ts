@@ -1,5 +1,5 @@
 /**
- * CQM2 v2.1.0 Isomorphic Zig 0.17 SIMD128 WebAssembly Kernel Bridge.
+ * CQM2 v5.0.0 Isomorphic Zig 0.17 SIMD128 WebAssembly Kernel Bridge (49 Hardware Kernels).
  * Zero Node/Bun-only imports: runs identically inside any modern Browser (Mobile/Desktop/4K),
  * Bun local server, or Node 24 CI runner with deterministic arena reset per call!
  */
@@ -238,6 +238,59 @@ export interface ZigWasmExports extends WebAssembly.Exports {
     rows: number,
     cols: number,
     bitsMode: number,
+  ): void;
+  // v5.0.0 ALife v3.0, Philox4x32-10, Forked PCI*, CSR Guard, 10081-param SuperMind REA & 51-param ResourceHead exports
+  cqm2_philox4x32_10_batch(
+    seedLo: number,
+    seedHi: number,
+    tick: number,
+    domainTag: number,
+    startEntity: number,
+    outFloatsPtr: number,
+    count: number,
+  ): void;
+  cqm2_alife_v3_ledger11_step(
+    pools13Ptr: number,
+    solarInflux: number,
+    photosynthesisReq: number,
+    somaToGamete: number,
+    mortalityFlux: number,
+    decompFlux: number,
+    workAlloc: number,
+    radCooling: number,
+    numClampDiss: number,
+  ): number;
+  cqm2_pci_lz_forked_snapshot(
+    liveStatePtr: number,
+    couplingsDensePtr: number,
+    nRaw: number,
+    perturbNode: number,
+    pulseAmp: number,
+    rolloutStepsRaw: number,
+  ): number;
+  cqm2_spectral_guard_csr_step(
+    numRows: number,
+    rowPtr: number,
+    colIdxPtr: number,
+    valsInOutPtr: number,
+    uVecInOutPtr: number,
+    scratchVPtr: number,
+    maxRho: number,
+  ): number;
+  cqm2_super_mind_10k_step(
+    in16Ptr: number,
+    params10081Ptr: number,
+    memSlotInOutPtr: number,
+    eshkolVfe: number,
+    metacogConf: number,
+    out24Ptr: number,
+    stats16Ptr: number,
+  ): number;
+  cqm2_entity_resource_head_51_batch(
+    inputs8Ptr: number,
+    weights51Ptr: number,
+    outputs3Ptr: number,
+    count: number,
   ): void;
 }
 
@@ -871,6 +924,157 @@ export class ZigKernelBridge {
 
   public qwzChernFhs(massM: number, gridN = 24): number {
     return this.exports.cqm_moonlab_qwz_chern_fhs(massM, gridN >>> 0);
+  }
+
+  public philox4x32Batch(
+    seedLo: number,
+    seedHi: number,
+    tick: number,
+    domainTag: number,
+    startEntity: number,
+    count: number,
+  ): Float32Array {
+    if (count <= 0) return new Float32Array(0);
+    this.exports.cqm2_reset_heap();
+    const outPtr = this.allocF32Zero(count);
+    this.exports.cqm2_philox4x32_10_batch(
+      seedLo >>> 0,
+      seedHi >>> 0,
+      tick >>> 0,
+      domainTag >>> 0,
+      startEntity >>> 0,
+      outPtr,
+      count >>> 0,
+    );
+    const out = new Float32Array(count);
+    out.set(new Float32Array(this.exports.memory.buffer, outPtr, count));
+    return out;
+  }
+
+  public stepAlifeV3Ledger11(
+    pools13: Float64Array,
+    solarInflux: number,
+    photosynthesisReq: number,
+    somaToGamete: number,
+    mortalityFlux: number,
+    decompFlux: number,
+    workAlloc: number,
+    radCooling: number,
+    numClampDiss: number,
+  ): number {
+    this.exports.cqm2_reset_heap();
+    const ptr = this.exports.cqm2_alloc(13 * 8);
+    new Float64Array(this.exports.memory.buffer, ptr, 13).set(pools13.subarray(0, 13));
+    const drift = this.exports.cqm2_alife_v3_ledger11_step(
+      ptr,
+      solarInflux,
+      photosynthesisReq,
+      somaToGamete,
+      mortalityFlux,
+      decompFlux,
+      workAlloc,
+      radCooling,
+      numClampDiss,
+    );
+    pools13.subarray(0, 13).set(new Float64Array(this.exports.memory.buffer, ptr, 13));
+    return drift;
+  }
+
+  public pciLzForkedSnapshot(
+    liveState: Float32Array,
+    couplingsDense: Float32Array,
+    n: number,
+    perturbNode = 0,
+    pulseAmp = 1.2,
+    rolloutSteps = 16,
+  ): number {
+    const dim = Math.max(4, Math.min(64, n | 0));
+    this.exports.cqm2_reset_heap();
+    const sPtr = this.allocF32(liveState.subarray(0, dim));
+    const cPtr = this.allocF32(couplingsDense.subarray(0, dim * dim));
+    return this.exports.cqm2_pci_lz_forked_snapshot(
+      sPtr,
+      cPtr,
+      dim >>> 0,
+      perturbNode >>> 0,
+      pulseAmp,
+      rolloutSteps >>> 0,
+    );
+  }
+
+  public stepSpectralGuardCsr(
+    numRows: number,
+    rowPtr: Uint32Array,
+    colIdx: Uint32Array,
+    valsInOut: Float32Array,
+    uVecInOut: Float32Array,
+    maxRho = 0.99,
+  ): number {
+    if (numRows <= 0) return 0;
+    this.exports.cqm2_reset_heap();
+    const nnz = rowPtr[numRows] ?? valsInOut.length;
+    const rpPtr = this.exports.cqm2_alloc((numRows + 1) * 4);
+    const ciPtr = this.exports.cqm2_alloc(Math.max(16, nnz * 4));
+    new Uint32Array(this.exports.memory.buffer, rpPtr, numRows + 1).set(rowPtr.subarray(0, numRows + 1));
+    new Uint32Array(this.exports.memory.buffer, ciPtr, nnz).set(colIdx.subarray(0, nnz));
+    const vPtr = this.allocF32(valsInOut.subarray(0, nnz));
+    const uPtr = this.allocF32(uVecInOut.subarray(0, numRows));
+    const svPtr = this.allocF32Zero(numRows);
+
+    const sigma = this.exports.cqm2_spectral_guard_csr_step(
+      numRows >>> 0,
+      rpPtr,
+      ciPtr,
+      vPtr,
+      uPtr,
+      svPtr,
+      maxRho,
+    );
+    const buf = this.exports.memory.buffer;
+    valsInOut.subarray(0, nnz).set(new Float32Array(buf, vPtr, nnz));
+    uVecInOut.subarray(0, numRows).set(new Float32Array(buf, uPtr, numRows));
+    return sigma;
+  }
+
+  public stepSuperMind10k(
+    in16: Float32Array,
+    params10081: Float32Array,
+    memSlot: number,
+    eshkolVfe: number,
+    metacogConf: number,
+    out24: Float32Array,
+    stats16: Float32Array,
+  ): { rea: number; nextMemSlot: number } {
+    this.exports.cqm2_reset_heap();
+    const inPtr = this.allocF32(in16.subarray(0, 16));
+    const pPtr = this.allocF32(params10081.subarray(0, 10081));
+    const slotPtr = this.exports.cqm2_alloc(16);
+    new Uint32Array(this.exports.memory.buffer, slotPtr, 1)[0] = memSlot >>> 0;
+    const oPtr = this.allocF32Zero(24);
+    const sPtr = this.allocF32Zero(16);
+
+    const rea = this.exports.cqm2_super_mind_10k_step(inPtr, pPtr, slotPtr, eshkolVfe, metacogConf, oPtr, sPtr);
+    const buf = this.exports.memory.buffer;
+    params10081.subarray(0, 10081).set(new Float32Array(buf, pPtr, 10081));
+    out24.subarray(0, 24).set(new Float32Array(buf, oPtr, 24));
+    stats16.subarray(0, 16).set(new Float32Array(buf, sPtr, 16));
+    const nextMemSlot = new Uint32Array(buf, slotPtr, 1)[0]!;
+    return { rea, nextMemSlot };
+  }
+
+  public stepEntityResourceHead51Batch(
+    inputs8: Float32Array,
+    weights51: Float32Array,
+    outputs3: Float32Array,
+    count: number,
+  ): void {
+    if (count <= 0) return;
+    this.exports.cqm2_reset_heap();
+    const inPtr = this.allocF32(inputs8.subarray(0, count * 8));
+    const wPtr = this.allocF32(weights51.subarray(0, count * 51));
+    const outPtr = this.allocF32Zero(count * 3);
+    this.exports.cqm2_entity_resource_head_51_batch(inPtr, wPtr, outPtr, count >>> 0);
+    outputs3.subarray(0, count * 3).set(new Float32Array(this.exports.memory.buffer, outPtr, count * 3));
   }
 }
 

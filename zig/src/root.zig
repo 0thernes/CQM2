@@ -2,10 +2,11 @@ const std = @import("std");
 const math = std.math;
 
 // ============================================================================
-// CQM2 v4.0.0 Dual-Target Zig SIMD128 / AVX2 Scientific & Neural Kernel Suite
+// CQM2 v5.0.0 Dual-Target Zig SIMD128 / AVX2 Scientific & Neural Kernel Suite
 // Targets: wasm32-freestanding (+simd128) AND x86_64/aarch64 Native FFI DLL
-// Unifies all 20 CQM2 kernels + all 18 Original CQM `cqm_*` kernels + 5 v4.0.0
-// Neuroscience & 11/11/2026 Errata kernels (43 total hardware-SIMD exports).
+// Unifies all 20 CQM2 kernels + all 18 Original CQM `cqm_*` kernels + 11 v4/v5
+// Neuroscience, SuperMind (REA), Economy & 11/11/2026 ALife v3.0 kernels
+// (49 total hardware-SIMD exports).
 // ============================================================================
 
 const HEAP_SIZE: usize = 32 * 1024 * 1024; // 32 MiB deterministic linear arena
@@ -2254,6 +2255,509 @@ export fn cqm2_nested_bitnet_int4_gemv(
 }
 
 // ============================================================================
+// 17. CQM2 v5.0.0 ALife v3.0 (11/11/2026) & Original CQM SuperMind (REA) Suite
+// ============================================================================
+
+// (F) Domain-Isolated Counter-Based Philox4x32-10 PRNG (Salmon et al. SC11)
+// Eliminates shared mutable PRNG state across subsystems (physics, neural, mutation, audio).
+export fn cqm2_philox4x32_10_batch(
+    key_lo: u32,
+    key_hi: u32,
+    tick_lo: u32,
+    domain_tag: u32,
+    start_index: u32,
+    out_floats: [*]f32,
+    count: usize,
+) callconv(.c) void {
+    const M0: u64 = 0xD2511F53;
+    const M1: u64 = 0xCD9E8D57;
+    const W0: u32 = 0x9E3779B9;
+    const W1: u32 = 0xBB67AE85;
+
+    var written: usize = 0;
+    var block: u32 = 0;
+    while (written < count) : (block += 1) {
+        var c0: u32 = start_index +% block;
+        var c1: u32 = tick_lo;
+        var c2: u32 = domain_tag;
+        var c3: u32 = 0xC0540902;
+        var k0: u32 = key_lo;
+        var k1: u32 = key_hi;
+
+        var round: usize = 0;
+        while (round < 10) : (round += 1) {
+            const p0: u64 = M0 * @as(u64, c0);
+            const p1: u64 = M1 * @as(u64, c2);
+            const hi0: u32 = @truncate(p0 >> 32);
+            const lo0: u32 = @truncate(p0);
+            const hi1: u32 = @truncate(p1 >> 32);
+            const lo1: u32 = @truncate(p1);
+
+            c0 = hi1 ^ c1 ^ k0;
+            c1 = lo1;
+            c2 = hi0 ^ c3 ^ k1;
+            c3 = lo0;
+
+            k0 +%= W0;
+            k1 +%= W1;
+        }
+
+        const lanes = [4]u32{ c0, c1, c2, c3 };
+        var l: usize = 0;
+        while (l < 4 and written < count) : (l += 1) {
+            // Exact 24-bit mantissa uniform in [0, 1)
+            out_floats[written] = @as(f32, @floatFromInt(lanes[l] >> 8)) * (1.0 / 16777216.0);
+            written += 1;
+        }
+    }
+}
+
+// (G) ALife v3.0 11-Pool Closed FP64 Kahan-Babuška-Neumaier Thermodynamic Ledger
+// Pools [0..10]: E_patch, E_soma, E_gamete, E_corpse, E_detritus, E_mineral, E_work_buf,
+//                E_rad_import, E_rad_export, E_heat_phys, E_diss_num
+// Slots [11..12]: [kbn_comp, initial_closed_invariant]
+// Invariant: (sum_{0..6} E_i + E_rad_export + E_heat_phys + E_diss_num) - E_rad_import == const (<= 1e-12)
+export fn cqm2_alife_v3_ledger11_step(
+    pools13: [*]f64,
+    solar_influx: f64,
+    photosynthesis_req: f64,
+    soma_to_gamete: f64,
+    mortality_flux: f64,
+    decomp_flux: f64,
+    work_alloc: f64,
+    rad_cooling: f64,
+    num_clamp_diss: f64,
+) callconv(.c) f64 {
+    var comp = pools13[11];
+
+    // Initialize baseline invariant prior to first flux if unset
+    if (pools13[12] <= 0.0) {
+        var init_sum: f64 = 0.0;
+        var init_c: f64 = 0.0;
+        var k: usize = 0;
+        while (k <= 10) : (k += 1) {
+            const signed_v: f64 = if (k == 7) -pools13[k] else pools13[k];
+            kbnAccum(&init_sum, signed_v, &init_c);
+        }
+        pools13[12] = init_sum + init_c;
+    }
+
+    // 1. Radiative solar import -> E_patch (slot 7 enters invariant with minus sign, so its KBN residual subtracts from comp!)
+    const sol = @max(0.0, solar_influx);
+    kbnAccum(&pools13[0], sol, &comp);
+    var comp7: f64 = 0.0;
+    kbnAccum(&pools13[7], sol, &comp7);
+    comp -= comp7;
+
+    // 2. Patch -> Soma + Physical Heat (strict paired double-entry transfers!)
+    const draw_patch = @min(@max(0.0, pools13[0]), @max(0.0, photosynthesis_req));
+    const to_soma = draw_patch * 0.68;
+    const to_heat1 = @max(0.0, draw_patch - to_soma);
+    kbnAccum(&pools13[0], -to_soma, &comp);
+    kbnAccum(&pools13[1], to_soma, &comp);
+    kbnAccum(&pools13[0], -to_heat1, &comp);
+    kbnAccum(&pools13[9], to_heat1, &comp);
+
+    // 3. Soma -> Gamete + Physical Heat
+    const draw_gam = @min(@max(0.0, pools13[1]) * 0.4, @max(0.0, soma_to_gamete));
+    const to_gam = draw_gam * 0.85;
+    const to_heat2 = @max(0.0, draw_gam - to_gam);
+    kbnAccum(&pools13[1], -to_gam, &comp);
+    kbnAccum(&pools13[2], to_gam, &comp);
+    kbnAccum(&pools13[1], -to_heat2, &comp);
+    kbnAccum(&pools13[9], to_heat2, &comp);
+
+    // 4. Mortality: Soma -> Corpse + Detritus
+    const mort = @min(@max(0.0, pools13[1]) * 0.25, @max(0.0, mortality_flux));
+    const to_corpse = mort * 0.75;
+    const to_det = @max(0.0, mort - to_corpse);
+    kbnAccum(&pools13[1], -to_corpse, &comp);
+    kbnAccum(&pools13[3], to_corpse, &comp);
+    kbnAccum(&pools13[1], -to_det, &comp);
+    kbnAccum(&pools13[4], to_det, &comp);
+
+    // 5. Saprotrophic decomposition: Corpse -> Mineral + Patch + Physical Heat
+    const dec_c = @min(@max(0.0, pools13[3]) * 0.5, @max(0.0, decomp_flux));
+    const to_min = dec_c * 0.60;
+    const to_pat = dec_c * 0.25;
+    const to_heat3 = @max(0.0, (dec_c - to_min) - to_pat);
+    kbnAccum(&pools13[3], -to_min, &comp);
+    kbnAccum(&pools13[5], to_min, &comp);
+    kbnAccum(&pools13[3], -to_pat, &comp);
+    kbnAccum(&pools13[0], to_pat, &comp);
+    kbnAccum(&pools13[3], -to_heat3, &comp);
+    kbnAccum(&pools13[9], to_heat3, &comp);
+
+    // 6. Mechanical Work Buffer -> Physical Heat + Numerical Clamp Dissipation + Radiative Export
+    const w_in = @min(@max(0.0, pools13[1]) * 0.2, @max(0.0, work_alloc));
+    kbnAccum(&pools13[1], -w_in, &comp);
+    kbnAccum(&pools13[6], w_in, &comp);
+
+    const w_avail = @max(0.0, pools13[6]);
+    const n_diss = @min(w_avail * 0.25, @max(0.0, num_clamp_diss));
+    const w_diss = @min(@max(0.0, w_avail - n_diss), w_avail * 0.55);
+    kbnAccum(&pools13[6], -n_diss, &comp);
+    kbnAccum(&pools13[10], n_diss, &comp);
+    kbnAccum(&pools13[6], -w_diss, &comp);
+    kbnAccum(&pools13[9], w_diss, &comp);
+
+    const rad_out = @min(@max(0.0, pools13[9]) * 0.05, @max(0.0, rad_cooling));
+    kbnAccum(&pools13[9], -rad_out, &comp);
+    kbnAccum(&pools13[8], rad_out, &comp);
+
+    pools13[11] = comp;
+
+    var cur_sum: f64 = 0.0;
+    var cur_c: f64 = comp;
+    var k2: usize = 0;
+    while (k2 <= 10) : (k2 += 1) {
+        const signed_v: f64 = if (k2 == 7) -pools13[k2] else pools13[k2];
+        kbnAccum(&cur_sum, signed_v, &cur_c);
+    }
+    return @abs((cur_sum + cur_c) - pools13[12]);
+}
+
+// (H) Errata D-02: Non-Destructive Forked-Snapshot Perturbational Complexity Index (PCI* LZ76)
+// Clones `live_state[0..n]` (n <= 64) into local scratch so live neural state is NEVER mutated!
+export fn cqm2_pci_lz_forked_snapshot(
+    live_state: [*]const f32,
+    couplings_dense: [*]const f32, // [n * n]
+    n_raw: usize,
+    perturb_node: usize,
+    pulse_amp: f32,
+    rollout_steps_raw: usize,
+) callconv(.c) f32 {
+    const n: usize = math.clamp(n_raw, 4, 64);
+    const steps: usize = math.clamp(rollout_steps_raw, 8, 32);
+
+    var base_s: [64]f32 = @splat(0.0);
+    var pert_s: [64]f32 = @splat(0.0);
+    var next_b: [64]f32 = @splat(0.0);
+    var next_p: [64]f32 = @splat(0.0);
+
+    var i: usize = 0;
+    while (i < n) : (i += 1) {
+        base_s[i] = live_state[i];
+        pert_s[i] = live_state[i];
+    }
+    pert_s[perturb_node % n] = math.clamp(pert_s[perturb_node % n] + pulse_amp, -2.5, 2.5);
+
+    var bit_seq: [2048]u8 = @splat(0);
+    const seq_len: usize = n * steps;
+    var ones: usize = 0;
+
+    var t: usize = 0;
+    while (t < steps) : (t += 1) {
+        i = 0;
+        while (i < n) : (i += 1) {
+            var acc_b: f32 = 0.0;
+            var acc_p: f32 = 0.0;
+            const row = couplings_dense + i * n;
+            var j: usize = 0;
+            while (j < n) : (j += 1) {
+                acc_b += row[j] * base_s[j];
+                acc_p += row[j] * pert_s[j];
+            }
+            next_b[i] = fastTanh(0.65 * base_s[i] + 0.35 * acc_b);
+            next_p[i] = fastTanh(0.65 * pert_s[i] + 0.35 * acc_p);
+            const diff = @abs(next_p[i] - next_b[i]);
+            const bit: u8 = if (diff > 0.035) 1 else 0;
+            bit_seq[t * n + i] = bit;
+            ones += bit;
+        }
+        i = 0;
+        while (i < n) : (i += 1) {
+            base_s[i] = next_b[i];
+            pert_s[i] = next_p[i];
+        }
+    }
+
+    if (ones == 0 or ones == seq_len) return 0.0;
+
+    // Kaspar-Schuster LZ76 exhaustive complexity count c(seq_len)
+    var c_lz: usize = 1;
+    var l_idx: usize = 0;
+    var idx: usize = 1;
+    var k_len: usize = 1;
+    var k_max: usize = 1;
+    while (true) {
+        if (idx + k_len - 1 >= seq_len) {
+            c_lz += 1;
+            break;
+        }
+        if (bit_seq[l_idx + k_len - 1] == bit_seq[idx + k_len - 1]) {
+            k_len += 1;
+        } else {
+            if (k_len > k_max) k_max = k_len;
+            l_idx += 1;
+            if (l_idx == idx) {
+                c_lz += 1;
+                idx += k_max;
+                if (idx >= seq_len) break;
+                l_idx = 0;
+                k_len = 1;
+                k_max = 1;
+            } else {
+                k_len = 1;
+            }
+        }
+    }
+
+    const p1 = @as(f32, @floatFromInt(ones)) / @as(f32, @floatFromInt(seq_len));
+    const p0 = 1.0 - p1;
+    const h_src = -(p1 * math.log2(@max(1e-6, p1)) + p0 * math.log2(@max(1e-6, p0)));
+    const l_f = @as(f32, @floatFromInt(seq_len));
+    const norm = @max(1.0, (l_f * @max(0.08, h_src)) / math.log2(@max(2.0, l_f)));
+    return math.clamp(@as(f32, @floatFromInt(c_lz)) / norm, 0.0, 1.0);
+}
+
+// (I) Incremental O(nnz) CSR Spectral-Radius Guard (enforces ||W||_2 <= max_rho)
+export fn cqm2_spectral_guard_csr_step(
+    num_rows: usize,
+    row_ptr: [*]const u32,
+    col_idx: [*]const u32,
+    vals_inout: [*]f32,
+    u_vec_inout: [*]f32, // [num_rows] unit power-iteration vector
+    scratch_v: [*]f32, // [num_rows]
+    max_rho: f32,
+) callconv(.c) f32 {
+    if (num_rows == 0) return 0.0;
+    var r: usize = 0;
+    var v_norm2: f32 = 0.0;
+    while (r < num_rows) : (r += 1) {
+        var acc: f32 = 0.0;
+        var k: usize = row_ptr[r];
+        const end_k: usize = row_ptr[r + 1];
+        while (k < end_k) : (k += 1) {
+            const c: usize = col_idx[k] % num_rows;
+            acc += vals_inout[k] * u_vec_inout[c];
+        }
+        scratch_v[r] = acc;
+        v_norm2 += acc * acc;
+    }
+    const sigma = @sqrt(v_norm2 + 1e-12);
+
+    // Update u_vec <- W^T * scratch_v normalized
+    r = 0;
+    while (r < num_rows) : (r += 1) u_vec_inout[r] = 0.0;
+    r = 0;
+    while (r < num_rows) : (r += 1) {
+        const vr = scratch_v[r];
+        var k: usize = row_ptr[r];
+        const end_k: usize = row_ptr[r + 1];
+        while (k < end_k) : (k += 1) {
+            const c: usize = col_idx[k] % num_rows;
+            u_vec_inout[c] += vals_inout[k] * vr;
+        }
+    }
+    var u_norm2: f32 = 0.0;
+    r = 0;
+    while (r < num_rows) : (r += 1) u_norm2 += u_vec_inout[r] * u_vec_inout[r];
+    const inv_u = 1.0 / @sqrt(u_norm2 + 1e-12);
+    r = 0;
+    while (r < num_rows) : (r += 1) u_vec_inout[r] *= inv_u;
+
+    const target = math.clamp(max_rho, 0.1, 0.999);
+    if (sigma > target) {
+        const scale = target / sigma;
+        const nnz: usize = row_ptr[num_rows];
+        var idx: usize = 0;
+        while (idx < nnz) : (idx += 1) vals_inout[idx] *= scale;
+        return target;
+    }
+    return sigma;
+}
+
+// (J) Original CQM 10,081-Parameter Archon `SuperMind` Forward + Episodic Memory + 16 Cognitive Stats (`REA`)
+// Exact layout of `params10081`:
+//   w1[16*64=1024], b1[64]              -> 1,088
+//   w2[64*64=4096], b2[64]              -> 4,160 (cum 5,248)
+//   w_rec[64*32=2048], mem[32*32=1024]  -> 3,072 (cum 8,320)
+//   w3[64*24=1536], b3[24]              -> 1,560 (cum 9,880)
+//   w_val[64], b_val[1]                 ->    65 (cum 9,945)
+//   w_meta[16*8=128], b_meta[8]         ->   136 (cum 10,081 exact!)
+// Outputs:
+//   out24[24]   : motor / wingman / aura / broadcast vector
+//   stats16[16] : [VAL, ARO, DOM, SUR, AGG, DEC, CUR, DRE, HAL, REA, SAW, NOV, IGN, INTG, PHI, CONF]
+export fn cqm2_super_mind_10k_step(
+    in16: [*]const f32,
+    params10081: [*]f32,
+    mem_slot_inout: *u32,
+    eshkol_vfe: f32,
+    metacog_conf: f32,
+    out24: [*]f32,
+    stats16: [*]f32,
+) callconv(.c) f32 {
+    const w1 = params10081;
+    const b1 = w1 + 1024;
+    const w2 = b1 + 64;
+    const b2 = w2 + 4096;
+    const w_rec = b2 + 64;
+    const mem_bank = w_rec + 2048;
+    const w3 = mem_bank + 1024;
+    const b3 = w3 + 1536;
+    const w_val = b3 + 24;
+    const b_val = w_val + 64;
+    const w_meta = b_val + 1;
+    const b_meta = w_meta + 128;
+
+    var h1: [64]f32 = undefined;
+    var i: usize = 0;
+    while (i < 64) : (i += 1) {
+        var acc: f32 = b1[i];
+        var j: usize = 0;
+        while (j < 16) : (j += 4) {
+            const wv: @Vector(4, f32) = (w1 + i * 16 + j)[0..4].*;
+            const xv: @Vector(4, f32) = (in16 + j)[0..4].*;
+            acc += @reduce(.Add, wv * xv);
+        }
+        h1[i] = fastTanh(acc);
+    }
+
+    // Retrieve episodic context from 32x32 circular memory bank
+    var mem_ctx: [32]f32 = @splat(0.0);
+    var s: usize = 0;
+    while (s < 32) : (s += 1) {
+        var acc_m: f32 = 0.0;
+        var k: usize = 0;
+        while (k < 32) : (k += 4) {
+            const mv: @Vector(4, f32) = (mem_bank + s * 32 + k)[0..4].*;
+            const qv: @Vector(4, f32) = h1[k..][0..4].*;
+            acc_m += @reduce(.Add, mv * qv);
+        }
+        mem_ctx[s] = fastTanh(acc_m * 0.25);
+    }
+
+    var h2: [64]f32 = undefined;
+    var h2_abs_sum: f32 = 0.0;
+    i = 0;
+    while (i < 64) : (i += 1) {
+        var acc: f32 = b2[i];
+        var j: usize = 0;
+        while (j < 64) : (j += 4) {
+            const wv: @Vector(4, f32) = (w2 + i * 64 + j)[0..4].*;
+            const hv: @Vector(4, f32) = h1[j..][0..4].*;
+            acc += @reduce(.Add, wv * hv);
+        }
+        var m: usize = 0;
+        while (m < 32) : (m += 4) {
+            const rv: @Vector(4, f32) = (w_rec + i * 32 + m)[0..4].*;
+            const cv: @Vector(4, f32) = mem_ctx[m..][0..4].*;
+            acc += 0.35 * @reduce(.Add, rv * cv);
+        }
+        const v = fastTanh(acc);
+        h2[i] = v;
+        h2_abs_sum += @abs(v);
+    }
+
+    // Write compressed h2[0..32] into current episodic memory slot
+    const slot: usize = @intCast(mem_slot_inout.* & 31);
+    var k2: usize = 0;
+    while (k2 < 32) : (k2 += 1) {
+        mem_bank[slot * 32 + k2] = 0.85 * mem_bank[slot * 32 + k2] + 0.15 * h2[k2];
+    }
+    mem_slot_inout.* = (mem_slot_inout.* +% 1) & 31;
+
+    // 24-channel motor/aura output
+    var o: usize = 0;
+    while (o < 24) : (o += 1) {
+        var acc: f32 = b3[o];
+        var j: usize = 0;
+        while (j < 64) : (j += 4) {
+            const wv: @Vector(4, f32) = (w3 + o * 64 + j)[0..4].*;
+            const hv: @Vector(4, f32) = h2[j..][0..4].*;
+            acc += @reduce(.Add, wv * hv);
+        }
+        out24[o] = fastTanh(acc);
+    }
+
+    // Value head + 8-dim metacognitive projection
+    var val_acc: f32 = b_val[0];
+    i = 0;
+    while (i < 64) : (i += 4) {
+        const wv: @Vector(4, f32) = (w_val + i)[0..4].*;
+        const hv: @Vector(4, f32) = h2[i..][0..4].*;
+        val_acc += @reduce(.Add, wv * hv);
+    }
+    const v_est = fastTanh(val_acc);
+
+    var meta8: [8]f32 = undefined;
+    var m_idx: usize = 0;
+    while (m_idx < 8) : (m_idx += 1) {
+        var acc: f32 = b_meta[m_idx];
+        var j: usize = 0;
+        while (j < 16) : (j += 4) {
+            const wv: @Vector(4, f32) = (w_meta + m_idx * 16 + j)[0..4].*;
+            const hv: @Vector(4, f32) = h2[j..][0..4].*;
+            acc += @reduce(.Add, wv * hv);
+        }
+        meta8[m_idx] = sigmoid(acc);
+    }
+
+    const arousal = math.clamp(h2_abs_sum / 42.0, 0.05, 0.99);
+    const rea_score = math.clamp(
+        0.55 * meta8[4] + 0.30 * math.clamp(metacog_conf, 0.0, 1.0) + 0.15 * (1.0 / (1.0 + @max(0.0, eshkol_vfe))),
+        0.05,
+        0.99,
+    );
+    const ign_prob = sigmoid(4.5 * (arousal - 0.35));
+
+    stats16[0] = math.clamp(0.5 + 0.5 * v_est, 0.0, 1.0); // VAL
+    stats16[1] = arousal; // ARO
+    stats16[2] = meta8[0]; // DOM
+    stats16[3] = math.clamp(@abs(in16[0] - v_est) * 0.65, 0.0, 1.0); // SUR
+    stats16[4] = meta8[1]; // AGG
+    stats16[5] = meta8[2] * 0.45; // DEC
+    stats16[6] = meta8[3]; // CUR
+    stats16[7] = sigmoid(-2.5 * (arousal - 0.45)); // DRE
+    stats16[8] = math.clamp(0.15 * (1.0 - metacog_conf) + 0.1 * meta8[2], 0.0, 1.0); // HAL
+    stats16[9] = rea_score; // REA (Reasoning!)
+    stats16[10] = meta8[5]; // SAW (Self-Awareness indicator)
+    stats16[11] = meta8[6]; // NOV (Novelty)
+    stats16[12] = ign_prob; // IGN (GWT Ignition)
+    stats16[13] = meta8[7]; // INTG (Integration indicator)
+    stats16[14] = math.clamp(0.5 * meta8[7] + 0.5 * ign_prob, 0.0, 1.0); // PHI (Structural integration proxy, indicatorOnly)
+    stats16[15] = math.clamp(0.5 * metacog_conf + 0.5 * rea_score, 0.0, 1.0); // CONF
+
+    return rea_score;
+}
+
+// (K) Original CQM 51-Parameter `EntityResourceHead` (8 -> 4 -> 3 = 36 + 15 = 51 params)
+// Drives Money ☉ / Credit ☾ / Matter ◇ / Energy ❖ gathering, trading, and hoarding!
+export fn cqm2_entity_resource_head_51_batch(
+    inputs8: [*]const f32, // [count * 8]
+    weights51: [*]const f32, // [count * 51]: w1[32], b1[4], w2[12], b2[3]
+    outputs3: [*]f32, // [count * 3]: [gather_drive, trade_bid, hoard_ratio]
+    count: usize,
+) callconv(.c) void {
+    var e: usize = 0;
+    while (e < count) : (e += 1) {
+        const xb = inputs8 + e * 8;
+        const wb = weights51 + e * 51;
+        const yb = outputs3 + e * 3;
+
+        const x0: @Vector(4, f32) = xb[0..4].*;
+        const x1: @Vector(4, f32) = xb[4..8].*;
+
+        var h4: [4]f32 = undefined;
+        var h: usize = 0;
+        while (h < 4) : (h += 1) {
+            const r0: @Vector(4, f32) = (wb + h * 8)[0..4].*;
+            const r1: @Vector(4, f32) = (wb + h * 8 + 4)[0..4].*;
+            h4[h] = fastTanh(@reduce(.Add, r0 * x0 + r1 * x1) + wb[32 + h]);
+        }
+        const hv: @Vector(4, f32) = h4;
+        const w2 = wb + 36;
+        const b2 = wb + 48;
+        var o: usize = 0;
+        while (o < 3) : (o += 1) {
+            const rv: @Vector(4, f32) = (w2 + o * 4)[0..4].*;
+            yb[o] = sigmoid(@reduce(.Add, rv * hv) + b2[o]);
+        }
+    }
+}
+
+// ============================================================================
 // Native Zig Unit Tests (`zig build test`)
 // ============================================================================
 test "3-qubit Pauli isotropic census & Hoggar QGT hexagon = 63 violated lines" {
@@ -2390,4 +2894,58 @@ test "Original CQM 18-kernel compatibility & v4.0.0 First-Law + BitNet/INT4 + 54
     var out4: [4]f32 = @splat(0.0);
     const td = cqm2_entity_brain_td_lamarck_batch(&in6, &w70, &ph6, &pv1, &rew1, &out4, 1, 0.05, 0.04);
     try std.testing.expect(td > 0.0);
+}
+
+test "v5.0.0 Philox4x32-10, ALife v3.0 11-pool KBN ledger, forked PCI*, CSR guard, 10081-param SuperMind REA & 51-param ResourceHead" {
+    // 1. Philox4x32-10 domain isolation: distinct domain_tag produces distinct deterministic streams in [0, 1)
+    var ph_a: [8]f32 = undefined;
+    var ph_b: [8]f32 = undefined;
+    cqm2_philox4x32_10_batch(0x12345678, 0x9ABCDEF0, 42, 1, 0, &ph_a, 8);
+    cqm2_philox4x32_10_batch(0x12345678, 0x9ABCDEF0, 42, 2, 0, &ph_b, 8);
+    try std.testing.expect(ph_a[0] >= 0.0 and ph_a[0] < 1.0);
+    try std.testing.expect(ph_a[0] != ph_b[0]);
+
+    // 2. ALife v3.0 11-pool closed ledger conservation <= 1e-12 over 1,000 ticks
+    var p13 = [_]f64{ 500.0, 200.0, 40.0, 15.0, 25.0, 80.0, 10.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0 };
+    var step_i: usize = 0;
+    while (step_i < 1000) : (step_i += 1) {
+        const err = cqm2_alife_v3_ledger11_step(&p13, 0.35, 0.22, 0.05, 0.03, 0.02, 0.04, 0.01, 0.005);
+        try std.testing.expect(err <= 1e-12);
+    }
+
+    // 3. Forked-snapshot PCI* LZ76 is non-destructive on live_state
+    const live_s = [_]f32{ 0.2, -0.3, 0.5, -0.1, 0.4, -0.2, 0.1, 0.3 };
+    var coup: [64]f32 = @splat(0.0);
+    var k: usize = 0;
+    while (k < 8) : (k += 1) coup[k * 8 + ((k + 1) % 8)] = 0.85;
+    const pci = cqm2_pci_lz_forked_snapshot(&live_s, &coup, 8, 0, 1.2, 16);
+    try std.testing.expect(pci >= 0.0 and pci <= 1.0);
+    try std.testing.expectApproxEqAbs(@as(f32, 0.2), live_s[0], 1e-7);
+
+    // 4. CSR spectral guard clamps 2x2 diagonal matrix with singular value 2.5 down to <= 0.99
+    const rp = [_]u32{ 0, 1, 2 };
+    const ci = [_]u32{ 0, 1 };
+    var vals = [_]f32{ 2.5, 2.5 };
+    var uvec = [_]f32{ 0.70710678, 0.70710678 };
+    var sv: [2]f32 = undefined;
+    const clamped_sigma = cqm2_spectral_guard_csr_step(2, &rp, &ci, &vals, &uvec, &sv, 0.99);
+    try std.testing.expectApproxEqAbs(@as(f32, 0.99), clamped_sigma, 1e-4);
+    try std.testing.expect(vals[0] <= 1.0);
+
+    // 5. 10,081-param SuperMind outputs valid 16 cognitive stats including REA (stats16[9])
+    var sm_in: [16]f32 = @splat(0.25);
+    var sm_w: [10081]f32 = @splat(0.02);
+    var mem_slot: u32 = 0;
+    var sm_out24: [24]f32 = undefined;
+    var sm_stats16: [16]f32 = undefined;
+    const rea = cqm2_super_mind_10k_step(&sm_in, &sm_w, &mem_slot, 0.18, 0.88, &sm_out24, &sm_stats16);
+    try std.testing.expect(rea >= 0.05 and rea <= 0.99);
+    try std.testing.expectApproxEqAbs(rea, sm_stats16[9], 1e-6);
+
+    // 6. 51-param EntityResourceHead outputs bounded [0, 1] economic bids
+    var er_in = [_]f32{ 0.5, -0.2, 0.8, 0.1, -0.4, 0.3, 0.6, -0.1 };
+    var er_w: [51]f32 = @splat(0.15);
+    var er_out: [3]f32 = undefined;
+    cqm2_entity_resource_head_51_batch(&er_in, &er_w, &er_out, 1);
+    try std.testing.expect(er_out[0] > 0.0 and er_out[0] < 1.0);
 }
